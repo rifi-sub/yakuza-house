@@ -9,6 +9,8 @@ import AdminPanel from './components/AdminPanel';
 import LegalModal from './components/LegalModal';
 import { Sparkles, Crown, ShieldCheck, ShoppingBag, Eye, Lock, ArrowRight, Heart, Flame, MessageCircle } from 'lucide-react';
 
+import { API_BASE } from './config';
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('fetish'); // fetish, princess, findreamland, howtoorder, admin
   const [items, setItems] = useState([]);
@@ -36,9 +38,10 @@ export default function App() {
   // Fetch Items from backend
   const fetchItems = () => {
     setLoadingItems(true);
-    fetch('/api/store/items')
+    fetch(`${API_BASE}/api/store/items`)
       .then(res => res.json())
       .then(data => {
+
         if (Array.isArray(data)) {
           setItems(data);
         }

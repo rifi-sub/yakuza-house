@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, ArrowRight, ArrowLeft, ShieldCheck, Lock, CreditCard, Send, Sparkles, AlertCircle, HelpCircle, Package, Truck } from 'lucide-react';
+import { API_BASE } from '../config';
 
 export default function CheckoutModal({ item, onClose, onOrderComplete }) {
+
+
   if (!item) return null;
 
   // Step state: 1 = Modalidad, 2 = Extras & Packaging, 3 = Contact & Payment
@@ -64,14 +67,14 @@ export default function CheckoutModal({ item, onClose, onOrderComplete }) {
 
   // Fetch Extras & Packaging from backend
   useEffect(() => {
-    fetch(`/api/store/extras?itemId=${item.id}`)
+    fetch(`${API_BASE}/api/store/extras?itemId=${item.id}`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setAvailableExtras(data);
       })
       .catch(() => {});
 
-    fetch('/api/store/packaging')
+    fetch(`${API_BASE}/api/store/packaging`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -81,6 +84,7 @@ export default function CheckoutModal({ item, onClose, onOrderComplete }) {
       })
       .catch(() => {});
   }, [item.id]);
+
 
   // Calculate Prices in real time
   const tierPrice = selectedTier ? selectedTier.price : item.basePrice;
@@ -155,7 +159,7 @@ export default function CheckoutModal({ item, onClose, onOrderComplete }) {
         acceptedTerms
       };
 
-      const res = await fetch('/api/store/orders', {
+      const res = await fetch(`${API_BASE}/api/store/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -168,12 +172,13 @@ export default function CheckoutModal({ item, onClose, onOrderComplete }) {
 
       // Automatically confirm payment simulation or trigger Stripe
       if (paymentMethod === 'STRIPE_CARD' || paymentMethod === 'BIZUM') {
-        await fetch(`/api/store/orders/${data.orderNumber}/confirm-payment`, {
+        await fetch(`${API_BASE}/api/store/orders/${data.orderNumber}/confirm-payment`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ paymentMethod, transactionId: `TXN_${Date.now()}` })
         });
       }
+
 
       onOrderComplete(data.orderNumber);
     } catch (err) {
