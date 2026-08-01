@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Plus, Edit, Trash2, Eye, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X } from 'lucide-react';
+import { API_BASE } from '../config';
 
 export default function AdminPanel({ onBackToStore }) {
+
   const [token, setToken] = useState(localStorage.getItem('yakuza_admin_token') || '');
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
@@ -75,7 +77,7 @@ export default function AdminPanel({ onBackToStore }) {
     e.preventDefault();
     setLoginError('');
     try {
-      const res = await fetch('/api/portfolio/auth/login', {
+      const res = await fetch(`${API_BASE}/api/portfolio/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailInput, password: passwordInput })
@@ -103,10 +105,10 @@ export default function AdminPanel({ onBackToStore }) {
     const headers = { Authorization: `Bearer ${token}` };
 
     Promise.all([
-      fetch('/api/store/admin/orders', { headers }).then(r => r.json()),
-      fetch('/api/store/admin/items', { headers }).then(r => r.json()),
-      fetch('/api/store/admin/extras', { headers }).then(r => r.json()),
-      fetch('/api/store/admin/packaging', { headers }).then(r => r.json())
+      fetch(`${API_BASE}/api/store/admin/orders`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE}/api/store/admin/items`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE}/api/store/admin/extras`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE}/api/store/admin/packaging`, { headers }).then(r => r.json())
     ])
       .then(([ordersData, itemsData, extrasData, packagingData]) => {
         if (Array.isArray(ordersData)) setOrders(ordersData);
@@ -129,8 +131,9 @@ export default function AdminPanel({ onBackToStore }) {
   const handleSeedDefault = async () => {
     if (!confirm('¿Deseas inicializar los datos por defecto (artículos, extras y embalajes)?')) return;
     try {
-      const res = await fetch('/api/store/admin/seed-default', {
+      const res = await fetch(`${API_BASE}/api/store/admin/seed-default`, {
         method: 'POST',
+
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -153,7 +156,7 @@ export default function AdminPanel({ onBackToStore }) {
     }
 
     try {
-      const res = await fetch('/api/store/admin/media/upload', {
+      const res = await fetch(`${API_BASE}/api/store/admin/media/upload`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData
@@ -194,7 +197,7 @@ export default function AdminPanel({ onBackToStore }) {
   // Update Order Status
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     try {
-      const res = await fetch(`/api/store/admin/orders/${orderId}/status`, {
+      const res = await fetch(`${API_BASE}/api/store/admin/orders/${orderId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -219,7 +222,7 @@ export default function AdminPanel({ onBackToStore }) {
   const handleSaveItem = async (e) => {
     e.preventDefault();
     try {
-      const url = editingItem?.id ? `/api/store/admin/items/${editingItem.id}` : '/api/store/admin/items';
+      const url = editingItem?.id ? `${API_BASE}/api/store/admin/items/${editingItem.id}` : `${API_BASE}/api/store/admin/items`;
       const method = editingItem?.id ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -243,7 +246,7 @@ export default function AdminPanel({ onBackToStore }) {
   const handleDeleteItem = async (id) => {
     if (!confirm('¿Seguro que deseas eliminar este artículo?')) return;
     try {
-      await fetch(`/api/store/admin/items/${id}`, {
+      await fetch(`${API_BASE}/api/store/admin/items/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -257,7 +260,7 @@ export default function AdminPanel({ onBackToStore }) {
   const handleSaveExtra = async (e) => {
     e.preventDefault();
     try {
-      const url = editingExtra?.id ? `/api/store/admin/extras/${editingExtra.id}` : '/api/store/admin/extras';
+      const url = editingExtra?.id ? `${API_BASE}/api/store/admin/extras/${editingExtra.id}` : `${API_BASE}/api/store/admin/extras`;
       const method = editingExtra?.id ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -281,7 +284,7 @@ export default function AdminPanel({ onBackToStore }) {
   const handleDeleteExtra = async (id) => {
     if (!confirm('¿Seguro que deseas eliminar este extra?')) return;
     try {
-      await fetch(`/api/store/admin/extras/${id}`, {
+      await fetch(`${API_BASE}/api/store/admin/extras/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -295,7 +298,7 @@ export default function AdminPanel({ onBackToStore }) {
   const handleSavePackaging = async (e) => {
     e.preventDefault();
     try {
-      const url = editingPackaging?.id ? `/api/store/admin/packaging/${editingPackaging.id}` : '/api/store/admin/packaging';
+      const url = editingPackaging?.id ? `${API_BASE}/api/store/admin/packaging/${editingPackaging.id}` : `${API_BASE}/api/store/admin/packaging`;
       const method = editingPackaging?.id ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -319,7 +322,7 @@ export default function AdminPanel({ onBackToStore }) {
   const handleDeletePackaging = async (id) => {
     if (!confirm('¿Seguro que deseas eliminar esta opción de embalaje?')) return;
     try {
-      await fetch(`/api/store/admin/packaging/${id}`, {
+      await fetch(`${API_BASE}/api/store/admin/packaging/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -328,6 +331,7 @@ export default function AdminPanel({ onBackToStore }) {
       alert('Error al eliminar opción de embalaje');
     }
   };
+
 
   // Login Form View if unauthenticated
   if (!token) {
