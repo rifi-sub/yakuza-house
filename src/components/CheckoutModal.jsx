@@ -170,17 +170,22 @@ export default function CheckoutModal({ item, onClose, onOrderComplete }) {
         throw new Error(data.error || 'Error al procesar el pedido.');
       }
 
-      // Automatically confirm payment simulation or trigger Stripe
-      if (paymentMethod === 'STRIPE_CARD' || paymentMethod === 'BIZUM') {
-        await fetch(`${API_BASE}/api/store/orders/${data.orderNumber}/confirm-payment`, {
+      // Si el método de pago es Stripe (Tarjeta/ApplePay), redirigir automáticamente a la pasarela de Stripe
+      if (paymentMethod === 'STRIPE_CARD') {
+        const stripeRes = await fetch(`${API_BASE}/api/store/orders/${data.orderNumber}/create-checkout-session`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ paymentMethod, transactionId: `TXN_${Date.now()}` })
+          body: JSON.stringify({ origin: window.location.href })
         });
+        const stripeData = await stripeRes.json();
+        if (stripeRes.ok && stripeData.url) {
+          window.location.href = stripeData.url;
+          return;
+        }
       }
 
-
       onOrderComplete(data.orderNumber);
+
     } catch (err) {
       console.error(err);
       setErrorMessage(err.message || 'Ocurrió un error al enviar el pedido.');

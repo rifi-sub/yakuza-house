@@ -52,7 +52,16 @@ export default function App() {
 
   useEffect(() => {
     fetchItems();
+
+    // Comprobar retorno de Stripe Checkout
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderSuccess = urlParams.get('orderSuccess');
+    if (orderSuccess) {
+      setConfirmedOrderNumber(orderSuccess);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, []);
+
 
   // Filter items by category/code prefix if needed
   const riaItems = items.filter(i => i.code && i.code.startsWith('RIA'));
