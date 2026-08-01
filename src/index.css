@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #070709;
+    color: #e2e8f0;
+    overflow-x: hidden;
+  }
+
+  input, textarea, select {
+    background-color: #0b0b0e !important;
+    color: #ffffff !important;
+    caret-color: #e63946;
+  }
+
+  option {
+    background-color: #0b0b0e !important;
+    color: #ffffff !important;
+  }
+
+  /* Solución para el autocompletado del navegador (autofill) */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus,
+  select:-webkit-autofill,
+  select:-webkit-autofill:hover,
+  select:-webkit-autofill:focus {
+    -webkit-text-fill-color: #ffffff !important;
+    -webkit-box-shadow: 0 0 0px 1000px #0b0b0e inset !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+}
+
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0b0e;
+}
+::-webkit-scrollbar-thumb {
+  background: #9b111e;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #e63946;
+}
+
+/* Glassmorphism Styles */
+.glass-panel {
+  background: rgba(23, 23, 34, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(230, 57, 70, 0.15);
+}
+
+.glass-panel-gold {
+  background: rgba(23, 23, 34, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.glass-modal {
+  background: rgba(11, 11, 16, 0.95);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(230, 57, 70, 0.25);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(230, 57, 70, 0.15);
+}
+
+/* Glowing animation */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(230, 57, 70, 0.3), inset 0 0 15px rgba(230, 57, 70, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(230, 57, 70, 0.6), inset 0 0 25px rgba(230, 57, 70, 0.2);
+  }
+}
+
+.glow-crimson {
+  animation: pulse-glow 3s infinite ease-in-out;
+}
+
+.text-gold-gradient {
+  background: linear-gradient(135deg, #f4d068 0%, #d4af37 50%, #aa8c2c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-crimson-gradient {
+  background: linear-gradient(135deg, #ff4d5a 0%, #e63946 50%, #9b111e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
