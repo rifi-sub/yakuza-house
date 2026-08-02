@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShoppingCart, Eye, ShieldCheck, Sparkles } from 'lucide-react';
+import { resolveMediaUrl } from '../config';
 
 export default function ItemCard({ item, onBuyNow, onViewDetails }) {
   // Parsear imágenes si es JSON string
@@ -10,7 +11,7 @@ export default function ItemCard({ item, onBuyNow, onViewDetails }) {
     imageList = [];
   }
 
-  const mainImage = imageList[0] || 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=600&q=80';
+  const mainImage = resolveMediaUrl(imageList[0]) || 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=600&q=80';
 
   const isAvailable = item.status === 'AVAILABLE' || !item.status;
 

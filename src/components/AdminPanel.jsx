@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Plus, Edit, Trash2, Eye, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X } from 'lucide-react';
-import { API_BASE } from '../config';
+import { API_BASE, resolveMediaUrl } from '../config';
 
 export default function AdminPanel({ onBackToStore }) {
 
@@ -579,7 +579,7 @@ export default function AdminPanel({ onBackToStore }) {
               } catch {
                 imageList = [];
               }
-              const cover = imageList[0] || 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=400&q=80';
+              const cover = resolveMediaUrl(imageList[0]) || 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=400&q=80';
 
               return (
                 <div key={item.id} className="glass-panel p-5 rounded-xl border border-gray-800 space-y-3 flex flex-col justify-between">
@@ -886,7 +886,7 @@ export default function AdminPanel({ onBackToStore }) {
                   <div className="flex gap-2 overflow-x-auto pt-2">
                     {itemForm.images.map((img, i) => (
                       <div key={i} className="relative w-16 h-16 rounded border border-gray-700 overflow-hidden flex-shrink-0 group">
-                        <img src={img} alt="" className="w-full h-full object-cover" />
+                        <img src={resolveMediaUrl(img)} alt="" className="w-full h-full object-cover" />
                         <button
                           type="button"
                           onClick={() => handleRemoveImage(i)}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, ShoppingCart, ShieldAlert, CheckCircle2, Lock, Sparkles, Clock, Package } from 'lucide-react';
+import { resolveMediaUrl } from '../config';
 
 export default function ItemDetailModal({ item, onClose, onBuyNow }) {
   if (!item) return null;
@@ -10,6 +11,8 @@ export default function ItemDetailModal({ item, onClose, onBuyNow }) {
   } catch {
     imageList = [];
   }
+  // Resolver URLs relativas al backend
+  imageList = imageList.map(resolveMediaUrl);
   if (imageList.length === 0) {
     imageList = ['https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=1000&q=80'];
   }
