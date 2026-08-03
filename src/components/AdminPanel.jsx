@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Package, Plus, Edit, Trash2, Eye, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Package, Plus, Edit, Trash2, Eye, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart } from 'lucide-react';
 import { API_BASE, resolveMediaUrl } from '../config';
+import princessVideo from '../princess-yakuza.mp4';
 
 export default function AdminPanel({ onBackToStore }) {
 
@@ -57,6 +58,10 @@ export default function AdminPanel({ onBackToStore }) {
   // Order Details Modal State
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [internalNotesInput, setInternalNotesInput] = useState('');
+
+  // Easter Egg state
+  const [easterEggOpen, setEasterEggOpen] = useState(false);
+  const videoRef = useRef(null);
 
   const orderStatuses = [
     'PAGO_PENDIENTE',
@@ -1174,6 +1179,203 @@ export default function AdminPanel({ onBackToStore }) {
           </div>
         </div>
       )}
+
+      {/* ═══ PRINCESA YAKUZA EASTER EGG ═══ */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 9999,
+          transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+          ...(easterEggOpen
+            ? {
+                width: '320px',
+                borderRadius: '16px',
+                background: 'rgba(11, 11, 16, 0.97)',
+                backdropFilter: 'blur(24px)',
+                WebkitBackdropFilter: 'blur(24px)',
+                border: '1px solid rgba(212, 175, 55, 0.35)',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(212, 175, 55, 0.15), 0 0 80px rgba(230, 57, 70, 0.08)',
+                overflow: 'hidden',
+              }
+            : {
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                background: 'rgba(11, 11, 16, 0.85)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid rgba(212, 175, 55, 0.2)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.5), 0 0 15px rgba(212, 175, 55, 0.08)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }),
+        }}
+        onClick={() => {
+          if (!easterEggOpen) {
+            setEasterEggOpen(true);
+            setTimeout(() => {
+              if (videoRef.current) videoRef.current.play();
+            }, 600);
+          }
+        }}
+        title={!easterEggOpen ? '👑' : undefined}
+      >
+        {!easterEggOpen ? (
+          <span
+            style={{
+              fontSize: '18px',
+              opacity: 0.6,
+              transition: 'opacity 0.3s, transform 0.3s',
+              display: 'block',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.transform = 'scale(1.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0.6';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            👑
+          </span>
+        ) : (
+          <div style={{ padding: '0' }}>
+            {/* Close button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setEasterEggOpen(false);
+                if (videoRef.current) {
+                  videoRef.current.pause();
+                  videoRef.current.currentTime = 0;
+                }
+              }}
+              style={{
+                position: 'absolute',
+                top: '8px',
+                right: '8px',
+                zIndex: 10,
+                background: 'rgba(0,0,0,0.6)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '50%',
+                width: '24px',
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'rgba(255,255,255,0.6)',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#fff';
+                e.currentTarget.style.background = 'rgba(230, 57, 70, 0.6)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
+                e.currentTarget.style.background = 'rgba(0,0,0,0.6)';
+              }}
+            >
+              <X style={{ width: '12px', height: '12px' }} />
+            </button>
+
+            {/* Video */}
+            <video
+              ref={videoRef}
+              src={princessVideo}
+              loop
+              muted
+              playsInline
+              style={{
+                width: '100%',
+                aspectRatio: '16 / 9',
+                objectFit: 'cover',
+                display: 'block',
+                borderRadius: '16px 16px 0 0',
+              }}
+            />
+
+            {/* Dedication text */}
+            <div
+              style={{
+                padding: '12px 16px 14px',
+                textAlign: 'center',
+                borderTop: '1px solid rgba(212, 175, 55, 0.15)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  marginBottom: '6px',
+                }}
+              >
+                <Heart
+                  style={{
+                    width: '12px',
+                    height: '12px',
+                    color: '#e63946',
+                    fill: '#e63946',
+                    animation: 'princess-heartbeat 1.5s ease-in-out infinite',
+                  }}
+                />
+                <span
+                  style={{
+                    fontFamily: 'serif',
+                    fontSize: '10px',
+                    letterSpacing: '2px',
+                    textTransform: 'uppercase',
+                    color: 'rgba(212, 175, 55, 0.5)',
+                  }}
+                >
+                  dedicado con amor
+                </span>
+                <Heart
+                  style={{
+                    width: '12px',
+                    height: '12px',
+                    color: '#e63946',
+                    fill: '#e63946',
+                    animation: 'princess-heartbeat 1.5s ease-in-out infinite',
+                    animationDelay: '0.3s',
+                  }}
+                />
+              </div>
+              <p
+                style={{
+                  fontFamily: 'serif',
+                  fontStyle: 'italic',
+                  fontSize: '13px',
+                  lineHeight: '1.5',
+                  background: 'linear-gradient(135deg, #f4d068 0%, #d4af37 50%, #aa8c2c 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  margin: 0,
+                }}
+              >
+                Para la maravillosa, increíble y perfecta Princesa Yakuza
+              </p>
+              <span style={{ fontSize: '14px', marginTop: '4px', display: 'block' }}>👑</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <style>{`
+        @keyframes princess-heartbeat {
+          0%, 100% { transform: scale(1); }
+          15% { transform: scale(1.3); }
+          30% { transform: scale(1); }
+          45% { transform: scale(1.2); }
+        }
+      `}</style>
 
     </div>
   );
