@@ -10,14 +10,29 @@ export default function AdminPanel({ onBackToStore }) {
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  const [activeTab, setActiveTab] = useState('orders'); // orders, items, extras, packaging
+  const [activeTab, setActiveTab] = useState('orders'); // orders, items, categories, reviews, banner, extras, packaging
 
   // Data states
   const [orders, setOrders] = useState([]);
   const [items, setItems] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [banner, setBanner] = useState({ badge: '', title: '', subtitle: '', bgImageUrl: '', buttonText: '' });
   const [extras, setExtras] = useState([]);
   const [packaging, setPackaging] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Drag & drop state
+  const [draggedItemIndex, setDraggedItemIndex] = useState(null);
+  const [draggedCategoryIndex, setDraggedCategoryIndex] = useState(null);
+
+  // Edit Category Modal State
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [categoryForm, setCategoryForm] = useState({ name: '', slug: '', description: '', active: true, order: 0 });
+
+  // Edit Review Modal State
+  const [editingReview, setEditingReview] = useState(null);
+  const [reviewForm, setReviewForm] = useState({ itemId: '', author: '', rating: 5, text: '', active: true, mediaUrls: [] });
 
   // Edit Item Modal State
   const [editingItem, setEditingItem] = useState(null);
@@ -29,6 +44,8 @@ export default function AdminPanel({ onBackToStore }) {
     basePrice: 50,
     status: 'AVAILABLE',
     stock: 1,
+    categoryId: '',
+    featured: false,
     images: []
   });
   const [newImageUrl, setNewImageUrl] = useState('');
@@ -112,12 +129,18 @@ export default function AdminPanel({ onBackToStore }) {
     Promise.all([
       fetch(`${API_BASE}/api/store/admin/orders`, { headers }).then(r => r.json()),
       fetch(`${API_BASE}/api/store/admin/items`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE}/api/store/admin/categories`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE}/api/store/admin/item-reviews`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE}/api/store/banner`).then(r => r.json()),
       fetch(`${API_BASE}/api/store/admin/extras`, { headers }).then(r => r.json()),
       fetch(`${API_BASE}/api/store/admin/packaging`, { headers }).then(r => r.json())
     ])
-      .then(([ordersData, itemsData, extrasData, packagingData]) => {
+      .then(([ordersData, itemsData, categoriesData, reviewsData, bannerData, extrasData, packagingData]) => {
         if (Array.isArray(ordersData)) setOrders(ordersData);
         if (Array.isArray(itemsData)) setItems(itemsData);
+        if (Array.isArray(categoriesData)) setCategories(categoriesData);
+        if (Array.isArray(reviewsData)) setReviews(reviewsData);
+        if (bannerData && typeof bannerData === 'object') setBanner(bannerData);
         if (Array.isArray(extrasData)) setExtras(extrasData);
         if (Array.isArray(packagingData)) setPackaging(packagingData);
         setLoading(false);
@@ -324,16 +347,159 @@ export default function AdminPanel({ onBackToStore }) {
     }
   };
 
-  const handleDeletePackaging = async (id) => {
-    if (!confirm('¿Seguro que deseas eliminar esta opción de embalaje?')) return;
+  // Category Save / Delete / Reorder
+  const handleSaveCategory = async (e) => {
+    e.preventDefault();
     try {
-      await fetch(`${API_BASE}/api/store/admin/packaging/${id}`, {
+      const url = editingCategory?.id ? `${API_BASE}/api/store/admin/categories/${editingCategory.id}` : `${API_BASE}/api/store/admin/categories`;
+      const method = editingCategory?.id ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(categoryForm)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error guardando categoría');
+      setEditingCategory(null);
+      fetchAllData();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteCategory = async (id) => {
+    if (!confirm('¿Seguro que deseas eliminar esta categoría?')) return;
+    try {
+      await fetch(`${API_BASE}/api/store/admin/categories/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchAllData();
     } catch (err) {
-      alert('Error al eliminar opción de embalaje');
+      alert('Error al eliminar categoría');
+    }
+  };
+
+  const handleCategoryDrop = async (dropIndex) => {
+    if (draggedCategoryIndex === null || draggedCategoryIndex === dropIndex) return;
+    const next = [...categories];
+    const [moved] = next.splice(draggedCategoryIndex, 1);
+    next.splice(dropIndex, 0, moved);
+    setCategories(next);
+    setDraggedCategoryIndex(null);
+    try {
+      await fetch(`${API_BASE}/api/store/admin/categories/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ items: next.map((cat, order) => ({ id: cat.id, order })) })
+      });
+    } catch (e) {
+      alert('Error reordenando categorías');
+    }
+  };
+
+  // Item Drop Reorder
+  const handleItemDrop = async (dropIndex) => {
+    if (draggedItemIndex === null || draggedItemIndex === dropIndex) return;
+    const next = [...items];
+    const [moved] = next.splice(draggedItemIndex, 1);
+    next.splice(dropIndex, 0, moved);
+    setItems(next);
+    setDraggedItemIndex(null);
+    try {
+      await fetch(`${API_BASE}/api/store/admin/items/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ items: next.map((it, order) => ({ id: it.id, order })) })
+      });
+    } catch (e) {
+      alert('Error reordenando artículos');
+    }
+  };
+
+  // Item Media Upload (Photos & Videos up to 200MB)
+  const handleItemMediaUpload = async (itemId, files) => {
+    if (!files || files.length === 0) return;
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append('files', files[i]);
+    }
+    try {
+      const res = await fetch(`${API_BASE}/api/store/admin/items/${itemId}/media`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error subiendo multimedia');
+      alert('Multimedia subida correctamente');
+      fetchAllData();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteItemMedia = async (itemId, mediaId) => {
+    if (!confirm('¿Eliminar este elemento multimedia?')) return;
+    try {
+      await fetch(`${API_BASE}/api/store/admin/items/${itemId}/media/${mediaId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchAllData();
+    } catch (err) {
+      alert('Error al eliminar multimedia');
+    }
+  };
+
+  // Reviews Save / Delete
+  const handleSaveReview = async (e) => {
+    e.preventDefault();
+    try {
+      const url = editingReview?.id ? `${API_BASE}/api/store/admin/item-reviews/${editingReview.id}` : `${API_BASE}/api/store/admin/items/${reviewForm.itemId}/reviews`;
+      const method = editingReview?.id ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(reviewForm)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error guardando reseña');
+      setEditingReview(null);
+      fetchAllData();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteReview = async (id) => {
+    if (!confirm('¿Seguro que deseas eliminar esta reseña?')) return;
+    try {
+      await fetch(`${API_BASE}/api/store/admin/item-reviews/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchAllData();
+    } catch (err) {
+      alert('Error al eliminar reseña');
+    }
+  };
+
+  // Banner Save
+  const handleSaveBanner = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE}/api/store/admin/banner`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(banner)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error guardando portada');
+      alert('Portada / Banner del Hero actualizado correctamente.');
+      fetchAllData();
+    } catch (err) {
+      alert(err.message);
     }
   };
 
@@ -427,7 +593,7 @@ export default function AdminPanel({ onBackToStore }) {
       <div className="flex items-center gap-2 mb-6 border-b border-gray-800 overflow-x-auto pb-2 font-mono text-xs">
         <button
           onClick={() => setActiveTab('orders')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all ${
+          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
             activeTab === 'orders' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
           }`}
         >
@@ -436,29 +602,56 @@ export default function AdminPanel({ onBackToStore }) {
 
         <button
           onClick={() => setActiveTab('items')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all ${
+          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
             activeTab === 'items' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
           }`}
         >
-          Artículos y Fotos ({items.length})
+          Artículos & Drag/Drop ({items.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('categories')}
+          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
+            activeTab === 'categories' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Categorías ({categories.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('reviews')}
+          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
+            activeTab === 'reviews' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Reseñas & Fotos ({reviews.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('banner')}
+          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
+            activeTab === 'banner' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Portada / Hero
         </button>
 
         <button
           onClick={() => setActiveTab('extras')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all ${
+          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
             activeTab === 'extras' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
           }`}
         >
-          Extras Configurables ({extras.length})
+          Extras ({extras.length})
         </button>
 
         <button
           onClick={() => setActiveTab('packaging')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all ${
+          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
             activeTab === 'packaging' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
           }`}
         >
-          Embalaje y Entrega ({packaging.length})
+          Embalaje ({packaging.length})
         </button>
       </div>
 
@@ -550,11 +743,14 @@ export default function AdminPanel({ onBackToStore }) {
         </div>
       )}
 
-      {/* TAB 2: ITEMS & CONDITIONS EDITOR */}
+      {/* TAB 2: ITEMS & CONDITIONS EDITOR WITH DRAG & DROP */}
       {activeTab === 'items' && (
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="font-sans font-bold text-lg text-white">Artículos, Fotografías y Condiciones</h3>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h3 className="font-sans font-bold text-lg text-white">Artículos y Drag & Drop</h3>
+              <p className="text-xs text-gray-400">Arrastra y suelta las tarjetas para reordenar los productos en la tienda en tiempo real.</p>
+            </div>
             <button
               onClick={() => {
                 setEditingItem({});
@@ -566,6 +762,8 @@ export default function AdminPanel({ onBackToStore }) {
                   basePrice: 60,
                   status: 'AVAILABLE',
                   stock: 1,
+                  categoryId: '',
+                  featured: false,
                   images: []
                 });
               }}
@@ -577,28 +775,41 @@ export default function AdminPanel({ onBackToStore }) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map(item => {
+            {items.map((item, index) => {
               let imageList = [];
               try {
                 imageList = typeof item.images === 'string' ? JSON.parse(item.images) : (item.images || []);
               } catch {
                 imageList = [];
               }
-              const cover = resolveMediaUrl(imageList[0]) || 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=400&q=80';
+              const coverMedia = item.media?.find(m => m.isCover) || item.media?.[0];
+              const cover = coverMedia ? resolveMediaUrl(coverMedia.url) : (resolveMediaUrl(imageList[0]) || 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=400&q=80');
 
               return (
-                <div key={item.id} className="glass-panel p-5 rounded-xl border border-gray-800 space-y-3 flex flex-col justify-between">
+                <div
+                  key={item.id}
+                  draggable
+                  onDragStart={() => setDraggedItemIndex(index)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => handleItemDrop(index)}
+                  className="glass-panel p-5 rounded-xl border border-gray-800 space-y-3 flex flex-col justify-between cursor-grab active:cursor-grabbing hover:border-crimson-500/40 transition-all"
+                >
                   <div>
                     <div className="relative aspect-video rounded-lg overflow-hidden bg-dark-950 mb-3 border border-gray-800">
                       <img src={cover} alt="" className="w-full h-full object-cover" />
                       <div className="absolute top-2 left-2 bg-crimson-600/90 text-white font-mono text-[10px] font-bold px-2 py-0.5 rounded">
-                        {item.code}
+                        #{index + 1} | {item.code}
                       </div>
                       <div className="absolute bottom-2 right-2 bg-dark-900/90 px-2 py-0.5 rounded text-gold-400 font-bold font-mono text-xs">
                         {item.basePrice}€
                       </div>
                     </div>
 
+                    {item.category && (
+                      <span className="text-[10px] font-mono text-gold-400 uppercase tracking-widest block mb-1">
+                        {item.category.name}
+                      </span>
+                    )}
                     <h4 className="font-sans font-bold text-base text-white">{item.name}</h4>
                     <p className="text-xs text-gray-400 line-clamp-2 mt-1">{item.description}</p>
                   </div>
@@ -624,6 +835,8 @@ export default function AdminPanel({ onBackToStore }) {
                             basePrice: item.basePrice,
                             status: item.status,
                             stock: item.stock || 1,
+                            categoryId: item.categoryId || '',
+                            featured: Boolean(item.featured),
                             images: imageList
                           });
                         }}
@@ -638,6 +851,218 @@ export default function AdminPanel({ onBackToStore }) {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* TAB: CATEGORÍAS */}
+      {activeTab === 'categories' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="font-sans font-bold text-lg text-white">Categorías de la Tienda</h3>
+              <p className="text-xs text-gray-400">Organiza tus productos por categorías temáticas (Prints, Marcapáginas, Stickers, RIA, etc.).</p>
+            </div>
+            <button
+              onClick={() => {
+                setEditingCategory({});
+                setCategoryForm({ name: '', slug: '', description: '', active: true, order: categories.length });
+              }}
+              className="py-2 px-4 rounded-xl bg-crimson-600 hover:bg-crimson-500 text-white font-sans font-bold text-xs uppercase tracking-wider flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Nueva Categoría
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {categories.map((cat, index) => (
+              <div
+                key={cat.id}
+                draggable
+                onDragStart={() => setDraggedCategoryIndex(index)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => handleCategoryDrop(index)}
+                className="glass-panel p-5 rounded-xl border border-gray-800 space-y-3 flex flex-col justify-between cursor-grab active:cursor-grabbing hover:border-gold-500/40"
+              >
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-mono text-gold-400 bg-gold-500/10 px-2 py-0.5 rounded border border-gold-500/20">
+                      Orden #{index + 1}
+                    </span>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${cat.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-800 text-gray-500'}`}>
+                      {cat.active ? 'Activa' : 'Oculta'}
+                    </span>
+                  </div>
+                  <h4 className="font-sans font-bold text-base text-white">{cat.name}</h4>
+                  <p className="text-xs text-gray-400 font-mono mt-1">Slug: /{cat.slug}</p>
+                  {cat.description && <p className="text-xs text-gray-300 mt-2">{cat.description}</p>}
+                </div>
+
+                <div className="pt-3 border-t border-gray-800 flex justify-between items-center">
+                  <span className="text-[10px] font-mono text-gray-500">{cat._count?.items ?? 0} artículos</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleDeleteCategory(cat.id)}
+                      className="p-1.5 rounded-lg bg-dark-900 border border-gray-800 text-gray-400 hover:text-red-400"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingCategory(cat);
+                        setCategoryForm({
+                          name: cat.name,
+                          slug: cat.slug,
+                          description: cat.description || '',
+                          active: cat.active,
+                          order: cat.order || 0
+                        });
+                      }}
+                      className="py-1.5 px-3 rounded-lg bg-dark-900 border border-gray-700 text-xs font-mono text-gray-300 hover:text-white flex items-center gap-1.5"
+                    >
+                      <Edit className="w-3.5 h-3.5 text-gold-400" />
+                      Editar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: RESEÑAS Y VALORACIONES */}
+      {activeTab === 'reviews' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="font-sans font-bold text-lg text-white">Reseñas y Valoraciones de Clientes</h3>
+              <p className="text-xs text-gray-400">Gestiona las valoraciones con estrellas (1-5), testimonios y fotos/vídeos demostrativos.</p>
+            </div>
+            <button
+              onClick={() => {
+                setEditingReview({});
+                setReviewForm({ itemId: items[0]?.id || '', author: '', rating: 5, text: '', active: true, mediaUrls: [] });
+              }}
+              className="py-2 px-4 rounded-xl bg-crimson-600 hover:bg-crimson-500 text-white font-sans font-bold text-xs uppercase tracking-wider flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Nueva Reseña
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {reviews.map(rev => (
+              <div key={rev.id} className="glass-panel p-5 rounded-xl border border-gray-800 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-sans font-bold text-sm text-white">{rev.author}</h4>
+                    <span className="text-[10px] font-mono text-gold-400 block">{rev.item?.name || 'Artículo'}</span>
+                  </div>
+                  <div className="flex items-center text-gold-400">
+                    {[1, 2, 3, 4, 5].map(s => (
+                      <span key={s} className={s <= rev.rating ? 'text-gold-400 font-bold' : 'text-gray-700'}>★</span>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-gray-300 leading-relaxed">{rev.text}</p>
+                <div className="pt-3 border-t border-gray-800 flex justify-between items-center">
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${rev.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-800 text-gray-500'}`}>
+                    {rev.active ? 'Visible' : 'Oculta'}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleDeleteReview(rev.id)}
+                      className="p-1.5 rounded-lg bg-dark-900 border border-gray-800 text-gray-400 hover:text-red-400"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingReview(rev);
+                        setReviewForm({
+                          itemId: rev.itemId,
+                          author: rev.author,
+                          rating: rev.rating,
+                          text: rev.text,
+                          active: rev.active,
+                          mediaUrls: rev.media?.map(m => m.url) || []
+                        });
+                      }}
+                      className="py-1.5 px-3 rounded-lg bg-dark-900 border border-gray-700 text-xs font-mono text-gray-300 hover:text-white flex items-center gap-1.5"
+                    >
+                      <Edit className="w-3.5 h-3.5 text-gold-400" />
+                      Editar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: PORTADA / HERO BANNER */}
+      {activeTab === 'banner' && (
+        <div className="max-w-2xl glass-panel p-6 rounded-2xl border border-gray-800 space-y-4">
+          <h3 className="font-sans font-bold text-lg text-white">Configuración del Banner de Portada</h3>
+          <p className="text-xs text-gray-400">Personaliza la insignia, título, subtítulo e imagen de fondo de la portada de la tienda.</p>
+
+          <form onSubmit={handleSaveBanner} className="space-y-4">
+            <div>
+              <label className="block text-xs font-mono text-gray-300 mb-1">Insignia Superior (Badge)</label>
+              <input
+                type="text"
+                value={banner.badge || ''}
+                onChange={e => setBanner({ ...banner, badge: e.target.value })}
+                className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono text-gray-300 mb-1">Título Principal</label>
+              <input
+                type="text"
+                value={banner.title || ''}
+                onChange={e => setBanner({ ...banner, title: e.target.value })}
+                className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono text-gray-300 mb-1">Subtítulo / Mensaje Promocional</label>
+              <textarea
+                rows={3}
+                value={banner.subtitle || ''}
+                onChange={e => setBanner({ ...banner, subtitle: e.target.value })}
+                className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono text-gray-300 mb-1">URL de Imagen de Fondo (opcional)</label>
+              <input
+                type="text"
+                value={banner.bgImageUrl || ''}
+                onChange={e => setBanner({ ...banner, bgImageUrl: e.target.value })}
+                placeholder="https://..."
+                className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono text-gray-300 mb-1">Texto del Botón Acción</label>
+              <input
+                type="text"
+                value={banner.buttonText || ''}
+                onChange={e => setBanner({ ...banner, buttonText: e.target.value })}
+                className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+              />
+            </div>
+            <button
+              type="submit"
+              className="py-2.5 px-6 rounded-xl bg-crimson-600 hover:bg-crimson-500 text-white font-sans font-bold text-xs uppercase tracking-wider"
+            >
+              Guardar Banner de Portada
+            </button>
+          </form>
         </div>
       )}
 
@@ -827,7 +1252,7 @@ export default function AdminPanel({ onBackToStore }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-gray-300 mb-1">Precio Inicial (€)</label>
                   <input
@@ -839,11 +1264,24 @@ export default function AdminPanel({ onBackToStore }) {
                   />
                 </div>
                 <div>
+                  <label className="block text-xs font-mono text-gray-300 mb-1">Categoría</label>
+                  <select
+                    value={itemForm.categoryId || ''}
+                    onChange={e => setItemForm({ ...itemForm, categoryId: e.target.value })}
+                    className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                  >
+                    <option value="">-- Sin Categoría --</option>
+                    {categories.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-xs font-mono text-gray-300 mb-1">Estado / Disponibilidad</label>
                   <select
                     value={itemForm.status}
                     onChange={e => setItemForm({ ...itemForm, status: e.target.value })}
-                    className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white placeholder-gray-400"
+                    className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
                   >
                     <option value="AVAILABLE">Disponible</option>
                     <option value="RESERVED">Reservado</option>
@@ -949,7 +1387,173 @@ export default function AdminPanel({ onBackToStore }) {
         </div>
       )}
 
-      {/* EDIT EXTRA MODAL */}
+      {/* EDIT CATEGORY MODAL */}
+      {editingCategory !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <div className="glass-modal rounded-2xl p-6 w-full max-w-md text-gray-100 my-8">
+            <h3 className="font-sans font-bold text-lg text-white mb-4">
+              {editingCategory?.id ? 'Editar Categoría' : 'Crear Nueva Categoría'}
+            </h3>
+
+            <form onSubmit={handleSaveCategory} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-gray-300 mb-1">Nombre de Categoría *</label>
+                <input
+                  type="text"
+                  value={categoryForm.name}
+                  onChange={e => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                  placeholder="Ej: Prints, Stickers, Libros, RIA..."
+                  className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-gray-300 mb-1">Slug URL (opcional)</label>
+                <input
+                  type="text"
+                  value={categoryForm.slug}
+                  onChange={e => setCategoryForm({ ...categoryForm, slug: e.target.value })}
+                  placeholder="ej: prints-fine-art"
+                  className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-gray-300 mb-1">Descripción</label>
+                <textarea
+                  rows={2}
+                  value={categoryForm.description}
+                  onChange={e => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                  className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="catActive"
+                  checked={categoryForm.active}
+                  onChange={e => setCategoryForm({ ...categoryForm, active: e.target.checked })}
+                  className="rounded border-gray-700 bg-dark-950 text-crimson-600"
+                />
+                <label htmlFor="catActive" className="text-xs text-gray-300">Categoría activa en la tienda</label>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingCategory(null)}
+                  className="py-2 px-4 rounded-xl border border-gray-800 text-xs font-mono text-gray-400"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="py-2 px-6 rounded-xl bg-crimson-600 hover:bg-crimson-500 text-white font-sans font-bold text-xs uppercase"
+                >
+                  Guardar Categoría
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT REVIEW MODAL */}
+      {editingReview !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <div className="glass-modal rounded-2xl p-6 w-full max-w-lg text-gray-100 my-8">
+            <h3 className="font-sans font-bold text-lg text-white mb-4">
+              {editingReview?.id ? 'Editar Reseña' : 'Crear Reseña de Cliente'}
+            </h3>
+
+            <form onSubmit={handleSaveReview} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-gray-300 mb-1">Artículo Asociado *</label>
+                <select
+                  value={reviewForm.itemId}
+                  onChange={e => setReviewForm({ ...reviewForm, itemId: e.target.value })}
+                  className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                  required
+                >
+                  <option value="">-- Seleccionar Artículo --</option>
+                  {items.map(it => (
+                    <option key={it.id} value={it.id}>{it.code} - {it.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-mono text-gray-300 mb-1">Autor (Cliente) *</label>
+                  <input
+                    type="text"
+                    value={reviewForm.author}
+                    onChange={e => setReviewForm({ ...reviewForm, author: e.target.value })}
+                    placeholder="ej: Alexander M."
+                    className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-gray-300 mb-1">Valoración (1 a 5 Estrellas) *</label>
+                  <select
+                    value={reviewForm.rating}
+                    onChange={e => setReviewForm({ ...reviewForm, rating: Number(e.target.value) })}
+                    className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono"
+                  >
+                    <option value={5}>★★★★★ (5/5 Excelente)</option>
+                    <option value={4}>★★★★☆ (4/5 Muy Bueno)</option>
+                    <option value={3}>★★★☆☆ (3/5 Bueno)</option>
+                    <option value={2}>★★☆☆☆ (2/5 Regular)</option>
+                    <option value={1}>★☆☆☆☆ (1/5 Malo)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-gray-300 mb-1">Comentario / Testimonio *</label>
+                <textarea
+                  rows={3}
+                  value={reviewForm.text}
+                  onChange={e => setReviewForm({ ...reviewForm, text: e.target.value })}
+                  placeholder="Opinión sobre el envío, empaquetado, acabados o discreción..."
+                  className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="revActive"
+                  checked={reviewForm.active}
+                  onChange={e => setReviewForm({ ...reviewForm, active: e.target.checked })}
+                  className="rounded border-gray-700 bg-dark-950 text-crimson-600"
+                />
+                <label htmlFor="revActive" className="text-xs text-gray-300">Reseña visible públicamente en la ficha</label>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingReview(null)}
+                  className="py-2 px-4 rounded-xl border border-gray-800 text-xs font-mono text-gray-400"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="py-2 px-6 rounded-xl bg-crimson-600 hover:bg-crimson-500 text-white font-sans font-bold text-xs uppercase"
+                >
+                  Guardar Reseña
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {editingExtra !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
           <div className="glass-modal rounded-2xl p-6 w-full max-w-lg text-gray-100 my-8">

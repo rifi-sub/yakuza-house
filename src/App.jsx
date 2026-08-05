@@ -7,14 +7,22 @@ import CheckoutModal from './components/CheckoutModal';
 import OrderConfirmation from './components/OrderConfirmation';
 import AdminPanel from './components/AdminPanel';
 import LegalModal from './components/LegalModal';
-import { Sparkles, Crown, ShieldCheck, ShoppingBag, Eye, Lock, ArrowRight, Heart, Flame, MessageCircle } from 'lucide-react';
+import CartModal from './components/CartModal';
+import { Sparkles, Crown, Lock, ShoppingBag } from 'lucide-react';
 
-import { API_BASE } from './config';
+import { API_BASE, resolveMediaUrl } from './config';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('fetish'); // fetish, princess, findreamland, howtoorder, admin
+  const [activeTab, setActiveTab] = useState('fetish'); // fetish, admin
   const [items, setItems] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [banner, setBanner] = useState(null);
   const [loadingItems, setLoadingItems] = useState(true);
+
+  // Cart state
+  const [cartItems, setCartItems] = useState([]);
+  const [showCartModal, setShowCartModal] = useState(false);
 
   // Selected item modals
   const [selectedDetailItem, setSelectedDetailItem] = useState(null);
@@ -22,36 +30,33 @@ export default function App() {
   const [confirmedOrderNumber, setConfirmedOrderNumber] = useState('');
   
   // Legal modal
-  const [legalModalType, setLegalModalType] = useState(null); // terms, privacy, refund
+  const [legalModalType, setLegalModalType] = useState(null);
 
   // Lookup modal
   const [lookupOrderNumber, setLookupOrderNumber] = useState('');
   const [showLookupModal, setShowLookupModal] = useState(false);
 
-  // Flip cards state for Reino & Games
-  const [flippedCards, setFlippedCards] = useState({});
-
-  const toggleFlip = (cardId) => {
-    setFlippedCards(prev => ({ ...prev, [cardId]: !prev[cardId] }));
-  };
-
-  // Fetch Items from backend
-  const fetchItems = () => {
+  // Fetch Items, Categories and Banner from backend
+  const fetchStoreData = () => {
     setLoadingItems(true);
-    fetch(`${API_BASE}/api/store/items`)
-      .then(res => res.json())
-      .then(data => {
-
-        if (Array.isArray(data)) {
-          setItems(data);
-        }
+    const catQuery = selectedCategory ? `?category=${encodeURIComponent(selectedCategory)}` : '';
+    
+    Promise.all([
+      fetch(`${API_BASE}/api/store/items${catQuery}`).then(r => r.json()),
+      fetch(`${API_BASE}/api/store/categories`).then(r => r.json()),
+      fetch(`${API_BASE}/api/store/banner`).then(r => r.json())
+    ])
+      .then(([itemsData, categoriesData, bannerData]) => {
+        if (Array.isArray(itemsData)) setItems(itemsData);
+        if (Array.isArray(categoriesData)) setCategories(categoriesData);
+        if (bannerData && typeof bannerData === 'object') setBanner(bannerData);
         setLoadingItems(false);
       })
       .catch(() => setLoadingItems(false));
   };
 
   useEffect(() => {
-    fetchItems();
+    fetchStoreData();
 
     // Comprobar retorno de Stripe Checkout
     const urlParams = new URLSearchParams(window.location.search);
@@ -60,7 +65,26 @@ export default function App() {
       setConfirmedOrderNumber(orderSuccess);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, []);
+  }, [selectedCategory]);
+
+  const handleAddToCart = (item) => {
+    setCartItems(prev => {
+      const existing = prev.find(i => i.item.id === item.id);
+      if (existing) {
+        return prev.map(i => i.item.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
+      }
+      return [...prev, { item, quantity: 1 }];
+    });
+    setShowCartModal(true);
+  };
+
+  const handleUpdateCartQuantity = (itemId, quantity) => {
+    setCartItems(prev => prev.map(i => i.item.id === itemId ? { ...i, quantity } : i));
+  };
+
+  const handleRemoveFromCart = (itemId) => {
+    setCartItems(prev => prev.filter(i => i.item.id !== itemId));
+  };
 
 
   // Filter items by category/code prefix if needed
@@ -117,26 +141,33 @@ export default function App() {
         setActiveTab={setActiveTab}
         onOpenLegal={(type) => setLegalModalType(type)}
         onOpenOrderLookup={() => setShowLookupModal(true)}
+        itemsInCartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+        onOpenCart={() => setShowCartModal(true)}
       />
 
       <main className="flex-1">
         
-        {/* HERO PORTADA */}
-        <section className="relative py-16 md:py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-dark-950 via-dark-900 to-dark-900 border-b border-crimson-600/20 overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-crimson-900/20 via-transparent to-transparent pointer-events-none" />
+        {/* DYNAMIC HERO BANNER PORTADA */}
+        <section
+          className="relative py-16 md:py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-dark-950 via-dark-900 to-dark-900 border-b border-crimson-600/20 overflow-hidden bg-cover bg-center"
+          style={{ backgroundImage: banner?.bgImageUrl ? `url(${banner.bgImageUrl})` : undefined }}
+        >
+          <div className="absolute inset-0 bg-black/60 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-crimson-900/30 via-transparent to-transparent pointer-events-none" />
           
           <div className="max-w-5xl mx-auto text-center relative z-10 space-y-6">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel-gold border border-gold-500/30 text-gold-400 text-xs font-mono tracking-widest uppercase mb-2 animate-bounce">
               <Crown className="w-4 h-4 text-gold-400" />
-              Boutique Findom & Fetish Exclusiva
+              {banner?.badge || 'Boutique Findom & Fetish Exclusiva'}
             </div>
 
             <h1 className="font-sans font-black text-4xl sm:text-6xl lg:text-7xl tracking-wider text-white">
-              YAKUZA <span className="text-crimson-gradient">HOUSE</span>
+              {banner?.title ? banner.title : (
+                <>YAKUZA <span className="text-crimson-gradient">HOUSE</span></>
+              )}
             </h1>
 
             <p className="text-sm sm:text-base text-gray-300 max-w-2xl mx-auto font-light leading-relaxed">
-              Descubre lencería usada, fluidos exclusivos y piezas únicas con compra directa sin formularios largos. Envío discreto garantizado o gestión directa por Vinted.
+              {banner?.subtitle || 'Descubre lencería usada, fluidos exclusivos y piezas únicas con compra directa sin formularios largos. Envío discreto garantizado o gestión directa por Vinted.'}
             </p>
 
             {/* Direct Quick Action */}
@@ -146,7 +177,7 @@ export default function App() {
                 className="py-3.5 px-8 rounded-xl bg-gradient-to-r from-crimson-700 via-crimson-600 to-crimson-500 text-white font-sans font-bold text-xs uppercase tracking-widest shadow-xl shadow-crimson-600/30 hover:scale-105 transition-all flex items-center gap-2"
               >
                 <Sparkles className="w-4 h-4 text-gold-400" />
-                Explorar Catálogo de la Tienda
+                {banner?.buttonText || 'Explorar Catálogo de la Tienda'}
               </button>
             </div>
 
@@ -155,7 +186,7 @@ export default function App() {
 
         {/* TAB 1: FETISH HOUSE */}
         {activeTab === 'fetish' && (
-          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
+          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
             
             {/* Intro Quote */}
             <div className="glass-panel p-8 rounded-2xl border-l-4 border-l-crimson-500 max-w-4xl mx-auto space-y-4">
@@ -172,148 +203,86 @@ export default function App() {
               </div>
             </div>
 
-            {/* CATÁLOGOS GALERÍAS */}
-            <div>
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8 border-b border-gray-800 pb-4">
-                <div>
-                  <span className="text-xs font-mono text-crimson-400 uppercase tracking-widest block">Catálogo Fetish House</span>
-                  <h2 className="font-sans font-extrabold text-2xl text-white">Ropa Íntima y Accesorios (RIA)</h2>
-                </div>
-                <p className="text-xs text-gray-400 font-mono">Selecciona un artículo para configurar modal y extras</p>
-              </div>
-
-              {loadingItems ? (
-                <div className="py-12 text-center text-xs font-mono text-gray-500">Cargando catálogo...</div>
-              ) : riaItems.length === 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {/* Fallback Sample RIA cards if db empty before seed */}
-                  {[1, 2, 3, 4].map(idx => (
-                    <ItemCard
-                      key={idx}
-                      item={{
-                        id: `sample-ria-${idx}`,
-                        code: `RIA${idx}`,
-                        name: `Lencería Exclusiva RIA${idx}`,
-                        description: 'Prenda de seda usada en sesión especial de entrenamiento.',
-                        basePrice: 50 + idx * 10,
-                        status: 'AVAILABLE'
-                      }}
-                      onBuyNow={handleBuyNow}
-                      onViewDetails={setSelectedDetailItem}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {riaItems.map(item => (
-                    <ItemCard
-                      key={item.id}
-                      item={item}
-                      onBuyNow={handleBuyNow}
-                      onViewDetails={setSelectedDetailItem}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* FLUIDOS Y PRODUCTOS */}
-            <div>
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8 border-b border-gray-800 pb-4">
-                <div>
-                  <span className="text-xs font-mono text-gold-400 uppercase tracking-widest block">Esencias & Delicias</span>
-                  <h2 className="font-sans font-extrabold text-2xl text-white">Fluidos y Productos (FR)</h2>
-                </div>
-              </div>
-
-              {loadingItems ? (
-                <div className="py-12 text-center text-xs font-mono text-gray-500">Cargando catálogo...</div>
-              ) : frItems.length === 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {[1, 2, 3, 4].map(idx => (
-                    <ItemCard
-                      key={idx}
-                      item={{
-                        id: `sample-fr-${idx}`,
-                        code: `FR${idx}`,
-                        name: `Producto Especial FR${idx}`,
-                        description: 'Esencia artesanal empaquetada bajo protocolo exclusivo.',
-                        basePrice: 40 + idx * 15,
-                        status: 'AVAILABLE'
-                      }}
-                      onBuyNow={handleBuyNow}
-                      onViewDetails={setSelectedDetailItem}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {frItems.map(item => (
-                    <ItemCard
-                      key={item.id}
-                      item={item}
-                      onBuyNow={handleBuyNow}
-                      onViewDetails={setSelectedDetailItem}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* OTROS ARTÍCULOS */}
-            {otherItems.length > 0 && (
-              <div>
-                <h2 className="font-sans font-extrabold text-2xl text-white mb-6 border-b border-gray-800 pb-4">Otros Artículos del Catálogo</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {otherItems.map(item => (
-                    <ItemCard
-                      key={item.id}
-                      item={item}
-                      onBuyNow={handleBuyNow}
-                      onViewDetails={setSelectedDetailItem}
-                    />
-                  ))}
-                </div>
+            {/* BARRA DE NAVEGACIÓN POR CATEGORÍAS */}
+            {categories.length > 0 && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-4 border-b border-gray-800">
+                <button
+                  onClick={() => setSelectedCategory('')}
+                  className={`py-2 px-4 rounded-full font-mono text-xs whitespace-nowrap transition-all ${
+                    selectedCategory === ''
+                      ? 'bg-crimson-600 text-white font-bold shadow-md shadow-crimson-600/30'
+                      : 'bg-dark-950 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
+                  }`}
+                >
+                  Todas las categorías ({items.length})
+                </button>
+                {categories.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.slug)}
+                    className={`py-2 px-4 rounded-full font-mono text-xs whitespace-nowrap transition-all ${
+                      selectedCategory === cat.slug
+                        ? 'bg-crimson-600 text-white font-bold shadow-md shadow-crimson-600/30'
+                        : 'bg-dark-950 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
+                    }`}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
               </div>
             )}
 
+            {/* GRIDA DE ARTÍCULOS DE LA TIENDA */}
+            <div>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8 border-b border-gray-800 pb-4">
+                <div>
+                  <span className="text-xs font-mono text-crimson-400 uppercase tracking-widest block">Catálogo Oficial</span>
+                  <h2 className="font-sans font-extrabold text-2xl text-white">
+                    {selectedCategory ? categories.find(c => c.slug === selectedCategory)?.name || 'Artículos' : 'Todos los Artículos de la Tienda'}
+                  </h2>
+                </div>
+                <p className="text-xs text-gray-400 font-mono">Haz clic en un artículo para ver su galería multimedia, valoraciones y extras</p>
+              </div>
+
+              {loadingItems ? (
+                <div className="py-12 text-center text-xs font-mono text-gray-500">Cargando catálogo de la tienda...</div>
+              ) : items.length === 0 ? (
+                <div className="text-center py-12 text-gray-400 font-mono text-sm bg-dark-950/50 p-8 rounded-2xl border border-gray-800">
+                  No hay artículos disponibles en esta categoría actualmente.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {items.map(item => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      onBuyNow={handleBuyNow}
+                      onViewDetails={setSelectedDetailItem}
+                      onAddToCart={handleAddToCart}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
           </section>
         )}
-
-        {/* SECCIÓN EN CONSTRUCCIÓN PARA OTRAS PESTAÑAS */}
-        {activeTab !== 'fetish' && activeTab !== 'admin' && (
-          <section className="max-w-3xl mx-auto px-4 py-20 text-center space-y-6">
-            <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/10">
-              <Crown className="w-8 h-8 animate-pulse" />
-            </div>
-
-            <div className="inline-block">
-              <span className="text-xs font-mono text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 uppercase tracking-widest">
-                🚧 Sección En Construcción
-              </span>
-            </div>
-
-            <h2 className="font-sans font-extrabold text-3xl sm:text-4xl text-white">
-              Próximamente Disponible
-            </h2>
-
-            <p className="text-sm text-gray-300 max-w-md mx-auto leading-relaxed font-light">
-              Esta sección se encuentra en desarrollo. Por el momento, la <strong className="text-white">Tienda Yakuza Store</strong> está 100% activa para consultar el catálogo y realizar compras directas.
-            </p>
-
-            <div className="pt-4">
-              <button
-                onClick={() => setActiveTab('fetish')}
-                className="py-3.5 px-8 rounded-xl bg-gradient-to-r from-crimson-700 via-crimson-600 to-crimson-500 text-white font-sans font-bold text-xs uppercase tracking-widest shadow-xl shadow-crimson-600/30 hover:scale-105 transition-all"
-              >
-                Ir a la Tienda Oficial
-              </button>
-            </div>
-          </section>
-        )}
-
 
       </main>
+
+      {/* Cart Drawer / Modal */}
+      {showCartModal && (
+        <CartModal
+          cartItems={cartItems}
+          onUpdateQuantity={handleUpdateCartQuantity}
+          onRemoveItem={handleRemoveFromCart}
+          onClose={() => setShowCartModal(false)}
+          onCheckout={(item) => {
+            setShowCartModal(false);
+            setSelectedCheckoutItem(item);
+          }}
+        />
+      )}
 
       {/* Item Detail Modal */}
       {selectedDetailItem && (
@@ -321,6 +290,7 @@ export default function App() {
           item={selectedDetailItem}
           onClose={() => setSelectedDetailItem(null)}
           onBuyNow={handleBuyNow}
+          onAddToCart={handleAddToCart}
         />
       )}
 

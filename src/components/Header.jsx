@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ShoppingBag, ShieldCheck, Crown, Sparkles, Menu, X, Settings } from 'lucide-react';
 
-export default function Header({ activeTab, setActiveTab, onOpenLegal, onOpenOrderLookup, itemsInCartCount = 0 }) {
+export default function Header({ activeTab, setActiveTab, onOpenLegal, onOpenOrderLookup, itemsInCartCount = 0, onOpenCart }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
@@ -62,6 +62,22 @@ export default function Header({ activeTab, setActiveTab, onOpenLegal, onOpenOrd
 
           {/* Action Buttons */}
           <div className="hidden md:flex items-center gap-3">
+            {onOpenCart && (
+              <button
+                onClick={onOpenCart}
+                className="relative py-1.5 px-3 rounded-lg bg-crimson-600/20 border border-crimson-500/40 text-white text-xs font-mono flex items-center gap-2 hover:bg-crimson-600/30 transition-all"
+                title="Ver Cesta"
+              >
+                <ShoppingBag className="w-4 h-4 text-gold-400" />
+                <span className="font-bold">Cesta</span>
+                {itemsInCartCount > 0 && (
+                  <span className="w-5 h-5 rounded-full bg-crimson-600 text-white font-bold text-[10px] flex items-center justify-center animate-pulse">
+                    {itemsInCartCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             <button
               onClick={onOpenOrderLookup}
               className="text-xs font-mono text-gray-400 hover:text-gold-400 transition-colors px-3 py-1.5 rounded border border-gray-800 hover:border-gold-500/30"
@@ -84,6 +100,19 @@ export default function Header({ activeTab, setActiveTab, onOpenLegal, onOpenOrd
 
           {/* Mobile Menu Button */}
           <div className="flex md:hidden items-center gap-2">
+            {onOpenCart && (
+              <button
+                onClick={onOpenCart}
+                className="relative p-2 text-gold-400 hover:text-white rounded-lg border border-gray-800"
+              >
+                <ShoppingBag className="w-5 h-5" />
+                {itemsInCartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-crimson-600 text-white font-bold text-[9px] flex items-center justify-center">
+                    {itemsInCartCount}
+                  </span>
+                )}
+              </button>
+            )}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 text-gray-300 hover:text-white rounded-lg border border-gray-800"
