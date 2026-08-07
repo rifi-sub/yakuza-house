@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Package, Plus, Edit, Trash2, Eye, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart } from 'lucide-react';
 import { API_BASE, resolveMediaUrl } from '../config';
 import princessVideo from '../princess-yakuza.mp4';
+import { MediaPickerModal } from './MediaPickerModal';
 
 export default function AdminPanel({ onBackToStore }) {
 
@@ -21,6 +22,10 @@ export default function AdminPanel({ onBackToStore }) {
   const [extras, setExtras] = useState([]);
   const [packaging, setPackaging] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Media Picker Modal State
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+  const [mediaPickerTarget, setMediaPickerTarget] = useState('item_images');
 
   // Drag & drop state
   const [draggedItemIndex, setDraggedItemIndex] = useState(null);
@@ -1039,13 +1044,26 @@ export default function AdminPanel({ onBackToStore }) {
             </div>
             <div>
               <label className="block text-xs font-mono text-gray-300 mb-1">URL de Imagen de Fondo (opcional)</label>
-              <input
-                type="text"
-                value={banner.bgImageUrl || ''}
-                onChange={e => setBanner({ ...banner, bgImageUrl: e.target.value })}
-                placeholder="https://..."
-                className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={banner.bgImageUrl || ''}
+                  onChange={e => setBanner({ ...banner, bgImageUrl: e.target.value })}
+                  placeholder="https://..."
+                  className="flex-1 bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMediaPickerTarget('banner_bg');
+                    setMediaPickerOpen(true);
+                  }}
+                  className="py-2 px-3 rounded-lg bg-gold-500/20 hover:bg-gold-500/30 border border-gold-500/40 text-gold-300 font-mono text-xs font-bold flex items-center gap-1.5"
+                >
+                  <ImageIcon className="w-4 h-4" />
+                  Elegir / Subir
+                </button>
+              </div>
             </div>
             <div>
               <label className="block text-xs font-mono text-gray-300 mb-1">Texto del Botón Acción</label>
@@ -1296,14 +1314,25 @@ export default function AdminPanel({ onBackToStore }) {
                   Fotografías del Artículo ({itemForm.images.length})
                 </label>
 
-                {/* Subir archivo directo */}
-                <div className="flex items-center gap-3">
-                  <label className="py-2 px-4 rounded-lg bg-crimson-600 hover:bg-crimson-500 text-white font-mono text-xs font-bold cursor-pointer flex items-center gap-2">
-                    <Upload className="w-4 h-4" />
-                    {uploadingImage ? 'Subiendo...' : 'Subir foto desde PC'}
-                    <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="hidden" />
+                {/* Opciones de Selección / Subida de fotos */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMediaPickerTarget('item_images');
+                      setMediaPickerOpen(true);
+                    }}
+                    className="py-2 px-4 rounded-lg bg-gold-500/20 hover:bg-gold-500/30 border border-gold-500/50 text-gold-300 font-mono text-xs font-bold flex items-center gap-2"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                    Elegir de Biblioteca o Subir Nuevo
+                  </button>
+
+                  <label className="py-2 px-3 rounded-lg bg-dark-900 border border-gray-700 hover:text-white text-gray-300 font-mono text-xs font-bold cursor-pointer flex items-center gap-1.5">
+                    <Upload className="w-3.5 h-3.5" />
+                    {uploadingImage ? 'Subiendo...' : 'Subida rápida desde PC'}
+                    <input type="file" multiple accept="image/*,video/*" onChange={handleFileUpload} className="hidden" />
                   </label>
-                  <span className="text-[11px] text-gray-500">o pega una URL directa:</span>
                 </div>
 
                 {/* Añadir URL */}
@@ -1980,6 +2009,43 @@ export default function AdminPanel({ onBackToStore }) {
           45% { transform: scale(1.2); }
         }
       `}</style>
+
+      {/* Selector de Biblioteca de Medios */}
+      <MediaPickerModal
+        isOpen={mediaPickerOpen}
+        onClose={() => setMediaPickerOpen(false)}
+        token={token}
+        multiple={mediaPickerTarget === 'item_images'}
+        title={mediaPickerTarget === 'banner_bg' ? 'Elegir Imagen de Fondo del Banner' : 'Añadir Multimedia a la Galería del Artículo'}
+        onSelectUrl={(url) => {
+          if (mediaPickerTarget === 'banner_bg') {
+            setBanner(prev => ({ ...prev, bgImageUrl: url }));
+          }
+        }}
+        onSelectUrls={async (urls) => {
+          if (mediaPickerTarget === 'item_images') {
+            setItemForm(prev => ({
+              ...prev,
+              images: [...prev.images, ...urls]
+            }));
+
+            if (editingItem?.id) {
+              try {
+                await fetch(`${API_BASE}/api/store/admin/items/${editingItem.id}/media-from-library`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ urls })
+                });
+              } catch (e) {
+                console.error('Error guardando media en backend:', e);
+              }
+            }
+          }
+        }}
+      />
 
     </div>
   );
