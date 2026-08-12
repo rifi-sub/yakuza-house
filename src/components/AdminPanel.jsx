@@ -141,6 +141,13 @@ export default function AdminPanel({ onBackToStore }) {
       fetch(`${API_BASE}/api/store/admin/packaging`, { headers }).then(r => r.json())
     ])
       .then(([ordersData, itemsData, categoriesData, reviewsData, bannerData, extrasData, packagingData]) => {
+        if (ordersData?.error || itemsData?.error || categoriesData?.error) {
+          console.warn('[AdminPanel] Token de sesión expirado o inválido. Cerrando sesión...');
+          handleLogout();
+          setLoginError('Tu sesión ha expirado. Por favor, vuelve a iniciar sesión para ver los artículos.');
+          setLoading(false);
+          return;
+        }
         if (Array.isArray(ordersData)) setOrders(ordersData);
         if (Array.isArray(itemsData)) setItems(itemsData);
         if (Array.isArray(categoriesData)) setCategories(categoriesData);
