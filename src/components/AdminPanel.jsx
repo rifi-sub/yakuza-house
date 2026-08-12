@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Edit, Trash2, Eye, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Eye, EyeOff, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart } from 'lucide-react';
 import { API_BASE, resolveMediaUrl } from '../config';
 import princessVideo from '../princess-yakuza.mp4';
 import { MediaPickerModal } from './MediaPickerModal';
@@ -293,6 +293,25 @@ export default function AdminPanel({ onBackToStore }) {
       fetchAllData();
     } catch (err) {
       alert('Error al eliminar artículo');
+    }
+  };
+
+  const handleToggleItemActive = async (item) => {
+    try {
+      const nextActive = item.active === false ? true : false;
+      const res = await fetch(`${API_BASE}/api/store/admin/items/${item.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ active: nextActive })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error cambiando visibilidad');
+      fetchAllData();
+    } catch (err) {
+      alert(err.message);
     }
   };
 
@@ -776,6 +795,7 @@ export default function AdminPanel({ onBackToStore }) {
                   stock: 1,
                   categoryId: '',
                   featured: false,
+                  active: true,
                   images: []
                 });
               }}
@@ -812,6 +832,9 @@ export default function AdminPanel({ onBackToStore }) {
                       <div className="absolute top-2 left-2 bg-crimson-600/90 text-white font-mono text-[10px] font-bold px-2 py-0.5 rounded">
                         #{index + 1} | {item.code}
                       </div>
+                      <div className={`absolute top-2 right-2 px-2 py-0.5 rounded text-[10px] font-mono font-bold ${item.active !== false ? 'bg-emerald-600/90 text-white' : 'bg-red-600/90 text-white'}`}>
+                        {item.active !== false ? 'Publicado' : 'Oculto'}
+                      </div>
                       <div className="absolute bottom-2 right-2 bg-dark-900/90 px-2 py-0.5 rounded text-gold-400 font-bold font-mono text-xs">
                         {item.basePrice}€
                       </div>
@@ -829,6 +852,14 @@ export default function AdminPanel({ onBackToStore }) {
                   <div className="pt-3 border-t border-gray-800 flex justify-between items-center">
                     <span className="text-[10px] font-mono text-gray-500">Stock: {item.stock}</span>
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleToggleItemActive(item)}
+                        className={`py-1.5 px-2.5 rounded-lg border text-xs font-mono flex items-center gap-1 transition-colors ${item.active !== false ? 'bg-emerald-950/40 border-emerald-700/50 text-emerald-300 hover:bg-emerald-900/60' : 'bg-red-950/40 border-red-700/50 text-red-300 hover:bg-red-900/60'}`}
+                        title={item.active !== false ? 'Ocultar producto de la tienda' : 'Mostrar producto en la tienda'}
+                      >
+                        {item.active !== false ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                        <span>{item.active !== false ? 'Ocultar' : 'Mostrar'}</span>
+                      </button>
                       <button
                         onClick={() => handleDeleteItem(item.id)}
                         className="p-1.5 rounded-lg bg-dark-900 border border-gray-800 text-gray-400 hover:text-red-400"
@@ -849,6 +880,7 @@ export default function AdminPanel({ onBackToStore }) {
                             stock: item.stock || 1,
                             categoryId: item.categoryId || '',
                             featured: Boolean(item.featured),
+                            active: item.active !== false,
                             images: imageList
                           });
                         }}
@@ -1313,6 +1345,23 @@ export default function AdminPanel({ onBackToStore }) {
                     <option value="OUT_OF_STOCK">Agotado</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Visibilidad & Ocultar / Mostrar */}
+              <div className="flex items-center gap-3 p-3 bg-dark-950 rounded-lg border border-gray-800">
+                <input
+                  type="checkbox"
+                  id="itemActiveCheck"
+                  checked={itemForm.active !== false}
+                  onChange={e => setItemForm({ ...itemForm, active: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-700 text-crimson-600 focus:ring-crimson-500 bg-dark-900 cursor-pointer"
+                />
+                <label htmlFor="itemActiveCheck" className="text-xs font-mono text-gray-200 cursor-pointer flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${itemForm.active !== false ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
+                    {itemForm.active !== false ? 'PUBLICADO' : 'OCULTO'}
+                  </span>
+                  <span>Visible públicamente en la Tienda Yakuza (los clientes podrán verlo y comprarlo)</span>
+                </label>
               </div>
 
               {/* SECCIÓN DE FOTOGRAFÍAS */}
