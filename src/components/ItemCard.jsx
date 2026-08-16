@@ -21,7 +21,7 @@ export default function ItemCard({ item, onBuyNow, onViewDetails, onAddToCart })
     <div className="glass-panel rounded-xl overflow-hidden hover:border-crimson-500/50 transition-all duration-300 flex flex-col group hover:shadow-xl hover:shadow-crimson-600/10">
       
       {/* Media & Badges */}
-      <div className="relative aspect-[4/3] bg-dark-800 overflow-hidden cursor-pointer" onClick={() => onViewDetails(item)}>
+      <div className="relative aspect-square bg-dark-800 overflow-hidden cursor-pointer" onClick={() => onViewDetails(item)}>
         <img
           src={mainImage}
           alt={item.name}

@@ -471,15 +471,23 @@ export default function AdminPanel({ onBackToStore }) {
   };
 
   const handleDeleteItemMedia = async (itemId, mediaId) => {
-    if (!confirm('¿Eliminar este elemento multimedia?')) return;
+    if (!confirm('¿Eliminar esta foto/vídeo del producto?')) return;
     try {
-      await fetch(`${API_BASE}/api/store/admin/items/${itemId}/media/${mediaId}`, {
+      const res = await fetch(`${API_BASE}/api/store/admin/items/${itemId}/media/${mediaId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (!res.ok) throw new Error('Error al eliminar multimedia');
+
+      // Actualizar estado local inmediatamente para que desaparezca del modal
+      setEditingItem(prev => prev ? {
+        ...prev,
+        media: (prev.media || []).filter(m => m.id !== mediaId)
+      } : prev);
+
       fetchAllData();
     } catch (err) {
-      alert('Error al eliminar multimedia');
+      alert(err.message || 'Error al eliminar multimedia');
     }
   };
 
@@ -1409,21 +1417,51 @@ export default function AdminPanel({ onBackToStore }) {
                   </button>
                 </div>
 
-                {/* Vista previa de imágenes */}
+                {/* Galería guardada en BD (media real) */}
+                {editingItem?.id && editingItem?.media?.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-mono text-emerald-400 mb-1.5">✓ Fotos guardadas — haz hover y pulsa ✕ para borrarla definitivamente</p>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {editingItem.media.map((m) => (
+                        <div key={m.id} className="relative w-20 h-20 rounded border border-emerald-700/40 overflow-hidden flex-shrink-0 group">
+                          {m.type === 'VIDEO' ? (
+                            <video src={resolveMediaUrl(m.url)} muted className="w-full h-full object-cover" />
+                          ) : (
+                            <img src={resolveMediaUrl(m.url)} alt="" className="w-full h-full object-cover" />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteItemMedia(editingItem.id, m.id)}
+                            className="absolute inset-0 bg-red-700/90 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-0.5"
+                          >
+                            <X className="w-5 h-5" />
+                            <span className="text-[9px] font-mono font-bold">BORRAR</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* URLs pendientes (aún no guardadas como media en BD) */}
                 {itemForm.images.length > 0 && (
-                  <div className="flex gap-2 overflow-x-auto pt-2">
-                    {itemForm.images.map((img, i) => (
-                      <div key={i} className="relative w-16 h-16 rounded border border-gray-700 overflow-hidden flex-shrink-0 group">
-                        <img src={resolveMediaUrl(img)} alt="" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveImage(i)}
-                          className="absolute inset-0 bg-red-600/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
+                  <div>
+                    <p className="text-[10px] font-mono text-amber-400 mb-1.5">⏳ URLs pendientes (se guardarán al pulsar "Guardar Artículo")</p>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {itemForm.images.map((img, i) => (
+                        <div key={i} className="relative w-20 h-20 rounded border border-amber-700/40 overflow-hidden flex-shrink-0 group">
+                          <img src={resolveMediaUrl(img)} alt="" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(i)}
+                            className="absolute inset-0 bg-red-700/90 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-0.5"
+                          >
+                            <X className="w-5 h-5" />
+                            <span className="text-[9px] font-mono font-bold">QUITAR</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

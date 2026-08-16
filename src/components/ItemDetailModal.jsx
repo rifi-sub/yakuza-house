@@ -59,7 +59,7 @@ export default function ItemDetailModal({ item, onClose, onBuyNow, onAddToCart }
           
           {/* Left Column: Multimedia Gallery */}
           <div className="p-6 bg-dark-900/60 border-b md:border-b-0 md:border-r border-gray-800/80 flex flex-col">
-            <div className="relative aspect-square rounded-xl overflow-hidden bg-dark-800 border border-gray-800 mb-4 flex items-center justify-center">
+            <div className="relative rounded-xl overflow-hidden bg-dark-800 border border-gray-800 mb-4 flex items-center justify-center min-h-[220px] max-h-[420px]">
               {currentMedia.type === 'VIDEO' ? (
                 <video
                   src={currentMedia.url}
@@ -73,7 +73,7 @@ export default function ItemDetailModal({ item, onClose, onBuyNow, onAddToCart }
                 <img
                   src={currentMedia.url}
                   alt={currentMedia.altText || item.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-auto max-h-[420px] object-contain"
                 />
               )}
               <div className="absolute top-3 left-3 bg-crimson-600/90 text-white font-mono text-xs font-bold px-3 py-1 rounded shadow">
