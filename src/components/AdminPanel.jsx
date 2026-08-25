@@ -21,7 +21,34 @@ export default function AdminPanel({ onBackToStore }) {
   const [banner, setBanner] = useState({ badge: '', title: '', subtitle: '', bgImageUrl: '', buttonText: '' });
   const [extras, setExtras] = useState([]);
   const [packaging, setPackaging] = useState([]);
+  const launchDefaults = {
+    state: 'soon',
+    enabled: true,
+    targetFollowers: 2000,
+    countdownTarget: '',
+    showCountdown: true,
+    followersSource: 'auto',
+    followersManual: 0,
+    twitterHandle: '',
+    twitterUrl: '',
+    prize: { name: '', description: '', valueLabel: '', imageUrl: '' },
+    howToEnterBody: '',
+    terms: '',
+    featuredItemIds: []
+  };
+  const [launch, setLaunch] = useState(launchDefaults);
+  const [launchFollowers, setLaunchFollowers] = useState(null);
+  const [refreshingFollowers, setRefreshingFollowers] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // ISO UTC -> string "YYYY-MM-DDTHH:mm" para <input type="datetime-local">
+  const isoToLocalInput = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
 
   // Media Picker Modal State
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
@@ -138,9 +165,10 @@ export default function AdminPanel({ onBackToStore }) {
       fetch(`${API_BASE}/api/store/admin/item-reviews`, { headers }).then(r => r.json()),
       fetch(`${API_BASE}/api/store/banner`).then(r => r.json()),
       fetch(`${API_BASE}/api/store/admin/extras`, { headers }).then(r => r.json()),
-      fetch(`${API_BASE}/api/store/admin/packaging`, { headers }).then(r => r.json())
+      fetch(`${API_BASE}/api/store/admin/packaging`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE}/api/store/launch`).then(r => r.json()).catch(() => null)
     ])
-      .then(([ordersData, itemsData, categoriesData, reviewsData, bannerData, extrasData, packagingData]) => {
+      .then(([ordersData, itemsData, categoriesData, reviewsData, bannerData, extrasData, packagingData, launchData]) => {
         if (ordersData?.error || itemsData?.error || categoriesData?.error) {
           console.warn('[AdminPanel] Token de sesión expirado o inválido. Cerrando sesión...');
           handleLogout();
@@ -155,6 +183,14 @@ export default function AdminPanel({ onBackToStore }) {
         if (bannerData && typeof bannerData === 'object') setBanner(bannerData);
         if (Array.isArray(extrasData)) setExtras(extrasData);
         if (Array.isArray(packagingData)) setPackaging(packagingData);
+        if (launchData && typeof launchData === 'object') {
+          setLaunch(prev => ({
+            ...prev,
+            ...(launchData.config || {}),
+            prize: { ...prev.prize, ...((launchData.config && launchData.config.prize) || {}) }
+          }));
+          if (launchData.followers) setLaunchFollowers(launchData.followers);
+        }
         setLoading(false);
       })
       .catch(err => {
@@ -542,6 +578,54 @@ export default function AdminPanel({ onBackToStore }) {
     }
   };
 
+  // ==== Grand Opening / Sorteo ====
+  const handleSaveLaunch = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        ...launch,
+        countdownTarget: launch.countdownTarget ? new Date(launch.countdownTarget).toISOString() : null
+      };
+      const res = await fetch(`${API_BASE}/api/store/admin/launch`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error guardando lanzamiento');
+      alert('Configuración del Grand Opening guardada.');
+      fetchAllData();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleRefreshFollowers = async () => {
+    setRefreshingFollowers(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/store/admin/launch/refresh-followers`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error refrescando followers');
+      fetchAllData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRefreshingFollowers(false);
+    }
+  };
+
+  const toggleFeaturedItem = (id) => {
+    setLaunch(prev => ({
+      ...prev,
+      featuredItemIds: prev.featuredItemIds.includes(id)
+        ? prev.featuredItemIds.filter(i => i !== id)
+        : [...prev.featuredItemIds, id]
+    }));
+  };
+
 
   // Login Form View if unauthenticated
   if (!token) {
@@ -673,6 +757,15 @@ export default function AdminPanel({ onBackToStore }) {
           }`}
         >
           Portada / Hero
+        </button>
+
+        <button
+          onClick={() => setActiveTab('launch')}
+          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
+            activeTab === 'launch' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          🎉 Lanzamiento / Sorteo
         </button>
 
         <button
@@ -1126,6 +1219,280 @@ export default function AdminPanel({ onBackToStore }) {
               className="py-2.5 px-6 rounded-xl bg-crimson-600 hover:bg-crimson-500 text-white font-sans font-bold text-xs uppercase tracking-wider"
             >
               Guardar Banner de Portada
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* TAB: LANZAMIENTO / GRAND OPENING */}
+      {activeTab === 'launch' && (
+        <div className="max-w-3xl glass-panel p-6 rounded-2xl border border-gray-800 space-y-6">
+          <div>
+            <h3 className="font-sans font-bold text-lg text-white">Grand Opening — 2K Giveaway</h3>
+            <p className="text-xs text-gray-400 mt-1">
+              Control central del lanzamiento: estado del evento, cuenta atrás, seguidores de X/Twitter, premio y productos destacados del sorteo.
+            </p>
+          </div>
+
+          <form onSubmit={handleSaveLaunch} className="space-y-6">
+
+            {/* Estado del evento */}
+            <div className="space-y-2">
+              <label className="block text-xs font-mono text-gray-300">Estado del evento</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'soon', label: 'Próximamente', hint: 'La Casa se ordena', color: 'amber' },
+                  { id: 'live', label: 'Sorteo activo', hint: 'Participación abierta', color: 'crimson' },
+                  { id: 'open', label: 'Oficialmente abierta', hint: 'Tras la coronación', color: 'gold' }
+                ].map(s => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setLaunch(prev => ({ ...prev, state: s.id }))}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      launch.state === s.id
+                        ? 'bg-crimson-600/20 border-crimson-500 text-white shadow-md shadow-crimson-600/20'
+                        : 'bg-dark-950 border-gray-800 text-gray-400 hover:border-gray-600'
+                    }`}
+                  >
+                    <span className="block text-xs font-bold font-sans uppercase tracking-wider">{s.label}</span>
+                    <span className="block text-[10px] font-mono mt-0.5 opacity-70">{s.hint}</span>
+                  </button>
+                ))}
+              </div>
+
+              <label className="flex items-center gap-2 text-xs text-gray-300 pt-1">
+                <input
+                  type="checkbox"
+                  checked={!!launch.enabled}
+                  onChange={e => setLaunch(prev => ({ ...prev, enabled: e.target.checked }))}
+                  className="accent-gold-500 w-4 h-4"
+                />
+                Mostrar el bloque Grand Opening en la portada y la navegación
+              </label>
+            </div>
+
+            {/* Seguidores */}
+            <div className="bg-dark-950/70 rounded-xl border border-gray-800 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono text-gold-400 font-bold">Progreso de seguidores (X/Twitter)</label>
+                <button
+                  type="button"
+                  onClick={handleRefreshFollowers}
+                  disabled={refreshingFollowers}
+                  className="py-1.5 px-3 rounded-lg bg-gold-500/15 hover:bg-gold-500/25 border border-gold-500/40 text-gold-300 font-mono text-[11px] font-bold flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${refreshingFollowers ? 'animate-spin' : ''}`} />
+                  Refrescar ahora
+                </button>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-mono text-gray-400 mb-1">Handle de X/Twitter (sin @)</label>
+                  <input
+                    type="text"
+                    value={launch.twitterHandle}
+                    onChange={e => setLaunch(prev => ({ ...prev, twitterHandle: e.target.value.replace(/^@/, '') }))}
+                    placeholder="FINDOMYAKUZA"
+                    className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-mono text-gray-400 mb-1">Objetivo (umbral del sorteo)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={launch.targetFollowers}
+                    onChange={e => setLaunch(prev => ({ ...prev, targetFollowers: parseInt(e.target.value, 10) || 2000 }))}
+                    className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono text-gray-400">Fuente:</span>
+                <div className="flex rounded-lg overflow-hidden border border-gray-800">
+                  {[
+                    { id: 'auto', label: 'Automático (15 min)' },
+                    { id: 'manual', label: 'Manual' }
+                  ].map(f => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setLaunch(prev => ({ ...prev, followersSource: f.id }))}
+                      className={`px-3 py-1.5 text-[11px] font-mono ${launch.followersSource === f.id ? 'bg-crimson-600 text-white' : 'bg-dark-950 text-gray-400 hover:text-white'}`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3 items-end">
+                <div>
+                  <label className="block text-[11px] font-mono text-gray-400 mb-1">Valor manual (override)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={launch.followersManual}
+                    onChange={e => setLaunch(prev => ({ ...prev, followersManual: parseInt(e.target.value, 10) || 0 }))}
+                    className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                  />
+                </div>
+                <div className="text-[11px] font-mono text-gray-500 leading-relaxed bg-dark-900 rounded-lg p-2.5 border border-gray-800">
+                  <div>Actual: <span className="text-gold-400 font-bold">{launchFollowers?.count ?? '—'}</span></div>
+                  <div>Fuente: {launchFollowers?.source || '—'}</div>
+                  <div>Última lectura: {launchFollowers?.updatedAt ? new Date(launchFollowers.updatedAt).toLocaleString() : 'sin lectura'}</div>
+                  <div className="text-[10px] mt-1 opacity-70">X a veces bloquea el scraping: si falla, usa el valor manual.</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Cuenta atrás */}
+            <div className="bg-dark-950/70 rounded-xl border border-gray-800 p-4 space-y-3">
+              <label className="flex items-center gap-2 text-xs text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={!!launch.showCountdown}
+                  onChange={e => setLaunch(prev => ({ ...prev, showCountdown: e.target.checked }))}
+                  className="accent-gold-500 w-4 h-4"
+                />
+                Activar cuenta atrás hacia una fecha fija
+              </label>
+              <div>
+                <label className="block text-[11px] font-mono text-gray-400 mb-1">Fecha y hora del Grand Opening</label>
+                <input
+                  type="datetime-local"
+                  value={isoToLocalInput(launch.countdownTarget)}
+                  onChange={e => setLaunch(prev => ({ ...prev, countdownTarget: e.target.value }))}
+                  className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-mono text-gray-400 mb-1">URL de la publicación del sorteo (X/Twitter)</label>
+                <input
+                  type="url"
+                  value={launch.twitterUrl}
+                  onChange={e => setLaunch(prev => ({ ...prev, twitterUrl: e.target.value }))}
+                  placeholder="https://x.com/FINDOMYAKUZA/status/..."
+                  className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                />
+              </div>
+            </div>
+
+            {/* Premio */}
+            <div className="bg-dark-950/70 rounded-xl border border-gray-800 p-4 space-y-3">
+              <p className="text-xs font-mono text-gold-400 font-bold">El Premio</p>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-mono text-gray-400 mb-1">Nombre</label>
+                  <input
+                    type="text"
+                    value={launch.prize.name}
+                    onChange={e => setLaunch(prev => ({ ...prev, prize: { ...prev.prize, name: e.target.value } }))}
+                    placeholder="Devoción Coronada"
+                    className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-mono text-gray-400 mb-1">Etiqueta de valor</label>
+                  <input
+                    type="text"
+                    value={launch.prize.valueLabel}
+                    onChange={e => setLaunch(prev => ({ ...prev, prize: { ...prev.prize, valueLabel: e.target.value } }))}
+                    placeholder="Valor simbólico 300€"
+                    className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-mono text-gray-400 mb-1">Descripción</label>
+                <textarea
+                  rows={3}
+                  value={launch.prize.description}
+                  onChange={e => setLaunch(prev => ({ ...prev, prize: { ...prev.prize, description: e.target.value } }))}
+                  className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-mono text-gray-400 mb-1">Imagen del premio</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={launch.prize.imageUrl}
+                    onChange={e => setLaunch(prev => ({ ...prev, prize: { ...prev.prize, imageUrl: e.target.value } }))}
+                    placeholder="https://..."
+                    className="flex-1 bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setMediaPickerTarget('launch_prize'); setMediaPickerOpen(true); }}
+                    className="py-2 px-3 rounded-lg bg-gold-500/20 hover:bg-gold-500/30 border border-gold-500/40 text-gold-300 font-mono text-xs font-bold flex items-center gap-1.5"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                    Elegir / Subir
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Cómo participar + condiciones */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-mono text-gray-400 mb-1">Cómo participar (visible en la página del sorteo)</label>
+                <textarea
+                  rows={4}
+                  value={launch.howToEnterBody}
+                  onChange={e => setLaunch(prev => ({ ...prev, howToEnterBody: e.target.value }))}
+                  placeholder="Pasos para participar…"
+                  className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-mono text-gray-400 mb-1">Condiciones</label>
+                <textarea
+                  rows={3}
+                  value={launch.terms}
+                  onChange={e => setLaunch(prev => ({ ...prev, terms: e.target.value }))}
+                  className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                />
+              </div>
+            </div>
+
+            {/* Productos destacados */}
+            <div className="bg-dark-950/70 rounded-xl border border-gray-800 p-4 space-y-3">
+              <p className="text-xs font-mono text-gold-400 font-bold">Productos destacados del sorteo ({launch.featuredItemIds.length})</p>
+              <p className="text-[11px] text-gray-500">Se muestran en la página del sorteo para que quien entra siga explorando la tienda.</p>
+              <div className="grid sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                {items.map(item => (
+                  <label
+                    key={item.id}
+                    className={`flex items-center gap-2.5 p-2 rounded-lg border cursor-pointer transition-all text-xs ${
+                      launch.featuredItemIds.includes(item.id)
+                        ? 'border-gold-500/60 bg-gold-500/10 text-white'
+                        : 'border-gray-800 bg-dark-900 text-gray-400 hover:border-gray-600'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="accent-gold-500"
+                      checked={launch.featuredItemIds.includes(item.id)}
+                      onChange={() => toggleFeaturedItem(item.id)}
+                    />
+                    <span className="font-mono text-gold-400">{item.code}</span>
+                    <span className="truncate">{item.name}</span>
+                    <span className="ml-auto font-mono flex-shrink-0">{item.basePrice}€</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="py-2.5 px-6 rounded-xl bg-crimson-600 hover:bg-crimson-500 text-white font-sans font-bold text-xs uppercase tracking-wider"
+            >
+              Guardar Configuración del Grand Opening
             </button>
           </form>
         </div>
@@ -2114,6 +2481,9 @@ export default function AdminPanel({ onBackToStore }) {
         onSelectUrl={(url) => {
           if (mediaPickerTarget === 'banner_bg') {
             setBanner(prev => ({ ...prev, bgImageUrl: url }));
+          }
+          if (mediaPickerTarget === 'launch_prize') {
+            setLaunch(prev => ({ ...prev, prize: { ...prev.prize, imageUrl: url } }));
           }
         }}
         onSelectUrls={async (urls) => {
