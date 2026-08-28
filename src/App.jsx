@@ -147,37 +147,43 @@ export default function App() {
 
       <main className="flex-1">
         
-        {/* DYNAMIC HERO BANNER PORTADA */}
+        {/* DYNAMIC HERO BANNER PORTADA (CLUB ART DÉCO) */}
         <section
-          className="relative py-16 md:py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-dark-950 via-dark-900 to-dark-900 border-b border-crimson-600/20 overflow-hidden bg-cover bg-center"
+          className="relative py-20 md:py-28 px-4 sm:px-6 lg:px-8 bg-cover bg-center border-b border-gold-500/35 overflow-hidden"
           style={{ backgroundImage: banner?.bgImageUrl ? `url(${banner.bgImageUrl})` : undefined }}
         >
-          <div className="absolute inset-0 bg-black/60 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-crimson-900/30 via-transparent to-transparent pointer-events-none" />
+          {/* Film Vignette & Warm Lighting Filter */}
+          <div className="absolute inset-0 bg-dark-950/80 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-bordeaux-700/40 via-dark-950/80 to-dark-950 pointer-events-none" />
           
           <div className="max-w-5xl mx-auto text-center relative z-10 space-y-6">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel-gold border border-gold-500/30 text-gold-400 text-xs font-mono tracking-widest uppercase mb-2 animate-bounce">
+            <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full legibility-shield border border-gold-500/50 text-gold-300 text-xs font-sans tracking-widest uppercase mb-2 shadow-xl">
               <Crown className="w-4 h-4 text-gold-400" />
-              {banner?.badge || 'Boutique Findom & Fetish Exclusiva'}
+              {banner?.badge || '✦ CLUB PRIVADO & BOUTIQUE FETISH EXCLUSIVA ✦'}
             </div>
 
-            <h1 className="font-sans font-black text-4xl sm:text-6xl lg:text-7xl tracking-wider text-white">
+            <h1 className="font-sans font-black text-4xl sm:text-6xl lg:text-7xl tracking-widest text-ivory-100 display-shadow">
               {banner?.title ? banner.title : (
-                <>YAKUZA <span className="text-crimson-gradient">HOUSE</span></>
+                <>YAKUZA <span className="text-gold-gradient">HOUSE</span></>
               )}
             </h1>
 
-            <p className="text-sm sm:text-base text-gray-300 max-w-2xl mx-auto font-light leading-relaxed">
-              {banner?.subtitle || 'Descubre lencería usada, fluidos exclusivos y piezas únicas con compra directa sin formularios largos. Envío discreto garantizado o gestión directa por Vinted.'}
+            {/* Art Déco Divider */}
+            <div className="artdeco-divider max-w-md mx-auto">
+              <div className="ad-center" />
+            </div>
+
+            <p className="text-sm sm:text-base text-ivory-300 max-w-2xl mx-auto font-body leading-relaxed legibility-shield p-4 rounded-xl border border-gold-500/20">
+              {banner?.subtitle || 'Bienvenido a tu perdición. Explora lencería de autor, fluidos exclusivos y piezas de culto con compra directa y total discreción.'}
             </p>
 
             {/* Direct Quick Action */}
             <div className="flex flex-wrap justify-center gap-4 pt-4">
               <button
                 onClick={() => setActiveTab('fetish')}
-                className="py-3.5 px-8 rounded-xl bg-gradient-to-r from-crimson-700 via-crimson-600 to-crimson-500 text-white font-sans font-bold text-xs uppercase tracking-widest shadow-xl shadow-crimson-600/30 hover:scale-105 transition-all flex items-center gap-2"
+                className="btn-royal-bordeaux"
               >
                 <Sparkles className="w-4 h-4 text-gold-400" />
-                {banner?.buttonText || 'Explorar Catálogo de la Tienda'}
+                {banner?.buttonText || 'Entrar en Mi Mundo'}
               </button>
             </div>
 
@@ -188,30 +194,30 @@ export default function App() {
         {activeTab === 'fetish' && (
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
             
-            {/* Intro Quote */}
-            <div className="glass-panel p-8 rounded-2xl border-l-4 border-l-crimson-500 max-w-4xl mx-auto space-y-4">
-              <p className="text-sm sm:text-base text-gray-200 italic font-serif leading-relaxed">
+            {/* Intro Quote (Legibility Shield & Bordeaux Panel) */}
+            <div className="legibility-bordeaux p-8 rounded-2xl border border-gold-500/40 max-w-4xl mx-auto space-y-4 shadow-2xl">
+              <p className="text-sm sm:text-base text-ivory-300 italic font-serif leading-relaxed">
                 “Mi saliva, las marcas en mis suelas, mis calcetines sudados tras una dura sesión o incluso mi repostería fina es un manjar reservado para alguien inferior como tú. Me encanta complacerme a tu costa y otorgarte el honor de poseer mi esencia.”
               </p>
-              <div className="flex flex-wrap gap-4 text-xs font-mono text-gray-400 pt-2 border-t border-gray-800">
-                <span className="flex items-center gap-1.5 text-gold-400">
-                  <Lock className="w-3.5 h-3.5" /> Envíos discretos y sellados al vacío
+              <div className="flex flex-wrap gap-4 text-xs font-sans text-ivory-400 pt-3 border-t border-gold-500/20">
+                <span className="flex items-center gap-1.5 text-gold-300">
+                  <Lock className="w-3.5 h-3.5 text-gold-400" /> Envíos discretos y sellados al vacío
                 </span>
-                <span className="flex items-center gap-1.5 text-crimson-400">
-                  <ShoppingBag className="w-3.5 h-3.5" /> Opción de gestión por Vinted integrada
+                <span className="flex items-center gap-1.5 text-bordeaux-300">
+                  <ShoppingBag className="w-3.5 h-3.5 text-gold-400" /> Opción de gestión directa por Vinted integrada
                 </span>
               </div>
             </div>
 
             {/* BARRA DE NAVEGACIÓN POR CATEGORÍAS */}
             {categories.length > 0 && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-4 border-b border-gray-800">
+              <div className="flex items-center gap-2 overflow-x-auto pb-4 border-b border-gold-500/20">
                 <button
                   onClick={() => setSelectedCategory('')}
-                  className={`py-2 px-4 rounded-full font-mono text-xs whitespace-nowrap transition-all ${
+                  className={`py-2 px-5 rounded-full font-sans text-xs uppercase tracking-widest whitespace-nowrap transition-all ${
                     selectedCategory === ''
-                      ? 'bg-crimson-600 text-white font-bold shadow-md shadow-crimson-600/30'
-                      : 'bg-dark-950 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
+                      ? 'bg-bordeaux-600/80 text-gold-300 font-bold border border-gold-500/60 shadow-lg shadow-bordeaux-700/50'
+                      : 'bg-dark-950/80 border border-gold-500/20 text-ivory-400 hover:text-white hover:border-gold-500/40'
                   }`}
                 >
                   Todas las categorías ({items.length})
@@ -220,10 +226,10 @@ export default function App() {
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.slug)}
-                    className={`py-2 px-4 rounded-full font-mono text-xs whitespace-nowrap transition-all ${
+                    className={`py-2 px-5 rounded-full font-sans text-xs uppercase tracking-widest whitespace-nowrap transition-all ${
                       selectedCategory === cat.slug
-                        ? 'bg-crimson-600 text-white font-bold shadow-md shadow-crimson-600/30'
-                        : 'bg-dark-950 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
+                        ? 'bg-bordeaux-600/80 text-gold-300 font-bold border border-gold-500/60 shadow-lg shadow-bordeaux-700/50'
+                        : 'bg-dark-950/80 border border-gold-500/20 text-ivory-400 hover:text-white hover:border-gold-500/40'
                     }`}
                   >
                     {cat.name}
@@ -234,14 +240,14 @@ export default function App() {
 
             {/* GRIDA DE ARTÍCULOS DE LA TIENDA */}
             <div>
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8 border-b border-gray-800 pb-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8 border-b border-gold-500/20 pb-4">
                 <div>
-                  <span className="text-xs font-mono text-crimson-400 uppercase tracking-widest block">Catálogo Oficial</span>
-                  <h2 className="font-sans font-extrabold text-2xl text-white">
-                    {selectedCategory ? categories.find(c => c.slug === selectedCategory)?.name || 'Artículos' : 'Todos los Artículos de la Tienda'}
+                  <span className="text-xs font-sans text-gold-400 uppercase tracking-widest block">✦ Catálogo Exclusivo</span>
+                  <h2 className="font-sans font-extrabold text-2xl text-ivory-100">
+                    {selectedCategory ? categories.find(c => c.slug === selectedCategory)?.name || 'Artículos' : 'Todos los Artículos del Club'}
                   </h2>
                 </div>
-                <p className="text-xs text-gray-400 font-mono">Haz clic en un artículo para ver su galería multimedia, valoraciones y extras</p>
+                <p className="text-xs text-ivory-400 font-sans">Haz clic en un artículo para ver su galería multimedia, valoraciones y extras</p>
               </div>
 
               {loadingItems ? (
