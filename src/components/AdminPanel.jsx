@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Package, Plus, Edit, Trash2, Eye, EyeOff, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart } from 'lucide-react';
-import { API_BASE, resolveMediaUrl } from '../config';
+import { API_BASE, resolveMediaUrl, safeFetchJson } from '../config';
 import princessVideo from '../princess-yakuza.mp4';
 import { MediaPickerModal } from './MediaPickerModal';
 
@@ -586,17 +586,15 @@ export default function AdminPanel({ onBackToStore }) {
         ...launch,
         countdownTarget: launch.countdownTarget ? new Date(launch.countdownTarget).toISOString() : null
       };
-      const res = await fetch(`${API_BASE}/api/store/admin/launch`, {
+      await safeFetchJson(`${API_BASE}/api/store/admin/launch`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error guardando lanzamiento');
       alert('Configuración del Grand Opening guardada.');
       fetchAllData();
     } catch (err) {
-      alert(err.message);
+      alert(err.message || 'Error guardando lanzamiento');
     }
   };
 

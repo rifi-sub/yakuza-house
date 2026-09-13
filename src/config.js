@@ -21,3 +21,18 @@ export function resolveMediaUrl(url) {
 
   return url;
 }
+
+// Helper seguro para peticiones fetch que devuelven JSON
+export async function safeFetchJson(url, options = {}) {
+  const res = await fetch(url, options);
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const text = await res.text();
+    throw new Error(`El servidor (${url}) respondió con un formato no válido (${res.status} ${res.statusText}). Comprueba que el backend esté activo.`);
+  }
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || data.message || `Error en la solicitud HTTP (${res.status})`);
+  }
+  return data;
+}
