@@ -1308,42 +1308,18 @@ export default function AdminPanel({ onBackToStore }) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-mono text-gray-400">Fuente:</span>
-                <div className="flex rounded-lg overflow-hidden border border-gray-800">
-                  {[
-                    { id: 'auto', label: 'Automático (15 min)' },
-                    { id: 'manual', label: 'Manual' }
-                  ].map(f => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => setLaunch(prev => ({ ...prev, followersSource: f.id }))}
-                      className={`px-3 py-1.5 text-[11px] font-mono ${launch.followersSource === f.id ? 'bg-crimson-600 text-white' : 'bg-dark-950 text-gray-400 hover:text-white'}`}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-3 items-end">
-                <div>
-                  <label className="block text-[11px] font-mono text-gray-400 mb-1">Valor manual (override)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={launch.followersManual}
-                    onChange={e => setLaunch(prev => ({ ...prev, followersManual: parseInt(e.target.value, 10) || 0 }))}
-                    className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div className="text-[11px] font-mono text-gray-500 leading-relaxed bg-dark-900 rounded-lg p-2.5 border border-gray-800">
-                  <div>Actual: <span className="text-gold-400 font-bold">{launchFollowers?.count ?? '—'}</span></div>
-                  <div>Fuente: {launchFollowers?.source || '—'}</div>
-                  <div>Última lectura: {launchFollowers?.updatedAt ? new Date(launchFollowers.updatedAt).toLocaleString() : 'sin lectura'}</div>
-                  <div className="text-[10px] mt-1 opacity-70">X a veces bloquea el scraping: si falla, usa el valor manual.</div>
-                </div>
+              <div>
+                <label className="block text-[11px] font-mono text-gray-400 mb-1">Número actual de Seguidores / Participantes (Manual)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={launch.followersManual}
+                  onChange={e => setLaunch(prev => ({ ...prev, followersManual: parseInt(e.target.value, 10) || 0, followersSource: 'manual' }))}
+                  className="w-full bg-dark-950 border border-gold-500/40 rounded px-3 py-2 text-xs text-gold-300 font-bold"
+                />
+                <p className="text-[10px] text-gray-400 font-mono mt-1">
+                  ✦ Contador manual exclusivo (sin depender de la API/scraping externo de X).
+                </p>
               </div>
             </div>
 
