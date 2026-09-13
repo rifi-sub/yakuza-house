@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { ShoppingBag, Crown, Sparkles, Menu, X, Settings } from 'lucide-react';
+import { ShoppingBag, Crown, Sparkles, Menu, X, Settings, HelpCircle, Gift } from 'lucide-react';
 
 export default function Header({ activeTab, setActiveTab, onOpenLegal, onOpenOrderLookup, itemsInCartCount = 0, onOpenCart }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
     { id: 'fetish', label: 'TIENDA (FETISH HOUSE)', icon: Sparkles, isStore: true },
+    { id: 'princess', label: 'YAKUZA PRINCESS', icon: Crown },
+    { id: 'giveaway', label: 'GRAND OPENING ✦ 2K', icon: Gift },
+    { id: 'howtoorder', label: 'CÓMO PEDIR', icon: HelpCircle }
   ];
 
   return (
