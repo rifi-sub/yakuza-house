@@ -26,9 +26,18 @@ function useCountdown(target) {
 const pad = n => String(n).padStart(2, '0');
 
 export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDetails, onAddToCart }) {
+  const [numberTab, setNumberTab] = useState('all');
+  const [searchRaffleQuery, setSearchRaffleQuery] = useState('');
+
   const config = launch?.config || {};
   const followers = launch?.followers || {};
   const featuredItems = Array.isArray(launch?.featuredItems) ? launch.featuredItems : [];
+
+  const raffle = config.raffleNumbers || { total: 100, assigned: {} };
+  const totalRaffle = typeof raffle.total === 'number' ? raffle.total : 100;
+  const assignedMap = raffle.assigned || {};
+  const assignedCount = Object.keys(assignedMap).length;
+  const availableCount = Math.max(0, totalRaffle - assignedCount);
 
   const state = config.state || 'soon';
   const stateCopy = copy.giveaway.states[state] || copy.giveaway.states.soon;
@@ -188,6 +197,151 @@ export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDe
             </div>
           </Reveal>
         </div>
+      </section>
+
+      {/* TABLERO DE PAPELETAS Y NÚMEROS DISPONIBLES / COMPRADOS */}
+      <section className="max-w-5xl mx-auto px-6 py-12">
+        <Reveal>
+          <div className="glass-panel p-8 md:p-10 space-y-8 border border-gold-500/35 rounded-3xl shadow-2xl">
+            
+            {/* Header del Panel */}
+            <div className="text-center space-y-3">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gold-500/10 border border-gold-500/30 text-gold-300 text-xs font-sans tracking-widest uppercase">
+                <Gift className="w-4 h-4 text-gold-400" />
+                <span>TABLA OFICIAL DE PAPELETAS DEL SORTEO</span>
+              </div>
+              <h2 className="font-brand font-black text-3xl sm:text-4xl text-ivory-100">
+                Estado de Números en Tiempo Real
+              </h2>
+              <p className="text-xs sm:text-sm text-ivory-300 max-w-2xl mx-auto font-sans leading-relaxed">
+                Consulta los números disponibles para la rifa. Cada vez que un devoto o sumi adquiere una papeleta, su número se actualiza y queda registrado en el tablero oficial de la Casa.
+              </p>
+            </div>
+
+            {/* Barra de Estadísticas & Contadores */}
+            <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto text-center">
+              <div className="legibility-shield p-4 rounded-xl border border-gold-500/30">
+                <span className="block text-2xl md:text-3xl font-mono font-bold text-ivory-100">{totalRaffle}</span>
+                <span className="text-[10px] sm:text-xs font-sans tracking-wider uppercase text-gray-400">Total Papeletas</span>
+              </div>
+              <div className="legibility-shield p-4 rounded-xl border border-gold-500/50 bg-gold-500/10 shadow-lg shadow-gold-500/10">
+                <span className="block text-2xl md:text-3xl font-mono font-bold text-gold-300">{availableCount}</span>
+                <span className="text-[10px] sm:text-xs font-sans tracking-wider uppercase text-gold-400 font-semibold">Disponibles</span>
+              </div>
+              <div className="legibility-shield p-4 rounded-xl border border-bordeaux-500/50 bg-bordeaux-600/30 shadow-lg shadow-bordeaux-700/30">
+                <span className="block text-2xl md:text-3xl font-mono font-bold text-bordeaux-300">{assignedCount}</span>
+                <span className="text-[10px] sm:text-xs font-sans tracking-wider uppercase text-bordeaux-300 font-semibold">Vendidas / Reservadas</span>
+              </div>
+            </div>
+
+            {/* Filtros de Pestañas & Búsqueda */}
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 border-t border-b border-gold-500/20 py-4">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setNumberTab('all')}
+                  className={`px-4 py-2 rounded-lg font-sans text-xs uppercase tracking-wider transition-all ${
+                    numberTab === 'all'
+                      ? 'bg-gold-500 text-dark-950 font-bold shadow-md'
+                      : 'bg-dark-950 border border-gold-500/20 text-ivory-400 hover:text-white'
+                  }`}
+                >
+                  Todas ({totalRaffle})
+                </button>
+                <button
+                  onClick={() => setNumberTab('available')}
+                  className={`px-4 py-2 rounded-lg font-sans text-xs uppercase tracking-wider transition-all ${
+                    numberTab === 'available'
+                      ? 'bg-gold-500 text-dark-950 font-bold shadow-md'
+                      : 'bg-dark-950 border border-gold-500/20 text-ivory-400 hover:text-white'
+                  }`}
+                >
+                  Disponibles ({availableCount})
+                </button>
+                <button
+                  onClick={() => setNumberTab('assigned')}
+                  className={`px-4 py-2 rounded-lg font-sans text-xs uppercase tracking-wider transition-all ${
+                    numberTab === 'assigned'
+                      ? 'bg-bordeaux-600 text-gold-300 font-bold border border-gold-500/40 shadow-md'
+                      : 'bg-dark-950 border border-gold-500/20 text-ivory-400 hover:text-white'
+                  }`}
+                >
+                  Reservadas ({assignedCount})
+                </button>
+              </div>
+
+              <div className="w-full sm:w-64">
+                <input
+                  type="text"
+                  value={searchRaffleQuery}
+                  onChange={e => setSearchRaffleQuery(e.target.value)}
+                  placeholder="Buscar nº (ej: 07) o alias..."
+                  className="w-full bg-dark-950 border border-gold-500/30 rounded-lg px-3 py-2 text-xs text-white"
+                />
+              </div>
+            </div>
+
+            {/* Grid de Números de la Rifa */}
+            <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2.5 max-h-[28rem] overflow-y-auto pr-1">
+              {Array.from({ length: totalRaffle }).map((_, idx) => {
+                const numStr = String(idx).padStart(totalRaffle > 100 ? 3 : 2, '0');
+                const assignedData = assignedMap[numStr];
+                const isAssigned = !!assignedData;
+
+                // Filtro tab
+                if (numberTab === 'available' && isAssigned) return null;
+                if (numberTab === 'assigned' && !isAssigned) return null;
+
+                // Filtro busqueda
+                if (searchRaffleQuery.trim()) {
+                  const q = searchRaffleQuery.toLowerCase();
+                  const matchesNum = numStr.includes(q);
+                  const matchesBuyer = assignedData?.buyer?.toLowerCase().includes(q);
+                  if (!matchesNum && !matchesBuyer) return null;
+                }
+
+                return (
+                  <div
+                    key={numStr}
+                    className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center min-h-[4rem] relative overflow-hidden ${
+                      isAssigned
+                        ? 'bg-bordeaux-700/70 border-bordeaux-500 text-ivory-100 shadow-md shadow-bordeaux-700/40'
+                        : 'bg-dark-950/90 border-gold-500/40 text-gold-300 hover:border-gold-400 hover:bg-gold-500/10 hover:scale-105'
+                    }`}
+                  >
+                    <span className={`font-mono text-sm font-bold tracking-widest ${isAssigned ? 'text-ivory-200 line-through opacity-80' : 'text-gold-300'}`}>
+                      #{numStr}
+                    </span>
+
+                    {isAssigned ? (
+                      <span className="text-[9px] font-sans font-bold text-gold-300 truncate max-w-full block mt-1 bg-dark-950/80 px-1.5 py-0.5 rounded border border-gold-500/30">
+                        {assignedData.buyer}
+                      </span>
+                    ) : (
+                      <span className="text-[8px] font-mono tracking-wider uppercase text-gold-400/80 block mt-1">
+                        DISPONIBLE
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* CTA para conseguir número */}
+            <div className="pt-4 border-t border-gold-500/20 text-center space-y-3">
+              <p className="text-xs text-ivory-300 font-sans">
+                ¿Quieres asegurar tu número para el sorteo de la Casa? Adquiere tu participación directa o consulta con la Princesa.
+              </p>
+              <button
+                onClick={onBackToStore}
+                className="btn-royal-bordeaux"
+              >
+                <Sparkles className="w-4 h-4 text-gold-400" />
+                Ver Piezas & Conseguir Número
+              </button>
+            </div>
+
+          </div>
+        </Reveal>
       </section>
 
       {/* CÓMO PARTICIPAR */}

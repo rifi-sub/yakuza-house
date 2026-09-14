@@ -34,11 +34,19 @@ export default function AdminPanel({ onBackToStore }) {
     prize: { name: '', description: '', valueLabel: '', imageUrl: '' },
     howToEnterBody: '',
     terms: '',
-    featuredItemIds: []
+    featuredItemIds: [],
+    raffleNumbers: {
+      total: 100,
+      assigned: {}
+    }
   };
   const [launch, setLaunch] = useState(launchDefaults);
   const [launchFollowers, setLaunchFollowers] = useState(null);
   const [refreshingFollowers, setRefreshingFollowers] = useState(false);
+  const [selectedRaffleNum, setSelectedRaffleNum] = useState(null);
+  const [raffleBuyerInput, setRaffleBuyerInput] = useState('');
+  const [raffleNotesInput, setRaffleNotesInput] = useState('');
+  const [raffleFilterText, setRaffleFilterText] = useState('');
   const [loading, setLoading] = useState(false);
 
   // ISO UTC -> string "YYYY-MM-DDTHH:mm" para <input type="datetime-local">
@@ -1462,6 +1470,98 @@ export default function AdminPanel({ onBackToStore }) {
               </div>
             </div>
 
+            {/* PANEL EDITABLE DE NÚMEROS DEL SORTEO / PAPELETAS */}
+            <div className="bg-dark-950/70 rounded-xl border border-gray-800 p-4 space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-gray-800 pb-3">
+                <div>
+                  <p className="text-xs font-mono text-gold-400 font-bold uppercase tracking-wider flex items-center gap-2">
+                    🎟️ Panel de Números / Papeletas del Sorteo
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    Gestiona la disponibilidad de números. Asigna cada número al Sumi que lo compre o desasígnalo cuando quede libre.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono px-3 py-1 rounded-full bg-bordeaux-600/50 border border-gold-500/40 text-gold-300 font-bold">
+                    {Object.keys(launch.raffleNumbers?.assigned || {}).length} / {launch.raffleNumbers?.total || 100} Vendidos
+                  </span>
+                </div>
+              </div>
+
+              {/* Total de números configurados y filtro */}
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-mono text-gray-400 mb-1">Total de Papeletas Generadas (Ej: 100 para 00-99)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="1000"
+                    value={launch.raffleNumbers?.total || 100}
+                    onChange={e => {
+                      const total = parseInt(e.target.value, 10) || 100;
+                      setLaunch(prev => ({
+                        ...prev,
+                        raffleNumbers: {
+                          total,
+                          assigned: prev.raffleNumbers?.assigned || {}
+                        }
+                      }));
+                    }}
+                    className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-mono text-gray-400 mb-1">Filtrar por Número o Nombre de Sumi</label>
+                  <input
+                    type="text"
+                    value={raffleFilterText}
+                    onChange={e => setRaffleFilterText(e.target.value)}
+                    placeholder="Ej: 07 o @Sumi_Alpha..."
+                    className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Grid de números interactivos */}
+              <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 max-h-72 overflow-y-auto p-3 bg-dark-900 rounded-xl border border-gray-800">
+                {Array.from({ length: launch.raffleNumbers?.total || 100 }).map((_, idx) => {
+                  const numStr = String(idx).padStart((launch.raffleNumbers?.total || 100) > 100 ? 3 : 2, '0');
+                  const assignedData = launch.raffleNumbers?.assigned?.[numStr];
+                  const isAssigned = !!assignedData;
+
+                  if (raffleFilterText.trim()) {
+                    const q = raffleFilterText.toLowerCase();
+                    const matchesNum = numStr.includes(q);
+                    const matchesBuyer = assignedData?.buyer?.toLowerCase().includes(q);
+                    if (!matchesNum && !matchesBuyer) return null;
+                  }
+
+                  return (
+                    <button
+                      key={numStr}
+                      type="button"
+                      onClick={() => {
+                        setSelectedRaffleNum(numStr);
+                        setRaffleBuyerInput(assignedData?.buyer || '');
+                        setRaffleNotesInput(assignedData?.notes || '');
+                      }}
+                      className={`p-2 rounded-lg border text-center font-mono text-xs transition-all flex flex-col items-center justify-center min-h-[3.2rem] ${
+                        isAssigned
+                          ? 'bg-bordeaux-700/80 border-bordeaux-400 text-ivory-100 shadow-md hover:bg-bordeaux-600'
+                          : 'bg-dark-950 hover:bg-gold-500/20 border-gray-800 hover:border-gold-500/60 text-gold-400'
+                      }`}
+                      title={isAssigned ? `Vendido a: ${assignedData.buyer}` : `Número #${numStr} Disponible`}
+                    >
+                      <span className={`font-bold text-xs ${isAssigned ? 'text-gold-300' : 'text-gold-400'}`}>#{numStr}</span>
+                      <span className="text-[9px] truncate max-w-full block text-ivory-300 font-sans mt-0.5 opacity-90">
+                        {isAssigned ? assignedData.buyer : 'Libre'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <button
               type="submit"
               className="py-2.5 px-6 rounded-xl bg-crimson-600 hover:bg-crimson-500 text-white font-sans font-bold text-xs uppercase tracking-wider"
@@ -2484,6 +2584,106 @@ export default function AdminPanel({ onBackToStore }) {
           }
         }}
       />
+
+      {/* MODAL DE ASIGNACIÓN / LIBERACIÓN DE NÚMERO DE SORTEO */}
+      {selectedRaffleNum !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="glass-modal p-6 rounded-2xl max-w-md w-full text-gray-100 border border-gold-500/40 space-y-4">
+            <div className="flex justify-between items-center border-b border-gold-500/20 pb-3">
+              <h3 className="font-sans font-bold text-lg text-gold-300 flex items-center gap-2">
+                🎟️ Gestionar Papeleta #{selectedRaffleNum}
+              </h3>
+              <button
+                onClick={() => setSelectedRaffleNum(null)}
+                className="text-gray-400 hover:text-white p-1 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-mono text-gray-300 mb-1">
+                  Alias del Sumiso / Nombre del Comprador
+                </label>
+                <input
+                  type="text"
+                  value={raffleBuyerInput}
+                  onChange={e => setRaffleBuyerInput(e.target.value)}
+                  placeholder="Ej: @Sumi_Carlos o Devoto_99"
+                  className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-mono text-gray-300 mb-1">
+                  Notas / Nº de Pedido (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={raffleNotesInput}
+                  onChange={e => setRaffleNotesInput(e.target.value)}
+                  placeholder="Ej: YAK-2026-0014"
+                  className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 justify-end pt-2 border-t border-gold-500/20">
+              {launch.raffleNumbers?.assigned?.[selectedRaffleNum] && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLaunch(prev => {
+                      const newAssigned = { ...(prev.raffleNumbers?.assigned || {}) };
+                      delete newAssigned[selectedRaffleNum];
+                      return {
+                        ...prev,
+                        raffleNumbers: {
+                          ...prev.raffleNumbers,
+                          assigned: newAssigned
+                        }
+                      };
+                    });
+                    setSelectedRaffleNum(null);
+                  }}
+                  className="py-2 px-4 rounded-lg bg-bordeaux-600/60 hover:bg-bordeaux-500 border border-bordeaux-400 text-xs font-sans text-white font-bold"
+                >
+                  Liberar (Hacer Disponible)
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!raffleBuyerInput.trim()) {
+                    alert('Por favor introduce el nombre o alias del comprador.');
+                    return;
+                  }
+                  setLaunch(prev => ({
+                    ...prev,
+                    raffleNumbers: {
+                      ...prev.raffleNumbers,
+                      assigned: {
+                        ...(prev.raffleNumbers?.assigned || {}),
+                        [selectedRaffleNum]: {
+                          buyer: raffleBuyerInput.trim(),
+                          notes: raffleNotesInput.trim(),
+                          assignedAt: new Date().toISOString()
+                        }
+                      }
+                    }
+                  }));
+                  setSelectedRaffleNum(null);
+                }}
+                className="py-2 px-5 rounded-lg bg-gold-500 hover:bg-gold-400 text-dark-950 font-sans font-bold text-xs uppercase"
+              >
+                Guardar Asignación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
