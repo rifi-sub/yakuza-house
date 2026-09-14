@@ -50,9 +50,10 @@ export default {
       },
       fontFamily: {
         display: ['"Cinzel Decorative"', 'Cinzel', 'serif'],
-        sans: ['Cinzel', 'Georgia', 'serif'],
+        brand: ['Cinzel', 'Georgia', 'serif'],
+        sans: ['"Plus Jakarta Sans"', 'Montserrat', 'system-ui', 'sans-serif'],
         serif: ['"Cormorant Garamond"', 'Georgia', 'serif'],
-        body: ['Inter', 'sans-serif']
+        body: ['"Plus Jakarta Sans"', 'Montserrat', 'system-ui', 'sans-serif']
       },
       letterSpacing: {
         widest2: '0.35em'

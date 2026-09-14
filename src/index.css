@@ -6,13 +6,13 @@
   body {
     background-color: #040405;
     color: #efe6d0;
-    font-family: Inter, sans-serif;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: Cinzel, Georgia, serif;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
   }
 
   input, textarea, select {
