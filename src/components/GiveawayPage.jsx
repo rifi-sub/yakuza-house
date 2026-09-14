@@ -140,7 +140,7 @@ export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDe
 
       {/* PROGRESO A LOS 2.000 */}
       {!isOpen && (
-        <section className="max-w-3xl mx-auto px-6 py-20">
+        <section className="max-w-3xl mx-auto px-6 pt-12 pb-4">
           <Reveal>
             <div className="glass-panel p-8 md:p-10 space-y-6">
               <div className="text-center space-y-1">
@@ -167,9 +167,9 @@ export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDe
       )}
 
       {/* PREMIO */}
-      <section className="max-w-4xl mx-auto px-6 py-16">
+      <section className="max-w-4xl mx-auto px-6 pt-4 pb-8">
         <Reveal>
-          <div className="ornament-divider mb-12"><span className="om-center" /></div>
+          <div className="ornament-divider mb-6"><span className="om-center" /></div>
         </Reveal>
         <div className="grid md:grid-cols-2 gap-10 items-center">
           <Reveal variant="reveal-left">
@@ -200,7 +200,7 @@ export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDe
       </section>
 
       {/* TABLERO DE PAPELETAS Y NÚMEROS DISPONIBLES / COMPRADOS */}
-      <section className="max-w-5xl mx-auto px-6 py-12">
+      <section className="max-w-5xl mx-auto px-6 pt-4 pb-12">
         <Reveal>
           <div className="glass-panel p-8 md:p-10 space-y-8 border border-gold-500/35 rounded-3xl shadow-2xl">
             
