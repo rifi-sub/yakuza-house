@@ -49,8 +49,10 @@ export default {
         }
       },
       fontFamily: {
-        display: ['"Cinzel Decorative"', 'Cinzel', 'serif'],
-        brand: ['"Cinzel Decorative"', 'Cinzel', 'Georgia', 'serif'],
+        display: ['"Italiana"', '"Cinzel Decorative"', 'Cinzel', 'serif'],
+        luxury: ['"Italiana"', '"Bodoni Moda"', 'serif'],
+        bodoni: ['"Bodoni Moda"', 'serif'],
+        brand: ['"Cinzel Decorative"', '"Italiana"', 'Cinzel', 'Georgia', 'serif'],
         sans: ['"Plus Jakarta Sans"', 'Montserrat', 'system-ui', 'sans-serif'],
         serif: ['"Cormorant Garamond"', 'Georgia', 'serif'],
         body: ['"Plus Jakarta Sans"', 'Montserrat', 'system-ui', 'sans-serif']

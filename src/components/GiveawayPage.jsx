@@ -4,6 +4,7 @@ import Reveal from './Reveal';
 import ItemCard from './ItemCard';
 import copy from '../copy';
 import { resolveMediaUrl } from '../config';
+import grandOpeningHeroImg from '../assets/grand-opening-hero.png';
 
 // --- Cuenta atrás ---
 function useCountdown(target) {
@@ -64,53 +65,26 @@ export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDe
 
         <div className="relative z-10 max-w-4xl mx-auto px-6 text-center space-y-6">
           
-          {/* EJE DECORATIVO SUPERIOR ART DÉCO (Ref. Imagen 2) */}
+          {/* EMBLEMA Y TÍTULO OFICIAL ART DÉCO / LUXURY EDITORIAL (ALTA RESOLUCIÓN) */}
           <Reveal>
-            <div className="flex flex-col items-center justify-center space-y-2 opacity-90 select-none">
-              <div className="w-[1px] h-10 bg-gradient-to-b from-transparent via-gold-500/70 to-gold-400" />
-              <div className="text-gold-400 text-xs tracking-[0.3em] flex items-center gap-2 font-mono">
-                <span className="text-[10px] text-gold-500">✦</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-crimson-500 inline-block shadow-sm shadow-crimson-500/80"></span>
-                <span className="text-xs text-gold-300">✦</span>
-              </div>
-            </div>
-          </Reveal>
-
-          {/* Sello / Subtítulo "CLUB PRIVADO" (Ref. Imagen 2) */}
-          <Reveal delay={120}>
-            <div className="space-y-1">
-              <p className="font-brand text-xs sm:text-sm font-bold tracking-[0.35em] uppercase text-gold-400">
-                ✦ C L U B &nbsp; P R I V A D O ✦
-              </p>
-              <p className="font-serif italic text-[11px] sm:text-xs text-gold-500/80 tracking-[0.25em] uppercase">
-                private membership &nbsp;·&nbsp; editorial luxury
-              </p>
-            </div>
-          </Reveal>
-
-          {/* TÍTULO PRINCIPAL DE LA MARCA & EVENTO (Ref. Imagen 1 & Imagen 2) */}
-          <Reveal delay={220}>
-            <div className="space-y-3 pt-2">
-              <h1 className="font-display font-black leading-tight uppercase">
-                <span className="block text-4xl sm:text-6xl lg:text-7xl xl:text-8xl tracking-[0.16em] bg-gradient-to-r from-[#f7e08b] via-[#d4af37] to-[#aa8c2c] bg-clip-text text-transparent drop-shadow-[0_4px_20px_rgba(201,162,39,0.35)]">
-                  YAKUZA HOUSE
-                </span>
-                <span className="block text-xl sm:text-3xl lg:text-4xl mt-3 tracking-[0.22em] text-ivory-100 font-brand font-extrabold">
-                  GRAND OPENING 2K GIVEAWAY
-                </span>
+            <div className="relative flex flex-col items-center justify-center pt-2 pb-1">
+              <img
+                src={grandOpeningHeroImg}
+                alt="CLUB PRIVADO - YAKUZA HOUSE - GRAND OPENING 2K GIVEAWAY — la inauguración oficial de la Casa —"
+                className="w-full max-w-xl sm:max-w-2xl lg:max-w-3xl mx-auto object-contain drop-shadow-[0_12px_45px_rgba(201,162,39,0.35)] select-none pointer-events-none transition-transform duration-700 hover:scale-[1.01]"
+              />
+              <h1 className="sr-only">
+                CLUB PRIVADO - private membership · editorial luxury - YAKUZA HOUSE GRAND OPENING 2K GIVEAWAY — la inauguración oficial de la Casa —
               </h1>
-              <p className="font-serif italic text-base sm:text-2xl text-gold-300 font-normal tracking-wide">
-                — la inauguración oficial de la Casa —
-              </p>
             </div>
           </Reveal>
 
           {/* EJE INTERMEDIO DE IDENTIDAD */}
-          <Reveal delay={300}>
-            <div className="flex flex-col items-center justify-center my-2 opacity-80 select-none">
-              <div className="w-[1px] h-4 bg-gold-500/40" />
-              <span className="text-[10px] font-mono tracking-[0.3em] text-gold-400/90 my-1">@spoilyakuza</span>
-              <div className="w-[1px] h-4 bg-gold-500/40" />
+          <Reveal delay={180}>
+            <div className="flex flex-col items-center justify-center my-1 opacity-85 select-none">
+              <div className="w-[1px] h-3 bg-gold-500/40" />
+              <span className="text-[10px] sm:text-xs font-mono tracking-[0.35em] text-gold-400/90 my-1">@spoilyakuza</span>
+              <div className="w-[1px] h-3 bg-gold-500/40" />
             </div>
           </Reveal>
 
