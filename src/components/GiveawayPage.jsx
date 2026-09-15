@@ -55,43 +55,78 @@ export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDe
 
   return (
     <main className="relative">
-      {/* HERO DEL EVENTO */}
-      <section className="relative min-h-[92vh] flex items-center justify-center overflow-hidden bg-gradient-to-b from-dark-950 via-dark-900 to-bordeaux-700/30 film-vignette">
+      {/* HERO DEL EVENTO (REFERENCIAS VISUALES ART DÉCO & LUXURY SERIF) */}
+      <section className="relative min-h-[95vh] flex items-center justify-center overflow-hidden bg-gradient-to-b from-dark-950 via-dark-900 to-bordeaux-700/30 film-vignette py-20">
         {/* Decoración de fondo */}
-        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,rgba(201,162,39,0.12),transparent_55%)]" />
-        <div className="absolute inset-x-8 top-28 hidden md:block border-t border-gold-500/20" />
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,rgba(201,162,39,0.15),transparent_60%)]" />
+        <div className="absolute inset-x-8 top-24 hidden md:block border-t border-gold-500/20" />
         <div className="absolute inset-x-8 bottom-10 hidden md:block border-t border-gold-500/20" />
 
-        <div className="relative z-10 max-w-4xl mx-auto px-6 text-center space-y-8 py-24">
+        <div className="relative z-10 max-w-4xl mx-auto px-6 text-center space-y-6">
+          
+          {/* EJE DECORATIVO SUPERIOR ART DÉCO (Ref. Imagen 2) */}
           <Reveal>
-            <div className="wax-seal seal-glow w-24 h-24 mx-auto text-3xl font-black select-none">
-              {copy.brand.short}
+            <div className="flex flex-col items-center justify-center space-y-2 opacity-90 select-none">
+              <div className="w-[1px] h-10 bg-gradient-to-b from-transparent via-gold-500/70 to-gold-400" />
+              <div className="text-gold-400 text-xs tracking-[0.3em] flex items-center gap-2 font-mono">
+                <span className="text-[10px] text-gold-500">✦</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-crimson-500 inline-block shadow-sm shadow-crimson-500/80"></span>
+                <span className="text-xs text-gold-300">✦</span>
+              </div>
             </div>
           </Reveal>
 
+          {/* Sello / Subtítulo "CLUB PRIVADO" (Ref. Imagen 2) */}
           <Reveal delay={120}>
-            <p className="text-xs md:text-sm font-sans tracking-widest2 uppercase text-gold-400">
-              {stateCopy.badge}
-            </p>
+            <div className="space-y-1">
+              <p className="font-brand text-xs sm:text-sm font-bold tracking-[0.35em] uppercase text-gold-400">
+                ✦ C L U B &nbsp; P R I V A D O ✦
+              </p>
+              <p className="font-serif italic text-[11px] sm:text-xs text-gold-500/80 tracking-[0.25em] uppercase">
+                private membership &nbsp;·&nbsp; editorial luxury
+              </p>
+            </div>
           </Reveal>
 
+          {/* TÍTULO PRINCIPAL DE LA MARCA & EVENTO (Ref. Imagen 1 & Imagen 2) */}
           <Reveal delay={220}>
-            <h1 className="font-display font-black display-shadow leading-none">
-              <span className="block text-4xl sm:text-6xl lg:text-7xl text-ivory-300">{defaults.title}</span>
-              <span className="block text-2xl sm:text-4xl lg:text-5xl mt-4 text-gold-gradient">{defaults.subtitle}</span>
-            </h1>
+            <div className="space-y-3 pt-2">
+              <h1 className="font-display font-black leading-tight uppercase">
+                <span className="block text-4xl sm:text-6xl lg:text-7xl xl:text-8xl tracking-[0.16em] bg-gradient-to-r from-[#f7e08b] via-[#d4af37] to-[#aa8c2c] bg-clip-text text-transparent drop-shadow-[0_4px_20px_rgba(201,162,39,0.35)]">
+                  YAKUZA HOUSE
+                </span>
+                <span className="block text-xl sm:text-3xl lg:text-4xl mt-3 tracking-[0.22em] text-ivory-100 font-brand font-extrabold">
+                  GRAND OPENING 2K GIVEAWAY
+                </span>
+              </h1>
+              <p className="font-serif italic text-base sm:text-2xl text-gold-300 font-normal tracking-wide">
+                — la inauguración oficial de la Casa —
+              </p>
+            </div>
           </Reveal>
 
+          {/* EJE INTERMEDIO DE IDENTIDAD */}
+          <Reveal delay={300}>
+            <div className="flex flex-col items-center justify-center my-2 opacity-80 select-none">
+              <div className="w-[1px] h-4 bg-gold-500/40" />
+              <span className="text-[10px] font-mono tracking-[0.3em] text-gold-400/90 my-1">@spoilyakuza</span>
+              <div className="w-[1px] h-4 bg-gold-500/40" />
+            </div>
+          </Reveal>
+
+          {/* CUADRO DESTACADO CON LA FRASE SOLICITADA */}
           <Reveal delay={340}>
-            <p className="font-serif italic text-lg md:text-xl text-ivory-400 max-w-2xl mx-auto leading-relaxed">
-              {stateCopy.body}
-            </p>
+            <div className="glass-panel p-6 sm:p-8 border border-gold-500/35 rounded-2xl max-w-2xl mx-auto shadow-2xl bg-dark-950/80 backdrop-blur-md">
+              <p className="font-serif italic text-lg sm:text-2xl text-ivory-300 leading-relaxed">
+                “{stateCopy.body}”
+              </p>
+            </div>
           </Reveal>
 
           {/* Cuenta atrás */}
           {showCountdown && cd && !cd.done && (
             <Reveal delay={460}>
-              <div className="flex items-center justify-center gap-3 md:gap-5">
+              <div className="flex items-center justify-center gap-3 md:gap-5 pt-2">
                 {[
                   { v: cd.days, label: 'días' },
                   { v: cd.hours, label: 'horas' },

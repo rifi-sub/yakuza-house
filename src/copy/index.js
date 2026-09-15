@@ -67,25 +67,25 @@ export const copy = {
 
   giveaway: {
     defaults: {
-      title: 'YAKUZA HOUSE GRAND OPENING',
-      subtitle: '2K GIVEAWAY — la inauguración oficial de la Casa',
+      title: 'YAKUZA HOUSE',
+      subtitle: 'GRAND OPENING 2K GIVEAWAY — la inauguración oficial de la Casa',
       prizeTitle: 'El Premio',
       prizeName: 'Devoción Coronada',
       prizeDescription: 'Un cofre sellado a mano, elegido pieza a pieza por la Princesa para el ganador del sorteo.',
       howTitle: 'Cómo se entra en el sorteo',
-      howBody: 'La mecánica completa se desvela cuando la Princesa la anuncie en Twitter. Síguela y mantén la atención.',
+      howBody: 'La mecánica completa se desvela cuando la Princesa la anuncie en X (Twitter). Síguela y mantén la atención.',
       termsTitle: 'Condiciones',
       terms: 'Reservado a mayores de edad. Un resguardo, un vencedor. La Casa decide y su palabra es final.',
     },
     states: {
       soon: {
-        badge: 'La Casa aún se ordena',
+        badge: '✦ CLUB PRIVADO · PRIVATE MEMBERSHIP ✦',
         headline: 'Próximamente',
-        body: 'El Reino se acerca a su coronación. Cuando alcancemos el umbral, esta puerta se abrirá.',
+        body: 'La puerta está abierta. Sigue las órdenes para cimentar tu nombre en el sorteo.',
         cta: 'Pasar a la tienda mientras tanto',
       },
       live: {
-        badge: 'El sorteo está en marcha',
+        badge: '✦ CLUB PRIVADO · PRIVATE MEMBERSHIP ✦',
         headline: 'Participa ahora',
         body: 'La puerta está abierta. Sigue las órdenes para cimentar tu nombre en el sorteo.',
         cta: 'Ir al sorteo en Twitter',
