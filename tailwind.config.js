@@ -50,7 +50,7 @@ export default {
       },
       fontFamily: {
         display: ['"Cinzel Decorative"', 'Cinzel', 'serif'],
-        brand: ['Cinzel', 'Georgia', 'serif'],
+        brand: ['"Cinzel Decorative"', 'Cinzel', 'Georgia', 'serif'],
         sans: ['"Plus Jakarta Sans"', 'Montserrat', 'system-ui', 'sans-serif'],
         serif: ['"Cormorant Garamond"', 'Georgia', 'serif'],
         body: ['"Plus Jakarta Sans"', 'Montserrat', 'system-ui', 'sans-serif']

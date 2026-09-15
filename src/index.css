@@ -11,8 +11,8 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: Cinzel, Georgia, serif;
-    letter-spacing: 0.04em;
+    font-family: 'Cinzel Decorative', Cinzel, Georgia, serif;
+    letter-spacing: 0.08em;
   }
 
   input, textarea, select {
