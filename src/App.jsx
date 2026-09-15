@@ -12,12 +12,12 @@ import YakuzaPrincessPage from './components/YakuzaPrincessPage';
 import HowToOrderPage from './components/HowToOrderPage';
 import GiveawayPage from './components/GiveawayPage';
 import { KingdomAuthModal } from './components/kingdom/KingdomAuthModal';
-import { Sparkles, Crown, Lock, ShoppingBag } from 'lucide-react';
+import { Sparkles, Crown, Lock, ShoppingBag, HelpCircle, Search, ArrowRight, Castle, Gift } from 'lucide-react';
 
 import { API_BASE, resolveMediaUrl } from './config';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('fetish'); // fetish, princess, giveaway, howtoorder, admin
+  const [activeTab, setActiveTab] = useState('home'); // home, fetish, princess, giveaway, howtoorder, admin
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -192,53 +192,231 @@ export default function App() {
 
       <main className="flex-1">
         
-        {/* DYNAMIC HERO BANNER PORTADA (CLUB ART DÉCO - MATTE ELEGANCE) */}
-        <section
-          className="relative py-20 md:py-28 px-4 sm:px-6 lg:px-8 bg-cover bg-center border-b border-gold-500/35 overflow-hidden bg-dark-950"
-          style={{ backgroundImage: banner?.bgImageUrl ? `url(${banner.bgImageUrl})` : undefined }}
-        >
-          {/* Dark Matte Solid Overlay - Completely Gradient-Free */}
-          <div className="absolute inset-0 bg-dark-950/85 backdrop-brightness-95 pointer-events-none" />
-          
-          <div className="max-w-5xl mx-auto text-center relative z-10 space-y-6">
-            <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full legibility-shield border border-gold-500/40 text-gold-300 text-xs font-sans tracking-widest uppercase mb-2 shadow-xl">
-              <Crown className="w-4 h-4 text-gold-400" />
-              {banner?.badge || '✦ CLUB PRIVADO & BOUTIQUE FETISH EXCLUSIVA ✦'}
-            </div>
+        {/* PÁGINA DE INICIO (HOME): El banner de boutique findom & fetish solo aparece aquí */}
+        {activeTab === 'home' && (
+          <div>
+            {/* DYNAMIC HERO BANNER PORTADA (CLUB ART DÉCO - MATTE ELEGANCE) */}
+            <section
+              className="relative py-20 md:py-28 px-4 sm:px-6 lg:px-8 bg-cover bg-center border-b border-gold-500/35 overflow-hidden bg-dark-950"
+              style={{ backgroundImage: banner?.bgImageUrl ? `url(${banner.bgImageUrl})` : undefined }}
+            >
+              {/* Dark Matte Solid Overlay - Completely Gradient-Free */}
+              <div className="absolute inset-0 bg-dark-950/85 backdrop-brightness-95 pointer-events-none" />
+              
+              <div className="max-w-5xl mx-auto text-center relative z-10 space-y-6">
+                <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full legibility-shield border border-gold-500/40 text-gold-300 text-xs font-sans tracking-widest uppercase mb-2 shadow-xl">
+                  <Crown className="w-4 h-4 text-gold-400" />
+                  {banner?.badge || '✦ CLUB PRIVADO & BOUTIQUE FETISH EXCLUSIVA ✦'}
+                </div>
 
-            <h1 className="font-brand font-black text-4xl sm:text-6xl lg:text-7xl tracking-widest text-ivory-100 display-shadow">
-              {banner?.title ? banner.title : (
-                <>YAKUZA <span className="text-gold-400">HOUSE</span></>
+                <h1 className="font-brand font-black text-4xl sm:text-6xl lg:text-7xl tracking-widest text-ivory-100 display-shadow">
+                  {banner?.title ? banner.title : (
+                    <>YAKUZA <span className="text-gold-400">HOUSE</span></>
+                  )}
+                </h1>
+
+                {/* Art Déco Divider */}
+                <div className="artdeco-divider max-w-md mx-auto">
+                  <div className="ad-center" />
+                </div>
+
+                <p className="text-sm sm:text-base text-ivory-300 max-w-2xl mx-auto font-sans font-normal leading-relaxed legibility-shield p-5 rounded-xl border border-gold-500/25">
+                  {banner?.subtitle || 'Bienvenido a la Casa de la Princesa. Explora lencería de autor, esencias privadas y piezas exclusivas de culto con compra directa y total discreción.'}
+                </p>
+
+                {/* Direct Quick Action */}
+                <div className="flex flex-wrap justify-center gap-4 pt-4">
+                  <button
+                    onClick={() => setActiveTab('fetish')}
+                    className="btn-royal-bordeaux"
+                  >
+                    <Sparkles className="w-4 h-4 text-gold-400" />
+                    {banner?.buttonText || 'Explorar la Colección'}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('giveaway')}
+                    className="py-3 px-6 rounded-xl font-sans text-xs uppercase tracking-widest font-bold border border-gold-500/40 text-gold-300 hover:bg-gold-500/15 transition-all shadow-lg flex items-center gap-2"
+                  >
+                    <Gift className="w-4 h-4 text-gold-400" />
+                    Grand Opening 2K
+                  </button>
+                </div>
+
+              </div>
+            </section>
+
+            {/* SECCIÓN HOME: Accesos del Club y Módulos Principales */}
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-16">
+              
+              {/* 4 Luxury Gateway Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                
+                {/* 1. Tienda / Boutique */}
+                <div 
+                  onClick={() => setActiveTab('fetish')}
+                  className="legibility-shield p-6 rounded-2xl border border-gold-500/30 hover:border-gold-400 transition-all cursor-pointer group hover:scale-[1.02] shadow-xl flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    <div className="w-10 h-10 rounded-xl bg-bordeaux-700/60 border border-gold-500/40 flex items-center justify-center text-gold-400 group-hover:scale-110 transition-transform">
+                      <ShoppingBag className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-brand font-bold text-lg text-white group-hover:text-gold-300">Boutique Fetish</h3>
+                    <p className="text-xs text-ivory-300 font-sans leading-relaxed">
+                      Lencería exclusiva, prendas usadas de culto, aromas y calcetines sudados con envío sellado y 100% hermético.
+                    </p>
+                  </div>
+                  <div className="pt-4 mt-4 border-t border-gold-500/20 flex items-center justify-between text-xs text-gold-400 font-sans font-semibold">
+                    <span>Entrar a la Tienda</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+
+                {/* 2. Yakuza Princess */}
+                <div 
+                  onClick={() => setActiveTab('princess')}
+                  className="legibility-shield p-6 rounded-2xl border border-gold-500/30 hover:border-gold-400 transition-all cursor-pointer group hover:scale-[1.02] shadow-xl flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    <div className="w-10 h-10 rounded-xl bg-bordeaux-700/60 border border-gold-500/40 flex items-center justify-center text-gold-400 group-hover:scale-110 transition-transform">
+                      <Crown className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-brand font-bold text-lg text-white group-hover:text-gold-300">Yakuza Princess</h3>
+                    <p className="text-xs text-ivory-300 font-sans leading-relaxed">
+                      Manifiesto de sumisión, tributos directos de adoración, normas del templo y devoción a la soberana.
+                    </p>
+                  </div>
+                  <div className="pt-4 mt-4 border-t border-gold-500/20 flex items-center justify-between text-xs text-gold-400 font-sans font-semibold">
+                    <span>Ver a la Princesa</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+
+                {/* 3. Grand Opening 2K */}
+                <div 
+                  onClick={() => setActiveTab('giveaway')}
+                  className="legibility-shield p-6 rounded-2xl border border-gold-500/30 hover:border-gold-400 transition-all cursor-pointer group hover:scale-[1.02] shadow-xl flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    <div className="w-10 h-10 rounded-xl bg-bordeaux-700/60 border border-gold-500/40 flex items-center justify-center text-gold-400 group-hover:scale-110 transition-transform">
+                      <Gift className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-brand font-bold text-lg text-white group-hover:text-gold-300">Grand Opening 2K</h3>
+                    <p className="text-xs text-ivory-300 font-sans leading-relaxed">
+                      La apertura oficial de la Casa. Sorteo especial 2.000 seguidores con premios reales y selección de números.
+                    </p>
+                  </div>
+                  <div className="pt-4 mt-4 border-t border-gold-500/20 flex items-center justify-between text-xs text-gold-400 font-sans font-semibold">
+                    <span>Ver Sorteo 2K</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+
+                {/* 4. Acceso Reino */}
+                <div 
+                  onClick={() => setShowKingdomAuth(true)}
+                  className="legibility-shield p-6 rounded-2xl border border-gold-500/30 hover:border-gold-400 transition-all cursor-pointer group hover:scale-[1.02] shadow-xl flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    <div className="w-10 h-10 rounded-xl bg-bordeaux-700/60 border border-gold-500/40 flex items-center justify-center text-gold-400 group-hover:scale-110 transition-transform">
+                      <Castle className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-brand font-bold text-lg text-white group-hover:text-gold-300">Acceso al Reino</h3>
+                    <p className="text-xs text-ivory-300 font-sans leading-relaxed">
+                      Club privado exclusivo. Solicita tu admisión formal o accede con tu número de expediente y alias.
+                    </p>
+                  </div>
+                  <div className="pt-4 mt-4 border-t border-gold-500/20 flex items-center justify-between text-xs text-gold-400 font-sans font-semibold">
+                    <span>{currentMember ? 'Mi Expediente' : 'Solicitar Entrada'}</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Princess Decree */}
+              <div className="legibility-bordeaux p-8 rounded-2xl border border-gold-500/40 max-w-4xl mx-auto space-y-5 shadow-2xl">
+                <span className="text-[11px] font-sans font-semibold text-gold-400 tracking-widest uppercase block">
+                  ✦ DECRETO DE LA PRINCESA
+                </span>
+                <p className="text-sm sm:text-base text-ivory-200 italic font-serif leading-relaxed">
+                  “Mi saliva, las marcas en mis suelas, mis calcetines sudados tras una dura sesión o incluso mi repostería fina es un manjar reservado para alguien inferior como tú. Me encanta complacerme a tu costa y otorgarte el honor de poseer mi esencia.”
+                </p>
+                <div className="flex flex-wrap gap-4 text-xs font-sans text-ivory-300 pt-4 border-t border-gold-500/20">
+                  <span className="flex items-center gap-2 text-gold-300 font-medium">
+                    <Lock className="w-3.5 h-3.5 text-gold-400" /> Envíos 100% discretos, herméticos y sellados al vacío
+                  </span>
+                  <span className="flex items-center gap-2 text-bordeaux-300 font-medium">
+                    <ShoppingBag className="w-3.5 h-3.5 text-gold-400" /> Opción de gestión directa y protegida por Vinted
+                  </span>
+                </div>
+              </div>
+
+              {/* Featured items preview */}
+              {items.length > 0 && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-end border-b border-gold-500/20 pb-4">
+                    <div>
+                      <span className="text-xs font-sans text-gold-400 font-semibold uppercase tracking-widest block">✦ Colección Destacada</span>
+                      <h2 className="font-brand font-extrabold text-2xl text-ivory-100">Piezas de la Boutique</h2>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('fetish')}
+                      className="text-xs font-sans font-semibold text-gold-400 hover:text-gold-300 flex items-center gap-1.5 transition-colors"
+                    >
+                      <span>Ver toda la tienda</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {items.slice(0, 4).map(item => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        onBuyNow={handleBuyNow}
+                        onViewDetails={setSelectedDetailItem}
+                        onAddToCart={handleAddToCart}
+                      />
+                    ))}
+                  </div>
+                </div>
               )}
-            </h1>
 
-            {/* Art Déco Divider */}
-            <div className="artdeco-divider max-w-md mx-auto">
-              <div className="ad-center" />
-            </div>
-
-            <p className="text-sm sm:text-base text-ivory-300 max-w-2xl mx-auto font-sans font-normal leading-relaxed legibility-shield p-5 rounded-xl border border-gold-500/25">
-              {banner?.subtitle || 'Bienvenido a la Casa de la Princesa. Explora lencería de autor, esencias privadas y piezas exclusivas de culto con compra directa y total discreción.'}
-            </p>
-
-            {/* Direct Quick Action */}
-            <div className="flex flex-wrap justify-center gap-4 pt-4">
-              <button
-                onClick={() => setActiveTab('fetish')}
-                className="btn-royal-bordeaux"
-              >
-                <Sparkles className="w-4 h-4 text-gold-400" />
-                {banner?.buttonText || 'Explorar la Colección'}
-              </button>
-            </div>
-
+            </section>
           </div>
-        </section>
+        )}
 
-        {/* TAB 1: FETISH HOUSE */}
+        {/* TAB 1: FETISH HOUSE (LA TIENDA - Sin banner hero) */}
         {activeTab === 'fetish' && (
-          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
+          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-8">
             
+            {/* Action Bar de la Tienda: Botones ¿Cómo pedir? y Consultar Pedido */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 md:p-5 rounded-2xl legibility-shield border border-gold-500/30 shadow-2xl">
+              <div>
+                <span className="text-[11px] font-sans font-bold text-gold-400 tracking-widest uppercase block">
+                  ✦ BOUTIQUE FETISH EXCLUSIVA
+                </span>
+                <h1 className="font-brand font-black text-xl sm:text-2xl text-white">Catálogo & Adquisiciones</h1>
+              </div>
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <button
+                  onClick={() => setActiveTab('howtoorder')}
+                  className="flex-1 sm:flex-initial py-2.5 px-4 rounded-xl bg-gradient-to-r from-bordeaux-700 to-bordeaux-600 hover:from-bordeaux-600 hover:to-bordeaux-500 border border-gold-500/40 text-gold-200 text-xs font-sans font-semibold flex items-center justify-center gap-2 transition-all shadow-md"
+                  title="Ver protocolo paso a paso para realizar un pedido"
+                >
+                  <HelpCircle className="w-4 h-4 text-gold-400" />
+                  <span>¿Cómo pedir?</span>
+                </button>
+                <button
+                  onClick={() => setShowLookupModal(true)}
+                  className="flex-1 sm:flex-initial py-2.5 px-4 rounded-xl bg-dark-950/80 hover:bg-dark-900 border border-gold-500/30 hover:border-gold-400 text-ivory-300 hover:text-white text-xs font-sans font-medium flex items-center justify-center gap-2 transition-all shadow-md"
+                  title="Consultar estado de tu pedido existente"
+                >
+                  <Search className="w-4 h-4 text-gold-400" />
+                  <span>Consultar Pedido</span>
+                </button>
+              </div>
+            </div>
+
             {/* Intro Quote (Legibility Shield & Bordeaux Panel) */}
             <div className="legibility-bordeaux p-8 rounded-2xl border border-gold-500/40 max-w-4xl mx-auto space-y-5 shadow-2xl">
               <span className="text-[11px] font-sans font-semibold text-gold-400 tracking-widest uppercase block">

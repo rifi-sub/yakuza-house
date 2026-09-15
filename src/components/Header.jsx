@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { ShoppingBag, Crown, Sparkles, Menu, X, Settings, HelpCircle, Gift, Castle } from 'lucide-react';
+import { ShoppingBag, Crown, Menu, X, Settings, Castle } from 'lucide-react';
 
 export default function Header({ 
   activeTab, 
   setActiveTab, 
-  onOpenLegal, 
-  onOpenOrderLookup, 
   itemsInCartCount = 0, 
   onOpenCart,
   onOpenKingdomAuth,
@@ -14,9 +12,9 @@ export default function Header({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { id: 'fetish', label: 'TIENDA (FETISH HOUSE)', icon: Sparkles, isStore: true },
-    { id: 'princess', label: 'YAKUZA PRINCESS', icon: Crown },
-    { id: 'giveaway', label: 'GRAND OPENING ✦ 2K', icon: Gift }
+    { id: 'fetish', label: 'Tienda' },
+    { id: 'princess', label: 'Yakuza Princess' },
+    { id: 'giveaway', label: 'Grand Opening' }
   ];
 
   return (
@@ -24,10 +22,11 @@ export default function Header({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           
-          {/* Logo Brand */}
+          {/* Logo Brand (Izquierda) */}
           <div 
-            onClick={() => setActiveTab('fetish')}
+            onClick={() => setActiveTab('home')}
             className="flex items-center gap-3.5 cursor-pointer group shrink-0"
+            title="Ir a Inicio"
           >
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-bordeaux-700 via-bordeaux-500 to-gold-400 p-0.5 shadow-lg shadow-gold-500/20 group-hover:scale-105 transition-transform">
               <div className="w-full h-full bg-dark-950 rounded-full flex items-center justify-center border border-gold-500/30">
@@ -42,53 +41,29 @@ export default function Header({
             </div>
           </div>
 
-          {/* Desktop Nav - Cleaned Up & Balanced */}
-          <nav className="hidden lg:flex items-center gap-2">
+          {/* (Padding Medio) Navegación Central: (Tienda | Yakuza Princess | Grand Opening) */}
+          <nav className="hidden md:flex items-center gap-2 lg:gap-3 px-6 lg:px-10 mx-auto">
             {navLinks.map((link) => {
-              const Icon = link.icon;
               const isActive = activeTab === link.id;
               return (
                 <button
                   key={link.id}
                   onClick={() => setActiveTab(link.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-sans text-xs uppercase tracking-widest font-semibold transition-all ${
+                  className={`px-4 py-2 rounded-lg font-sans text-xs uppercase tracking-widest font-semibold transition-all ${
                     isActive
                       ? 'bg-bordeaux-600/60 text-gold-300 border border-gold-500/50 shadow-md shadow-bordeaux-700/40'
                       : 'text-ivory-400 hover:text-white hover:bg-gold-500/10 hover:border-gold-500/30 border border-transparent'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-gold-400' : 'text-gold-500/70'}`} />
                   <span>{link.label}</span>
                 </button>
               );
             })}
           </nav>
 
-          {/* Action Buttons & Utilities */}
-          <div className="hidden md:flex items-center gap-2.5">
-            {/* Cómo pedir (movido aquí discretamente) */}
-            <button
-              onClick={() => setActiveTab('howtoorder')}
-              className={`text-[11px] font-sans tracking-wider transition-colors px-3 py-2 rounded border flex items-center gap-1.5 ${
-                activeTab === 'howtoorder'
-                  ? 'bg-gold-500/20 text-gold-300 border-gold-400 font-bold'
-                  : 'text-ivory-400 hover:text-gold-300 border-gold-500/25 hover:border-gold-400 bg-dark-950/60'
-              }`}
-              title="Guía de compra y protocolo"
-            >
-              <HelpCircle className="w-3.5 h-3.5 text-gold-400/80" />
-              <span>¿Cómo pedir?</span>
-            </button>
-
-            {/* Consultar Pedido */}
-            <button
-              onClick={onOpenOrderLookup}
-              className="text-[11px] font-sans tracking-wider text-ivory-400 hover:text-gold-300 transition-colors px-3 py-2 rounded border border-gold-500/25 hover:border-gold-400 bg-dark-950/60"
-            >
-              Consultar Pedido
-            </button>
-
-            {/* Acceso al Reino / Súbdito */}
+          {/* (Padding Medio) Derecha: Acceso Reino | Cesta | Config */}
+          <div className="hidden md:flex items-center gap-3 shrink-0">
+            {/* Acceso Reino */}
             <button
               onClick={onOpenKingdomAuth}
               className={`py-2 px-3.5 rounded-lg border text-xs font-sans flex items-center gap-2 transition-all shadow-md ${
@@ -119,10 +94,10 @@ export default function Header({
               </button>
             )}
 
-            {/* Admin Settings */}
+            {/* Config (Admin) */}
             <button
               onClick={() => setActiveTab('admin')}
-              className={`p-2 rounded-lg border transition-all ${
+              className={`py-2 px-3 rounded-lg border text-xs font-sans flex items-center gap-1.5 transition-all ${
                 activeTab === 'admin'
                   ? 'bg-gold-500/20 border-gold-400 text-gold-300'
                   : 'border-gold-500/20 text-gold-500/70 hover:text-gold-300 hover:border-gold-400 bg-dark-950/60'
@@ -130,6 +105,7 @@ export default function Header({
               title="Panel de Administración"
             >
               <Settings className="w-4 h-4" />
+              <span className="tracking-wider text-[11px] font-medium hidden lg:inline">Config</span>
             </button>
           </div>
 
@@ -171,7 +147,6 @@ export default function Header({
       {mobileMenuOpen && (
         <div className="md:hidden legibility-shield border-b border-gold-500/40 px-4 pt-2 pb-6 space-y-2">
           {navLinks.map((link) => {
-            const Icon = link.icon;
             const isActive = activeTab === link.id;
             return (
               <button
@@ -186,26 +161,12 @@ export default function Header({
                     : 'text-ivory-400 hover:bg-gold-500/10'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <Icon className="w-5 h-5 text-gold-400" />
-                  <span>{link.label}</span>
-                </div>
+                <span>{link.label}</span>
               </button>
             );
           })}
 
           <div className="pt-4 border-t border-gold-500/20 flex flex-col gap-2">
-            <button
-              onClick={() => {
-                setActiveTab('howtoorder');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-center py-2.5 text-xs font-sans tracking-wider text-ivory-300 bg-dark-950/80 rounded border border-gold-500/30 flex items-center justify-center gap-2"
-            >
-              <HelpCircle className="w-4 h-4 text-gold-400" />
-              ¿Cómo pedir? (Protocolo)
-            </button>
-
             <button
               onClick={() => {
                 onOpenKingdomAuth();
@@ -219,22 +180,13 @@ export default function Header({
 
             <button
               onClick={() => {
-                onOpenOrderLookup();
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-center py-2.5 text-xs font-sans tracking-wider text-gold-300 bg-dark-950/60 rounded border border-gold-500/30"
-            >
-              Consultar Pedido por Número
-            </button>
-            <button
-              onClick={() => {
                 setActiveTab('admin');
                 setMobileMenuOpen(false);
               }}
               className="w-full flex items-center justify-center gap-2 py-2 text-xs font-sans text-ivory-400 hover:text-white"
             >
               <Settings className="w-4 h-4 text-gold-400" />
-              Panel de Administración
+              Configuración (Admin)
             </button>
           </div>
         </div>
