@@ -11,6 +11,7 @@ import CartModal from './components/CartModal';
 import YakuzaPrincessPage from './components/YakuzaPrincessPage';
 import HowToOrderPage from './components/HowToOrderPage';
 import GiveawayPage from './components/GiveawayPage';
+import { KingdomAuthModal } from './components/kingdom/KingdomAuthModal';
 import { Sparkles, Crown, Lock, ShoppingBag } from 'lucide-react';
 
 import { API_BASE, resolveMediaUrl } from './config';
@@ -24,6 +25,27 @@ export default function App() {
   const [launch, setLaunch] = useState(null);
   const [princessConfig, setPrincessConfig] = useState(null);
   const [loadingItems, setLoadingItems] = useState(true);
+
+  // Kingdom Auth & Member Profile state
+  const [showKingdomAuth, setShowKingdomAuth] = useState(false);
+  const [currentMember, setCurrentMember] = useState(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('yakuza_member_token');
+    if (token) {
+      fetch(`${API_BASE}/api/kingdom/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(data => {
+          if (data && data.member) setCurrentMember(data.member);
+        })
+        .catch(() => {
+          localStorage.removeItem('yakuza_member_token');
+          setCurrentMember(null);
+        });
+    }
+  }, []);
 
   // Cart state
   const [cartItems, setCartItems] = useState([]);
@@ -124,7 +146,13 @@ export default function App() {
   if (activeTab === 'admin') {
     return (
       <div className="min-h-screen bg-dark-900">
-        <Header activeTab={activeTab} setActiveTab={setActiveTab} onOpenOrderLookup={() => setShowLookupModal(true)} />
+        <Header 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          onOpenOrderLookup={() => setShowLookupModal(true)} 
+          onOpenKingdomAuth={() => setShowKingdomAuth(true)}
+          currentMember={currentMember}
+        />
         <AdminPanel onBackToStore={() => setActiveTab('fetish')} />
         <Footer onOpenLegal={(type) => setLegalModalType(type)} />
       </div>
@@ -134,7 +162,13 @@ export default function App() {
   if (confirmedOrderNumber) {
     return (
       <div className="min-h-screen bg-dark-900">
-        <Header activeTab={activeTab} setActiveTab={setActiveTab} onOpenOrderLookup={() => setShowLookupModal(true)} />
+        <Header 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          onOpenOrderLookup={() => setShowLookupModal(true)} 
+          onOpenKingdomAuth={() => setShowKingdomAuth(true)}
+          currentMember={currentMember}
+        />
         <OrderConfirmation orderNumber={confirmedOrderNumber} onBackToStore={() => setConfirmedOrderNumber('')} />
         <Footer onOpenLegal={(type) => setLegalModalType(type)} />
       </div>
@@ -150,6 +184,8 @@ export default function App() {
         setActiveTab={setActiveTab}
         onOpenLegal={(type) => setLegalModalType(type)}
         onOpenOrderLookup={() => setShowLookupModal(true)}
+        onOpenKingdomAuth={() => setShowKingdomAuth(true)}
+        currentMember={currentMember}
         itemsInCartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
         onOpenCart={() => setShowCartModal(true)}
       />
@@ -386,6 +422,19 @@ export default function App() {
           onClose={() => setLegalModalType(null)}
         />
       )}
+
+      {/* Kingdom Auth & Admission Modal */}
+      <KingdomAuthModal
+        isOpen={showKingdomAuth}
+        onClose={() => setShowKingdomAuth(false)}
+        currentMember={currentMember}
+        onAuthSuccess={(member) => {
+          setCurrentMember(member);
+        }}
+        onLogout={() => {
+          setCurrentMember(null);
+        }}
+      />
 
       {/* Footer */}
       <Footer onOpenLegal={(type) => setLegalModalType(type)} />
