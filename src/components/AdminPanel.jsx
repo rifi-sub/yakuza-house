@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Edit, Trash2, Eye, EyeOff, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart, Crown } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Eye, EyeOff, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart, Crown, Users, Castle, BookOpen, Inbox } from 'lucide-react';
 import { API_BASE, resolveMediaUrl, safeFetchJson } from '../config';
 import princessVideo from '../princess-yakuza.mp4';
 import { MediaPickerModal } from './MediaPickerModal';
+import { KingdomCrmView } from './kingdom/KingdomCrmView';
+import { KingdomHierarchyView } from './kingdom/KingdomHierarchyView';
+import { KingdomActivitiesView } from './kingdom/KingdomActivitiesView';
+import { KingdomRequestsView } from './kingdom/KingdomRequestsView';
 
 export default function AdminPanel({ onBackToStore }) {
 
@@ -883,6 +887,46 @@ export default function AdminPanel({ onBackToStore }) {
         >
           <Crown className="w-3.5 h-3.5 text-gold-400" />
           👑 Yakuza Princess
+        </button>
+
+        <button
+          onClick={() => setActiveTab('kingdom_crm')}
+          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            activeTab === 'kingdom_crm' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5 text-gold-400" />
+          👥 CRM Miembros
+        </button>
+
+        <button
+          onClick={() => setActiveTab('kingdom_hierarchy')}
+          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            activeTab === 'kingdom_hierarchy' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          <Castle className="w-3.5 h-3.5 text-gold-400" />
+          🏛️ Jerarquía Reino
+        </button>
+
+        <button
+          onClick={() => setActiveTab('kingdom_activities')}
+          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            activeTab === 'kingdom_activities' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          <BookOpen className="w-3.5 h-3.5 text-gold-400" />
+          📚 Biblioteca Actividades
+        </button>
+
+        <button
+          onClick={() => setActiveTab('kingdom_requests')}
+          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            activeTab === 'kingdom_requests' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          <Inbox className="w-3.5 h-3.5 text-gold-400" />
+          📬 Solicitudes
         </button>
 
         <button
@@ -3295,6 +3339,23 @@ export default function AdminPanel({ onBackToStore }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* KINGDOM ARCHITECTURE TABS */}
+      {activeTab === 'kingdom_crm' && (
+        <KingdomCrmView token={token} />
+      )}
+
+      {activeTab === 'kingdom_hierarchy' && (
+        <KingdomHierarchyView token={token} />
+      )}
+
+      {activeTab === 'kingdom_activities' && (
+        <KingdomActivitiesView token={token} />
+      )}
+
+      {activeTab === 'kingdom_requests' && (
+        <KingdomRequestsView token={token} />
       )}
 
     </div>
