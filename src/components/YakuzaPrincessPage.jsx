@@ -1,18 +1,61 @@
 import React, { useState } from 'react';
 import { ShieldAlert, Crown, Lock, CheckCircle2, XCircle, Send, Sparkles, MessageCircle, AlertTriangle } from 'lucide-react';
 
-export default function YakuzaPrincessPage({ onNavigateToStore }) {
+export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore }) {
   const [activeTab, setActiveTab] = useState('normas'); // normas, presentate, reino
   const [flippedCards, setFlippedCards] = useState({});
 
-  const toggleCardFlip = (cardId) => {
-    setFlippedCards(prev => ({
-      ...prev,
-      [cardId]: !prev[cardId]
-    }));
+  const config = princessConfig || {};
+
+  const badge = config.badge || '✦ SECCIÓN EXCLUSIVA D/S & PROTOCOLO DE LA PRINCESA ✦';
+  const titleTop = config.titleTop || 'YAKUZA';
+  const titleAccent = config.titleAccent || 'PRINCESS';
+  const headerQuote = config.headerQuote || '“La sensación es la de entrar en un club privado extremadamente exclusivo. El acceso a mi energía no se compra: se conquista, se honra y se tributa con absoluta devoción.”';
+
+  const requirementsTitle = config.requirementsTitle || 'Requisitos para Servirme';
+  const requirementsList = config.requirementsList || [
+    'Debes ser mayor de edad, tener trabajo estable y mentalidad de crecimiento.',
+    'Debe gustarte el Findom, Finfet o tributar tratamiento de Princesa para optar a una relación D/s a largo plazo.',
+    'Respeta mi tiempo y mi vida; aquí no hay sitio para la necesidad constante de atención sin tributar.',
+    'Si decides comprometerte a SERVIRME, hazlo con seriedad, dedicación y reverencia.'
+  ];
+
+  const noResponseTitle = config.noResponseTitle || 'No respondo a:';
+  const noResponseList = config.noResponseList || [
+    'Mensajes sin educación o sin un motivo claro.',
+    'Propuestas básicas de conversación sin tributo previo.',
+    'Mensajes cargados de necesidad. Enviar insistentes mensajes solo aumentará mi desgana de contestarte.',
+    'Si no has leído esta información antes de escribir.'
+  ];
+  const unblockNote = config.unblockNote || '* Desbloqueo tras falta grave: 666€ (Que te resulte un infierno volver a mí si estuviste a mis pies y no me valoraste).';
+
+  const protocolBadge = config.protocolBadge || 'PROTOCOLO OBLIGATORIO';
+  const protocolTitle = config.protocolTitle || 'Cómo Dirigirte a la Princesa';
+  const protocolSteps = config.protocolSteps || [
+    { title: '1. Tributo Inicial', text: 'Haz un tributo inicial de 50€ (mínimo) como muestra de sumisión y respeto hacia mi tiempo.' },
+    { title: '2. Comprobante', text: 'Envía la captura de pantalla del tributo inmediatamente por X / Telegram.' },
+    { title: '3. Mensaje Plantilla', text: '“Hola buenas, soy [Nombre] de [Ciudad], tengo X años. Me gustaría saber si le complacería usarme para...”' }
+  ];
+
+  const ratesTitle = config.ratesTitle || 'Tarifas de Interacción Privada:';
+  const ratesList = config.ratesList || [
+    { label: 'Por mensaje privado', price: '25€' },
+    { label: 'Aspirante diario', price: '100€ / día' },
+    { label: 'Aspirante semanal', price: '700€ / sem' },
+    { label: 'Plaza en el Reino', price: '1.000€ / mes' }
+  ];
+
+  const kingdomHeaderBadge = config.kingdomHeaderBadge || 'JERARQUÍA DEL REINO';
+  const kingdomHeaderTitle = config.kingdomHeaderTitle || 'Haz clic en cada tarjeta para girarla y leer sus privilegios';
+  
+  const defaultGradients = {
+    plebeyos: 'from-dark-950 via-bordeaux-800 to-dark-950',
+    sirvientes: 'from-bordeaux-800 via-bordeaux-600 to-dark-950',
+    caballeros: 'from-dark-950 via-bordeaux-700 to-gold-700/30',
+    elegidos: 'from-bordeaux-700 via-gold-600/30 to-dark-950'
   };
 
-  const kingdomTiers = [
+  const rawKingdomTiers = config.kingdomTiers || [
     {
       id: 'plebeyos',
       badge: 'NIVEL 1',
@@ -20,8 +63,7 @@ export default function YakuzaPrincessPage({ onNavigateToStore }) {
       subtitle: 'Sumisos humildes de primer nivel',
       frontText: 'Sumisos que desean servir y ser útiles de alguna forma desde el respeto y la devoción.',
       backTitle: 'Órdenes & Grupo Telegram',
-      backText: 'Recibes órdenes y tareas gratuitas en el grupo oficial de Telegram. El único requisito es la disponibilidad, eficacia y la satisfacción de haberme complacido.',
-      gradient: 'from-dark-950 via-bordeaux-800 to-dark-950'
+      backText: 'Recibes órdenes y tareas gratuitas en el grupo oficial de Telegram. El único requisito es la disponibilidad, eficacia y la satisfacción de haberme complacido.'
     },
     {
       id: 'sirvientes',
@@ -30,8 +72,7 @@ export default function YakuzaPrincessPage({ onNavigateToStore }) {
       subtitle: 'Trato directo & Contratos',
       frontText: 'Sumisos entregados que se encargan de hacer la vida de la Princesa más fácil.',
       backTitle: 'Contacto Directo & Club 1k',
-      backText: 'Contacto directo con la Princesa, tareas personalizadas y recompensas directas al entrar en el club 1k. Contratos desbloqueados y opción de ascenso a Caballeros.',
-      gradient: 'from-bordeaux-800 via-bordeaux-600 to-dark-950'
+      backText: 'Contacto directo con la Princesa, tareas personalizadas y recompensas directas al entrar en el club 1k. Contratos desbloqueados y opción de ascenso a Caballeros.'
     },
     {
       id: 'caballeros',
@@ -40,8 +81,7 @@ export default function YakuzaPrincessPage({ onNavigateToStore }) {
       subtitle: 'Aspirantes a Propiedad',
       frontText: 'Sumisos que aspiran a ser propiedad exclusiva de la Princesa. ¿Conseguirás ser uno de ellos?',
       backTitle: 'Cashmeets & Citas Presenciales',
-      backText: 'Exploraremos la dinámica juntos. Evaluaciones de sumisión, aftercare exclusivo, cashmeets, cashdrops y entregas de productos en mano.',
-      gradient: 'from-dark-950 via-bordeaux-700 to-gold-700/30'
+      backText: 'Exploraremos la dinámica juntos. Evaluaciones de sumisión, aftercare exclusivo, cashmeets, cashdrops y entregas de productos en mano.'
     },
     {
       id: 'elegidos',
@@ -50,10 +90,23 @@ export default function YakuzaPrincessPage({ onNavigateToStore }) {
       subtitle: 'Pertenencia Absoluta (D/s)',
       frontText: 'Pertenece en mente, cuerpo y espíritu a la Princesa de manera presencial y online.',
       backTitle: 'Propiedad de la Diosa',
-      backText: 'Tu cuerpo, tu voluntad, tu mente y tu alma son míos. Soy tu propósito, tu guía y Dueña de todo tu ser. Citas presenciales exclusivas y tributo de vida.',
-      gradient: 'from-bordeaux-700 via-gold-600/30 to-dark-950'
+      backText: 'Tu cuerpo, tu voluntad, tu mente y tu alma son míos. Soy tu propósito, tu guía y Dueña de todo tu ser. Citas presenciales exclusivas y tributo de vida.'
     }
   ];
+
+  const kingdomTiers = rawKingdomTiers.map(t => ({
+    ...t,
+    gradient: t.gradient || defaultGradients[t.id] || 'from-dark-950 via-bordeaux-800 to-dark-950'
+  }));
+
+  const buttonStoreText = config.buttonStoreText || 'Explorar el Catálogo de la Tienda';
+
+  const toggleCardFlip = (cardId) => {
+    setFlippedCards(prev => ({
+      ...prev,
+      [cardId]: !prev[cardId]
+    }));
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
@@ -62,11 +115,11 @@ export default function YakuzaPrincessPage({ onNavigateToStore }) {
       <div className="text-center max-w-4xl mx-auto space-y-4">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full legibility-shield border border-gold-500/50 text-gold-300 text-xs font-sans tracking-widest uppercase shadow-lg">
           <Crown className="w-4 h-4 text-gold-400" />
-          ✦ SECCIÓN EXCLUSIVA D/S & PROTOCOLO DE LA PRINCESA ✦
+          {badge}
         </div>
 
         <h1 className="font-sans font-black text-4xl sm:text-6xl text-ivory-100 display-shadow tracking-widest">
-          YAKUZA <span className="text-bordeaux-gradient">PRINCESS</span>
+          {titleTop} <span className="text-bordeaux-gradient">{titleAccent}</span>
         </h1>
 
         <div className="artdeco-divider max-w-sm mx-auto">
@@ -74,7 +127,7 @@ export default function YakuzaPrincessPage({ onNavigateToStore }) {
         </div>
 
         <p className="text-sm sm:text-base text-ivory-300 font-body leading-relaxed legibility-shield p-4 rounded-xl border border-gold-500/20">
-          “La sensación es la de entrar en un club privado extremadamente exclusivo. El acceso a mi energía no se compra: se conquista, se honra y se tributa con absoluta devoción.”
+          {headerQuote}
         </p>
       </div>
 
@@ -120,26 +173,16 @@ export default function YakuzaPrincessPage({ onNavigateToStore }) {
           <div className="legibility-bordeaux p-8 rounded-2xl border border-gold-500/40 space-y-4 shadow-2xl">
             <div className="flex items-center gap-3 border-b border-gold-500/30 pb-3">
               <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-              <h3 className="font-sans font-bold text-xl text-ivory-100">Requisitos para Servirme</h3>
+              <h3 className="font-sans font-bold text-xl text-ivory-100">{requirementsTitle}</h3>
             </div>
             
             <ul className="space-y-3 text-xs text-ivory-300 font-body leading-relaxed">
-              <li className="flex items-start gap-2">
-                <span className="text-gold-400">✦</span>
-                <span>Debes ser <strong>mayor de edad</strong>, tener trabajo estable y mentalidad de crecimiento.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-gold-400">✦</span>
-                <span>Debe gustarte el <strong>Findom, Finfet</strong> o tributar tratamiento de Princesa para optar a una relación D/s a largo plazo.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-gold-400">✦</span>
-                <span><strong>Respeta mi tiempo y mi vida</strong>; aquí no hay sitio para la necesidad constante de atención sin tributar.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-gold-400">✦</span>
-                <span>Si decides comprometerte a <strong>SERVIRME</strong>, hazlo con seriedad, dedicación y reverencia.</span>
-              </li>
+              {requirementsList.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <span className="text-gold-400">✦</span>
+                  <span>{item}</span>
+                </li>
+              ))}
             </ul>
           </div>
 
@@ -147,30 +190,20 @@ export default function YakuzaPrincessPage({ onNavigateToStore }) {
           <div className="legibility-shield p-8 rounded-2xl border border-bordeaux-500/50 space-y-4 shadow-2xl">
             <div className="flex items-center gap-3 border-b border-bordeaux-500/30 pb-3">
               <XCircle className="w-6 h-6 text-bordeaux-400" />
-              <h3 className="font-sans font-bold text-xl text-ivory-100">No respondo a:</h3>
+              <h3 className="font-sans font-bold text-xl text-ivory-100">{noResponseTitle}</h3>
             </div>
 
             <ul className="space-y-3 text-xs text-ivory-400 font-body leading-relaxed">
-              <li className="flex items-start gap-2">
-                <span className="text-bordeaux-400">✖</span>
-                <span>Mensajes sin educación o sin un motivo claro.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-bordeaux-400">✖</span>
-                <span>Propuestas básicas de conversación sin tributo previo.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-bordeaux-400">✖</span>
-                <span>Mensajes cargados de necesidad. Enviar insistentes mensajes solo aumentará mi desgana de contestarte.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-bordeaux-400">✖</span>
-                <span>Si no has leído esta información antes de escribir.</span>
-              </li>
+              {noResponseList.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <span className="text-bordeaux-400">✖</span>
+                  <span>{item}</span>
+                </li>
+              ))}
             </ul>
 
             <div className="pt-2 border-t border-bordeaux-500/20 text-[11px] text-gold-300 font-sans italic">
-              * Desbloqueo tras falta grave: 666€ (Que te resulte un infierno volver a mí si estuviste a mis pies y no me valoraste).
+              {unblockNote}
             </div>
           </div>
 
@@ -183,47 +216,29 @@ export default function YakuzaPrincessPage({ onNavigateToStore }) {
           
           <div className="legibility-bordeaux p-8 rounded-2xl border border-gold-500/50 space-y-6 shadow-2xl">
             <div className="text-center space-y-2">
-              <span className="text-xs font-sans text-gold-400 uppercase tracking-widest block">PROTOCOLO OBLIGATORIO</span>
-              <h3 className="font-sans font-extrabold text-2xl text-ivory-100">Cómo Dirigirte a la Princesa</h3>
+              <span className="text-xs font-sans text-gold-400 uppercase tracking-widest block">{protocolBadge}</span>
+              <h3 className="font-sans font-extrabold text-2xl text-ivory-100">{protocolTitle}</h3>
             </div>
 
             <div className="grid md:grid-cols-3 gap-4 text-xs font-sans">
-              <div className="bg-dark-950/80 p-5 rounded-xl border border-gold-500/30 space-y-2">
-                <span className="text-gold-400 font-bold text-sm block">1. Tributo Inicial</span>
-                <p className="text-ivory-300 font-body">Haz un tributo inicial de <strong>50€ (mínimo)</strong> como muestra de sumisión y respeto hacia mi tiempo.</p>
-              </div>
-
-              <div className="bg-dark-950/80 p-5 rounded-xl border border-gold-500/30 space-y-2">
-                <span className="text-gold-400 font-bold text-sm block">2. Comprobante</span>
-                <p className="text-ivory-300 font-body">Envía la captura de pantalla del tributo inmediatamente por <strong>X / Telegram</strong>.</p>
-              </div>
-
-              <div className="bg-dark-950/80 p-5 rounded-xl border border-gold-500/30 space-y-2">
-                <span className="text-gold-400 font-bold text-sm block">3. Mensaje Plantilla</span>
-                <p className="text-ivory-300 font-body font-mono text-[11px]">“Hola buenas, soy [Nombre] de [Ciudad], tengo X años. Me gustaría saber si le complacería usarme para...”</p>
-              </div>
+              {protocolSteps.map((step, idx) => (
+                <div key={idx} className="bg-dark-950/80 p-5 rounded-xl border border-gold-500/30 space-y-2">
+                  <span className="text-gold-400 font-bold text-sm block">{step.title}</span>
+                  <p className="text-ivory-300 font-body">{step.text}</p>
+                </div>
+              ))}
             </div>
 
             {/* Tarifas de Continuidad */}
             <div className="bg-dark-950 p-6 rounded-xl border border-gold-500/20 space-y-3">
-              <h4 className="font-sans font-bold text-sm text-gold-300 uppercase tracking-wider">Tarifas de Interacción Privada:</h4>
+              <h4 className="font-sans font-bold text-sm text-gold-300 uppercase tracking-wider">{ratesTitle}</h4>
               <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs text-ivory-300 font-sans">
-                <div className="p-3 bg-bordeaux-950/60 rounded border border-gold-500/20 text-center">
-                  <span className="block font-bold text-gold-400 text-sm">25€</span>
-                  <span className="text-[10px] text-ivory-400">Por mensaje privado</span>
-                </div>
-                <div className="p-3 bg-bordeaux-950/60 rounded border border-gold-500/20 text-center">
-                  <span className="block font-bold text-gold-400 text-sm">100€ / día</span>
-                  <span className="text-[10px] text-ivory-400">Aspirante diario</span>
-                </div>
-                <div className="p-3 bg-bordeaux-950/60 rounded border border-gold-500/20 text-center">
-                  <span className="block font-bold text-gold-400 text-sm">700€ / sem</span>
-                  <span className="text-[10px] text-ivory-400">Aspirante semanal</span>
-                </div>
-                <div className="p-3 bg-bordeaux-950/60 rounded border border-gold-500/20 text-center">
-                  <span className="block font-bold text-gold-400 text-sm">1.000€ / mes</span>
-                  <span className="text-[10px] text-ivory-400">Plaza en el Reino</span>
-                </div>
+                {ratesList.map((rate, idx) => (
+                  <div key={idx} className="p-3 bg-bordeaux-950/60 rounded border border-gold-500/20 text-center">
+                    <span className="block font-bold text-gold-400 text-sm">{rate.price}</span>
+                    <span className="text-[10px] text-ivory-400">{rate.label}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -236,8 +251,8 @@ export default function YakuzaPrincessPage({ onNavigateToStore }) {
       {activeTab === 'reino' && (
         <div className="space-y-8">
           <div className="text-center max-w-2xl mx-auto space-y-2">
-            <span className="text-xs font-sans text-gold-400 uppercase tracking-widest block">JERARQUÍA DEL REINO</span>
-            <h3 className="font-sans font-bold text-2xl text-ivory-100">Haz clic en cada tarjeta para girarla y leer sus privilegios</h3>
+            <span className="text-xs font-sans text-gold-400 uppercase tracking-widest block">{kingdomHeaderBadge}</span>
+            <h3 className="font-sans font-bold text-2xl text-ivory-100">{kingdomHeaderTitle}</h3>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -299,7 +314,7 @@ export default function YakuzaPrincessPage({ onNavigateToStore }) {
           className="btn-royal-bordeaux"
         >
           <Sparkles className="w-4 h-4 text-gold-400" />
-          <span>Explorar el Catálogo de la Tienda</span>
+          <span>{buttonStoreText}</span>
         </button>
       </div>
 

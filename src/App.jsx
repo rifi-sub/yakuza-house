@@ -22,6 +22,7 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [banner, setBanner] = useState(null);
   const [launch, setLaunch] = useState(null);
+  const [princessConfig, setPrincessConfig] = useState(null);
   const [loadingItems, setLoadingItems] = useState(true);
 
   // Cart state
@@ -40,7 +41,7 @@ export default function App() {
   const [lookupOrderNumber, setLookupOrderNumber] = useState('');
   const [showLookupModal, setShowLookupModal] = useState(false);
 
-  // Fetch Items, Categories, Banner and Launch from backend
+  // Fetch Items, Categories, Banner, Launch and Princess Config from backend
   const fetchStoreData = () => {
     setLoadingItems(true);
     const catQuery = selectedCategory ? `?category=${encodeURIComponent(selectedCategory)}` : '';
@@ -49,13 +50,15 @@ export default function App() {
       fetch(`${API_BASE}/api/store/items${catQuery}`).then(r => r.json()).catch(() => []),
       fetch(`${API_BASE}/api/store/categories`).then(r => r.json()).catch(() => []),
       fetch(`${API_BASE}/api/store/banner`).then(r => r.json()).catch(() => null),
-      fetch(`${API_BASE}/api/store/launch`).then(r => r.json()).catch(() => null)
+      fetch(`${API_BASE}/api/store/launch`).then(r => r.json()).catch(() => null),
+      fetch(`${API_BASE}/api/store/princess`).then(r => r.json()).catch(() => null)
     ])
-      .then(([itemsData, categoriesData, bannerData, launchData]) => {
+      .then(([itemsData, categoriesData, bannerData, launchData, princessData]) => {
         if (Array.isArray(itemsData)) setItems(itemsData);
         if (Array.isArray(categoriesData)) setCategories(categoriesData);
         if (bannerData && typeof bannerData === 'object') setBanner(bannerData);
         if (launchData && typeof launchData === 'object') setLaunch(launchData);
+        if (princessData && typeof princessData === 'object') setPrincessConfig(princessData);
         setLoadingItems(false);
       })
       .catch(() => setLoadingItems(false));
@@ -285,7 +288,7 @@ export default function App() {
 
         {/* TAB 2: YAKUZA PRINCESS */}
         {activeTab === 'princess' && (
-          <YakuzaPrincessPage onNavigateToStore={() => setActiveTab('fetish')} />
+          <YakuzaPrincessPage princessConfig={princessConfig} onNavigateToStore={() => setActiveTab('fetish')} />
         )}
 
         {/* TAB 3: GRAND OPENING / SORTEO 2K */}

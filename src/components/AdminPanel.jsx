@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Edit, Trash2, Eye, EyeOff, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Eye, EyeOff, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart, Crown } from 'lucide-react';
 import { API_BASE, resolveMediaUrl, safeFetchJson } from '../config';
 import princessVideo from '../princess-yakuza.mp4';
 import { MediaPickerModal } from './MediaPickerModal';
@@ -11,7 +11,7 @@ export default function AdminPanel({ onBackToStore }) {
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  const [activeTab, setActiveTab] = useState('orders'); // orders, items, categories, reviews, banner, extras, packaging
+  const [activeTab, setActiveTab] = useState('orders'); // orders, items, categories, reviews, banner, princess, launch, extras, packaging
 
   // Data states
   const [orders, setOrders] = useState([]);
@@ -48,6 +48,85 @@ export default function AdminPanel({ onBackToStore }) {
   const [raffleNotesInput, setRaffleNotesInput] = useState('');
   const [raffleFilterText, setRaffleFilterText] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const defaultPrincessForm = {
+    badge: "✦ SECCIÓN EXCLUSIVA D/S & PROTOCOLO DE LA PRINCESA ✦",
+    titleTop: "YAKUZA",
+    titleAccent: "PRINCESS",
+    headerQuote: "“La sensación es la de entrar en un club privado extremadamente exclusivo. El acceso a mi energía no se compra: se conquista, se honra y se tributa con absoluta devoción.”",
+    requirementsTitle: "Requisitos para Servirme",
+    requirementsList: [
+      "Debes ser mayor de edad, tener trabajo estable y mentalidad de crecimiento.",
+      "Debe gustarte el Findom, Finfet o tributar tratamiento de Princesa para optar a una relación D/s a largo plazo.",
+      "Respeta mi tiempo y mi vida; aquí no hay sitio para la necesidad constante de atención sin tributar.",
+      "Si decides comprometerte a SERVIRME, hazlo con seriedad, dedicación y reverencia."
+    ],
+    noResponseTitle: "No respondo a:",
+    noResponseList: [
+      "Mensajes sin educación o sin un motivo claro.",
+      "Propuestas básicas de conversación sin tributo previo.",
+      "Mensajes cargados de necesidad. Enviar insistentes mensajes solo aumentará mi desgana de contestarte.",
+      "Si no has leído esta información antes de escribir."
+    ],
+    unblockNote: "* Desbloqueo tras falta grave: 666€ (Que te resulte un infierno volver a mí si estuviste a mis pies y no me valoraste).",
+    protocolBadge: "PROTOCOLO OBLIGATORIO",
+    protocolTitle: "Cómo Dirigirte a la Princesa",
+    protocolSteps: [
+      { title: "1. Tributo Inicial", text: "Haz un tributo inicial de 50€ (mínimo) como muestra de sumisión y respeto hacia mi tiempo." },
+      { title: "2. Comprobante", text: "Envía la captura de pantalla del tributo inmediatamente por X / Telegram." },
+      { title: "3. Mensaje Plantilla", text: "“Hola buenas, soy [Nombre] de [Ciudad], tengo X años. Me gustaría saber si le complacería usarme para...”" }
+    ],
+    ratesTitle: "Tarifas de Interacción Privada:",
+    ratesList: [
+      { label: "Por mensaje privado", price: "25€" },
+      { label: "Aspirante diario", price: "100€ / día" },
+      { label: "Aspirante semanal", price: "700€ / sem" },
+      { label: "Plaza en el Reino", price: "1.000€ / mes" }
+    ],
+    kingdomHeaderBadge: "JERARQUÍA DEL REINO",
+    kingdomHeaderTitle: "Haz clic en cada tarjeta para girarla y leer sus privilegios",
+    kingdomTiers: [
+      {
+        id: "plebeyos",
+        badge: "NIVEL 1",
+        title: "PLEBEYOS",
+        subtitle: "Sumisos humildes de primer nivel",
+        frontText: "Sumisos que desean servir y ser útiles de alguna forma desde el respeto y la devoción.",
+        backTitle: "Órdenes & Grupo Telegram",
+        backText: "Recibes órdenes y tareas gratuitas en el grupo oficial de Telegram. El único requisito es la disponibilidad, eficacia y la satisfacción de haberme complacido."
+      },
+      {
+        id: "sirvientes",
+        badge: "NIVEL 2",
+        title: "SIRVIENTES",
+        subtitle: "Trato directo & Contratos",
+        frontText: "Sumisos entregados que se encargan de hacer la vida de la Princesa más fácil.",
+        backTitle: "Contacto Directo & Club 1k",
+        backText: "Contacto directo con la Princesa, tareas personalizadas y recompensas directas al entrar en el club 1k. Contratos desbloqueados y opción de ascenso a Caballeros."
+      },
+      {
+        id: "caballeros",
+        badge: "NIVEL 3",
+        title: "CABALLEROS",
+        subtitle: "Aspirantes a Propiedad",
+        frontText: "Sumisos que aspiran a ser propiedad exclusiva de la Princesa. ¿Conseguirás ser uno de ellos?",
+        backTitle: "Cashmeets & Citas Presenciales",
+        backText: "Exploraremos la dinámica juntos. Evaluaciones de sumisión, aftercare exclusivo, cashmeets, cashdrops y entregas de productos en mano."
+      },
+      {
+        id: "elegidos",
+        badge: "NIVEL MÁXIMO",
+        title: "LOS ELEGIDOS",
+        subtitle: "Pertenencia Absoluta (D/s)",
+        frontText: "Pertenece en mente, cuerpo y espíritu a la Princesa de manera presencial y online.",
+        backTitle: "Propiedad de la Diosa",
+        backText: "Tu cuerpo, tu voluntad, tu mente y tu alma son míos. Soy tu propósito, tu guía y Dueña de todo tu ser. Citas presenciales exclusivas y tributo de vida."
+      }
+    ],
+    buttonStoreText: "Explorar el Catálogo de la Tienda"
+  };
+  const [princessForm, setPrincessForm] = useState(defaultPrincessForm);
+  const [savingPrincess, setSavingPrincess] = useState(false);
 
   // ISO UTC -> string "YYYY-MM-DDTHH:mm" para <input type="datetime-local">
   const isoToLocalInput = (iso) => {
@@ -174,9 +253,10 @@ export default function AdminPanel({ onBackToStore }) {
       fetch(`${API_BASE}/api/store/banner`).then(r => r.json()),
       fetch(`${API_BASE}/api/store/admin/extras`, { headers }).then(r => r.json()),
       fetch(`${API_BASE}/api/store/admin/packaging`, { headers }).then(r => r.json()),
-      fetch(`${API_BASE}/api/store/launch`).then(r => r.json()).catch(() => null)
+      fetch(`${API_BASE}/api/store/launch`).then(r => r.json()).catch(() => null),
+      fetch(`${API_BASE}/api/store/princess`).then(r => r.json()).catch(() => null)
     ])
-      .then(([ordersData, itemsData, categoriesData, reviewsData, bannerData, extrasData, packagingData, launchData]) => {
+      .then(([ordersData, itemsData, categoriesData, reviewsData, bannerData, extrasData, packagingData, launchData, princessData]) => {
         if (ordersData?.error || itemsData?.error || categoriesData?.error) {
           console.warn('[AdminPanel] Token de sesión expirado o inválido. Cerrando sesión...');
           handleLogout();
@@ -198,6 +278,12 @@ export default function AdminPanel({ onBackToStore }) {
             prize: { ...prev.prize, ...((launchData.config && launchData.config.prize) || {}) }
           }));
           if (launchData.followers) setLaunchFollowers(launchData.followers);
+        }
+        if (princessData && typeof princessData === 'object' && !princessData.error) {
+          setPrincessForm(prev => ({
+            ...prev,
+            ...princessData
+          }));
         }
         setLoading(false);
       })
@@ -586,6 +672,30 @@ export default function AdminPanel({ onBackToStore }) {
     }
   };
 
+  // Yakuza Princess Save
+  const handleSavePrincessConfig = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setSavingPrincess(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/store/admin/princess`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(princessForm)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error guardando configuración de Yakuza Princess');
+      alert('¡Configuración y textos de Yakuza Princess guardados con éxito!');
+      fetchAllData();
+    } catch (err) {
+      alert(err.message || 'Error guardando configuración');
+    } finally {
+      setSavingPrincess(false);
+    }
+  };
+
   // ==== Grand Opening / Sorteo ====
   const handleSaveLaunch = async (e) => {
     e.preventDefault();
@@ -763,6 +873,16 @@ export default function AdminPanel({ onBackToStore }) {
           }`}
         >
           Portada / Hero
+        </button>
+
+        <button
+          onClick={() => setActiveTab('princess')}
+          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            activeTab === 'princess' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          <Crown className="w-3.5 h-3.5 text-gold-400" />
+          👑 Yakuza Princess
         </button>
 
         <button
@@ -1722,6 +1842,498 @@ export default function AdminPanel({ onBackToStore }) {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: YAKUZA PRINCESS (TEXTOS & JERARQUÍA) */}
+      {activeTab === 'princess' && (
+        <div className="space-y-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-dark-950/80 p-5 rounded-xl border border-gold-500/30">
+            <div>
+              <div className="flex items-center gap-2">
+                <Crown className="w-5 h-5 text-gold-400" />
+                <h3 className="font-sans font-bold text-lg text-white">Configuración de Yakuza Princess</h3>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Modifica todos los textos de la página privada: frase de cabecera, requisitos, reglas, tarifas y las 4 tarjetas de la Jerarquía del Reino.
+              </p>
+            </div>
+            <button
+              onClick={handleSavePrincessConfig}
+              disabled={savingPrincess}
+              className="py-2.5 px-6 rounded-xl bg-gold-500 hover:bg-gold-400 text-dark-950 font-sans font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-gold-500/20 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              {savingPrincess ? 'Guardando...' : 'Guardar Cambios'}
+            </button>
+          </div>
+
+          {/* SECCIÓN 1: CABECERA & CITA */}
+          <div className="glass-panel p-6 rounded-xl border border-gray-800 space-y-4">
+            <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> 1. Cabecera Principal & Cita Destacada
+            </h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-mono text-gray-300 mb-1">Badge de Cabecera</label>
+                <input
+                  type="text"
+                  value={princessForm.badge || ''}
+                  onChange={e => setPrincessForm({ ...princessForm, badge: e.target.value })}
+                  className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-mono text-gray-300 mb-1">Título Superior</label>
+                <input
+                  type="text"
+                  value={princessForm.titleTop || ''}
+                  onChange={e => setPrincessForm({ ...princessForm, titleTop: e.target.value })}
+                  className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white font-bold"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-mono text-gray-300 mb-1">Título Acento (Color Carmesí)</label>
+                <input
+                  type="text"
+                  value={princessForm.titleAccent || ''}
+                  onChange={e => setPrincessForm({ ...princessForm, titleAccent: e.target.value })}
+                  className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-crimson-400 font-bold"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono text-gray-300 mb-1">Frase / Cita de la Princesa (Caja destacada superior)</label>
+              <textarea
+                rows="3"
+                value={princessForm.headerQuote || ''}
+                onChange={e => setPrincessForm({ ...princessForm, headerQuote: e.target.value })}
+                className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gold-200 font-serif italic"
+              />
+            </div>
+          </div>
+
+          {/* SECCIÓN 2: REQUISITOS PARA SERVIRME */}
+          <div className="glass-panel p-6 rounded-xl border border-gray-800 space-y-4">
+            <div className="flex justify-between items-center">
+              <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" /> 2. Requisitos para Servirme
+              </h4>
+              <button
+                type="button"
+                onClick={() => setPrincessForm(prev => ({ ...prev, requirementsList: [...(prev.requirementsList || []), ''] }))}
+                className="py-1 px-3 rounded-lg bg-crimson-600/30 hover:bg-crimson-600/50 text-crimson-300 border border-crimson-500/40 text-xs font-mono flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" /> Añadir Requisito
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono text-gray-300 mb-1">Título del Bloque</label>
+              <input
+                type="text"
+                value={princessForm.requirementsTitle || ''}
+                onChange={e => setPrincessForm({ ...princessForm, requirementsTitle: e.target.value })}
+                className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white font-bold"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-mono text-gray-400">Lista de Requisitos</label>
+              {(princessForm.requirementsList || []).map((reqItem, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  <span className="text-xs font-mono text-gold-400 w-5 text-right">{idx + 1}.</span>
+                  <input
+                    type="text"
+                    value={reqItem}
+                    onChange={e => {
+                      const updated = [...princessForm.requirementsList];
+                      updated[idx] = e.target.value;
+                      setPrincessForm({ ...princessForm, requirementsList: updated });
+                    }}
+                    className="flex-1 bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = princessForm.requirementsList.filter((_, i) => i !== idx);
+                      setPrincessForm({ ...princessForm, requirementsList: updated });
+                    }}
+                    className="p-2 rounded-lg bg-dark-900 text-gray-400 hover:text-red-400 border border-gray-800"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* SECCIÓN 3: NO RESPONDO A & DESBLOQUEO */}
+          <div className="glass-panel p-6 rounded-xl border border-gray-800 space-y-4">
+            <div className="flex justify-between items-center">
+              <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4" /> 3. Reglas "No Respondo a" & Nota de Desbloqueo
+              </h4>
+              <button
+                type="button"
+                onClick={() => setPrincessForm(prev => ({ ...prev, noResponseList: [...(prev.noResponseList || []), ''] }))}
+                className="py-1 px-3 rounded-lg bg-crimson-600/30 hover:bg-crimson-600/50 text-crimson-300 border border-crimson-500/40 text-xs font-mono flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" /> Añadir Regla
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono text-gray-300 mb-1">Título del Bloque</label>
+              <input
+                type="text"
+                value={princessForm.noResponseTitle || ''}
+                onChange={e => setPrincessForm({ ...princessForm, noResponseTitle: e.target.value })}
+                className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white font-bold"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-mono text-gray-400">Mensajes / Actitudes que NO se responden</label>
+              {(princessForm.noResponseList || []).map((noItem, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  <span className="text-xs font-mono text-crimson-400 w-5 text-right">✕</span>
+                  <input
+                    type="text"
+                    value={noItem}
+                    onChange={e => {
+                      const updated = [...princessForm.noResponseList];
+                      updated[idx] = e.target.value;
+                      setPrincessForm({ ...princessForm, noResponseList: updated });
+                    }}
+                    className="flex-1 bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = princessForm.noResponseList.filter((_, i) => i !== idx);
+                      setPrincessForm({ ...princessForm, noResponseList: updated });
+                    }}
+                    className="p-2 rounded-lg bg-dark-900 text-gray-400 hover:text-red-400 border border-gray-800"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono text-gray-300 mb-1">Nota de Desbloqueo (Penalización)</label>
+              <input
+                type="text"
+                value={princessForm.unblockNote || ''}
+                onChange={e => setPrincessForm({ ...princessForm, unblockNote: e.target.value })}
+                className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-crimson-300 italic"
+              />
+            </div>
+          </div>
+
+          {/* SECCIÓN 4: PROTOCOLO OBLIGATORIO & TARIFAS */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* PROTOCOLO STEPS */}
+            <div className="glass-panel p-6 rounded-xl border border-gray-800 space-y-4">
+              <div className="flex justify-between items-center">
+                <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest flex items-center gap-2">
+                  <Clock className="w-4 h-4" /> Protocolo Obligatorio
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setPrincessForm(prev => ({
+                    ...prev,
+                    protocolSteps: [...(prev.protocolSteps || []), { title: `${(prev.protocolSteps || []).length + 1}. Nuevo Paso`, text: '' }]
+                  }))}
+                  className="py-1 px-3 rounded-lg bg-crimson-600/30 hover:bg-crimson-600/50 text-crimson-300 border border-crimson-500/40 text-xs font-mono flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Paso
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono text-gray-300 mb-1">Badge Protocolo</label>
+                  <input
+                    type="text"
+                    value={princessForm.protocolBadge || ''}
+                    onChange={e => setPrincessForm({ ...princessForm, protocolBadge: e.target.value })}
+                    className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-gray-300 mb-1">Título Protocolo</label>
+                  <input
+                    type="text"
+                    value={princessForm.protocolTitle || ''}
+                    onChange={e => setPrincessForm({ ...princessForm, protocolTitle: e.target.value })}
+                    className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {(princessForm.protocolSteps || []).map((step, idx) => (
+                  <div key={idx} className="p-3 bg-dark-950/60 rounded-lg border border-gray-800 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <input
+                        type="text"
+                        value={step.title}
+                        onChange={e => {
+                          const updated = [...princessForm.protocolSteps];
+                          updated[idx] = { ...updated[idx], title: e.target.value };
+                          setPrincessForm({ ...princessForm, protocolSteps: updated });
+                        }}
+                        className="bg-dark-900 border border-gray-700 rounded px-2 py-1 text-xs text-gold-300 font-bold"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = princessForm.protocolSteps.filter((_, i) => i !== idx);
+                          setPrincessForm({ ...princessForm, protocolSteps: updated });
+                        }}
+                        className="p-1 text-gray-400 hover:text-red-400"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <textarea
+                      rows="2"
+                      value={step.text}
+                      onChange={e => {
+                        const updated = [...princessForm.protocolSteps];
+                        updated[idx] = { ...updated[idx], text: e.target.value };
+                        setPrincessForm({ ...princessForm, protocolSteps: updated });
+                      }}
+                      className="w-full bg-dark-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* TARIFAS DE INTERACCIÓN */}
+            <div className="glass-panel p-6 rounded-xl border border-gray-800 space-y-4">
+              <div className="flex justify-between items-center">
+                <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest flex items-center gap-2">
+                  <Lock className="w-4 h-4" /> Tarifas de Interacción Privada
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setPrincessForm(prev => ({
+                    ...prev,
+                    ratesList: [...(prev.ratesList || []), { label: 'Nueva Tarifa', price: '0€' }]
+                  }))}
+                  className="py-1 px-3 rounded-lg bg-crimson-600/30 hover:bg-crimson-600/50 text-crimson-300 border border-crimson-500/40 text-xs font-mono flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Tarifa
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-gray-300 mb-1">Título de Tarifas</label>
+                <input
+                  type="text"
+                  value={princessForm.ratesTitle || ''}
+                  onChange={e => setPrincessForm({ ...princessForm, ratesTitle: e.target.value })}
+                  className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white font-bold"
+                />
+              </div>
+
+              <div className="space-y-2">
+                {(princessForm.ratesList || []).map((rate, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      placeholder="Concepto (ej: Por mensaje)"
+                      value={rate.label}
+                      onChange={e => {
+                        const updated = [...princessForm.ratesList];
+                        updated[idx] = { ...updated[idx], label: e.target.value };
+                        setPrincessForm({ ...princessForm, ratesList: updated });
+                      }}
+                      className="flex-1 bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Precio (ej: 25€)"
+                      value={rate.price}
+                      onChange={e => {
+                        const updated = [...princessForm.ratesList];
+                        updated[idx] = { ...updated[idx], price: e.target.value };
+                        setPrincessForm({ ...princessForm, ratesList: updated });
+                      }}
+                      className="w-28 bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gold-400 font-bold text-right"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = princessForm.ratesList.filter((_, i) => i !== idx);
+                        setPrincessForm({ ...princessForm, ratesList: updated });
+                      }}
+                      className="p-2 rounded-lg bg-dark-900 text-gray-400 hover:text-red-400 border border-gray-800"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* SECCIÓN 5: JERARQUÍA DEL REINO (TARJETAS 3D FLIP CARDS) */}
+          <div className="glass-panel p-6 rounded-xl border border-gray-800 space-y-6">
+            <div>
+              <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest flex items-center gap-2 mb-3">
+                👑 5. Jerarquía del Reino (Las 4 Tarjetas Interactivas)
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-mono text-gray-300 mb-1">Badge Superior Jerarquía</label>
+                  <input
+                    type="text"
+                    value={princessForm.kingdomHeaderBadge || ''}
+                    onChange={e => setPrincessForm({ ...princessForm, kingdomHeaderBadge: e.target.value })}
+                    className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-gray-300 mb-1">Título de Instrucciones</label>
+                  <input
+                    type="text"
+                    value={princessForm.kingdomHeaderTitle || ''}
+                    onChange={e => setPrincessForm({ ...princessForm, kingdomHeaderTitle: e.target.value })}
+                    className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white font-bold"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {(princessForm.kingdomTiers || []).map((tier, idx) => (
+                <div key={tier.id || idx} className="p-5 rounded-xl bg-dark-950/80 border border-gold-500/20 space-y-3">
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-800">
+                    <span className="text-xs font-mono text-gold-400 font-bold uppercase">
+                      Tarjeta #{idx + 1}: {tier.title || tier.id}
+                    </span>
+                    <span className="text-[10px] font-mono text-gray-500">ID: {tier.id}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-mono text-gray-400 mb-0.5">Nivel / Badge</label>
+                      <input
+                        type="text"
+                        value={tier.badge || ''}
+                        onChange={e => {
+                          const updated = [...princessForm.kingdomTiers];
+                          updated[idx] = { ...updated[idx], badge: e.target.value };
+                          setPrincessForm({ ...princessForm, kingdomTiers: updated });
+                        }}
+                        className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-gold-300"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-mono text-gray-400 mb-0.5">Título Frontal</label>
+                      <input
+                        type="text"
+                        value={tier.title || ''}
+                        onChange={e => {
+                          const updated = [...princessForm.kingdomTiers];
+                          updated[idx] = { ...updated[idx], title: e.target.value };
+                          setPrincessForm({ ...princessForm, kingdomTiers: updated });
+                        }}
+                        className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-mono text-gray-400 mb-0.5">Subtítulo Frontal</label>
+                    <input
+                      type="text"
+                      value={tier.subtitle || ''}
+                      onChange={e => {
+                        const updated = [...princessForm.kingdomTiers];
+                        updated[idx] = { ...updated[idx], subtitle: e.target.value };
+                        setPrincessForm({ ...princessForm, kingdomTiers: updated });
+                      }}
+                      className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-gray-300"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-mono text-gray-400 mb-0.5">Descripción Cara Frontal</label>
+                    <textarea
+                      rows="2"
+                      value={tier.frontText || ''}
+                      onChange={e => {
+                        const updated = [...princessForm.kingdomTiers];
+                        updated[idx] = { ...updated[idx], frontText: e.target.value };
+                        setPrincessForm({ ...princessForm, kingdomTiers: updated });
+                      }}
+                      className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-gray-200"
+                    />
+                  </div>
+
+                  <div className="pt-2 border-t border-gray-800 space-y-2">
+                    <div>
+                      <label className="block text-[11px] font-mono text-crimson-400 mb-0.5">Título Cara Trasera (Al Girar)</label>
+                      <input
+                        type="text"
+                        value={tier.backTitle || ''}
+                        onChange={e => {
+                          const updated = [...princessForm.kingdomTiers];
+                          updated[idx] = { ...updated[idx], backTitle: e.target.value };
+                          setPrincessForm({ ...princessForm, kingdomTiers: updated });
+                        }}
+                        className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-crimson-300 font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-mono text-crimson-400 mb-0.5">Texto Cara Trasera (Privilegios / Descripción)</label>
+                      <textarea
+                        rows="3"
+                        value={tier.backText || ''}
+                        onChange={e => {
+                          const updated = [...princessForm.kingdomTiers];
+                          updated[idx] = { ...updated[idx], backText: e.target.value };
+                          setPrincessForm({ ...princessForm, kingdomTiers: updated });
+                        }}
+                        className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-gray-200"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* SECCIÓN 6: BOTÓN TIENDA */}
+          <div className="glass-panel p-6 rounded-xl border border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex-1 w-full">
+              <label className="block text-xs font-mono text-gray-300 mb-1">Texto del Botón Inferior hacia la Tienda</label>
+              <input
+                type="text"
+                value={princessForm.buttonStoreText || ''}
+                onChange={e => setPrincessForm({ ...princessForm, buttonStoreText: e.target.value })}
+                className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white"
+              />
+            </div>
+            <button
+              onClick={handleSavePrincessConfig}
+              disabled={savingPrincess}
+              className="py-3 px-8 rounded-xl bg-gold-500 hover:bg-gold-400 text-dark-950 font-sans font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-gold-500/20 disabled:opacity-50 whitespace-nowrap mt-4 sm:mt-5"
+            >
+              <Save className="w-4 h-4" />
+              {savingPrincess ? 'Guardando...' : 'Guardar Todo'}
+            </button>
           </div>
         </div>
       )}
