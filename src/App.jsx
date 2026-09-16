@@ -522,6 +522,9 @@ export default function App() {
             onBuyNow={handleBuyNow}
             onViewDetails={setSelectedDetailItem}
             onAddToCart={handleAddToCart}
+            onOrderComplete={handleOrderComplete}
+            onRefreshLaunch={fetchStoreData}
+            currentMember={currentMember}
           />
         )}
 

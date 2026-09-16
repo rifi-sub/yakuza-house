@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Crown, Gift, Clock, Sparkles, ShieldCheck, ChevronLeft, Twitter } from 'lucide-react';
+import { Crown, Gift, Clock, Sparkles, ShieldCheck, ChevronLeft, Twitter, Check, ShoppingCart, Dice5, CheckCircle2, X } from 'lucide-react';
 import Reveal from './Reveal';
 import ItemCard from './ItemCard';
 import copy from '../copy';
 import { resolveMediaUrl } from '../config';
 import grandOpeningHeroImg from '../assets/grand-opening-hero.png';
+import RafflePurchaseModal from './RafflePurchaseModal';
 
 // --- Cuenta atrás ---
 function useCountdown(target) {
@@ -26,9 +27,22 @@ function useCountdown(target) {
 
 const pad = n => String(n).padStart(2, '0');
 
-export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDetails, onAddToCart }) {
+export default function GiveawayPage({ 
+  launch, 
+  onBackToStore, 
+  onBuyNow, 
+  onViewDetails, 
+  onAddToCart,
+  onOrderComplete,
+  onRefreshLaunch,
+  currentMember
+}) {
   const [numberTab, setNumberTab] = useState('all');
   const [searchRaffleQuery, setSearchRaffleQuery] = useState('');
+  const [selectedNumbers, setSelectedNumbers] = useState([]);
+  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [lastPurchased, setLastPurchased] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null);
 
   const config = launch?.config || {};
   const followers = launch?.followers || {};
@@ -38,7 +52,39 @@ export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDe
   const totalRaffle = typeof raffle.total === 'number' ? raffle.total : 100;
   const assignedMap = raffle.assigned || {};
   const assignedCount = Object.keys(assignedMap).length;
-  const availableCount = Math.max(0, totalRaffle - assignedCount);
+  const padLen = totalRaffle > 100 ? 3 : 2;
+  const allAvailableNumbers = Array.from({ length: totalRaffle })
+    .map((_, idx) => String(idx).padStart(padLen, '0'))
+    .filter(numStr => !assignedMap[numStr]);
+
+  const handleToggleNumber = (numStr) => {
+    if (assignedMap[numStr]) {
+      setToastMessage(`El número #${numStr} ya pertenece a ${assignedMap[numStr].buyer || 'otro participante'}.`);
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
+    setSelectedNumbers(prev => 
+      prev.includes(numStr) ? prev.filter(n => n !== numStr) : [...prev, numStr]
+    );
+  };
+
+  const handleSelectRandom = (qty) => {
+    const unselected = allAvailableNumbers.filter(n => !selectedNumbers.includes(n));
+    if (unselected.length === 0) {
+      setToastMessage('No quedan más números disponibles en el sorteo.');
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+    const shuffled = [...unselected].sort(() => 0.5 - Math.random());
+    const picked = shuffled.slice(0, qty);
+    setSelectedNumbers(prev => [...prev, ...picked]);
+  };
+
+  const handlePurchaseSuccess = (result) => {
+    setLastPurchased(result);
+    setSelectedNumbers([]);
+    if (onRefreshLaunch) onRefreshLaunch();
+  };
 
   const state = config.state || 'soon';
   const stateCopy = copy.giveaway.states[state] || copy.giveaway.states.soon;
@@ -217,29 +263,133 @@ export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDe
             <div className="text-center space-y-3">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gold-500/10 border border-gold-500/30 text-gold-300 text-xs font-sans tracking-widest uppercase">
                 <Gift className="w-4 h-4 text-gold-400" />
-                <span>TABLA OFICIAL DE PAPELETAS DEL SORTEO</span>
+                <span>VENTA OFICIAL DE PAPELETAS · 3,00€ POR NÚMERO</span>
               </div>
               <h2 className="font-brand font-black text-3xl sm:text-4xl text-ivory-100">
-                Estado de Números en Tiempo Real
+                Elige tus Números para el Gran Sorteo
               </h2>
               <p className="text-xs sm:text-sm text-ivory-300 max-w-2xl mx-auto font-sans leading-relaxed">
-                Consulta los números disponibles para la rifa. Cada vez que un devoto o sumi adquiere una papeleta, su número se actualiza y queda registrado en el tablero oficial de la Casa.
+                Cada número tiene un coste de <strong className="text-gold-400">3,00€</strong>. Selecciona tus números en la tabla, introduce tu <strong className="text-gold-300">usuario de X (Twitter)</strong> y tus participaciones quedarán asignadas de inmediato a tu nombre en tiempo real.
               </p>
             </div>
 
+            {/* Notification Toast si clic en número asignado */}
+            {toastMessage && (
+              <div className="p-3 bg-bordeaux-700/60 border border-gold-500/40 text-gold-200 text-xs rounded-xl text-center shadow-lg animate-fade-in">
+                {toastMessage}
+              </div>
+            )}
+
+            {/* Confirmation Banner if recently purchased */}
+            {lastPurchased && (
+              <div className="p-6 bg-dark-950 border-2 border-gold-400 rounded-2xl text-center space-y-3 shadow-2xl animate-fade-in">
+                <div className="w-12 h-12 rounded-full bg-gold-500/20 text-gold-400 border border-gold-400/50 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-7 h-7" />
+                </div>
+                <h3 className="font-brand font-bold text-xl text-gold-300">¡Papeletas Asignadas con Éxito!</h3>
+                <p className="text-xs text-ivory-200">
+                  Tus números <strong className="text-gold-400">{lastPurchased.numbers.map(n => `#${n}`).join(', ')}</strong> han sido registrados para el usuario <strong className="text-gold-300">{lastPurchased.buyer}</strong>.
+                </p>
+                <p className="text-[11px] font-mono text-gray-400">
+                  Pedido Nº: <span className="text-gold-400 font-bold">{lastPurchased.orderNumber}</span> · Total: {lastPurchased.totalAmount.toFixed(2)}€
+                </p>
+                <div className="pt-2 flex justify-center gap-3">
+                  {onOrderComplete && (
+                    <button
+                      onClick={() => onOrderComplete(lastPurchased.orderNumber)}
+                      className="py-2 px-4 rounded-xl bg-gold-500 text-dark-950 font-sans font-bold text-xs hover:bg-gold-400 transition-all shadow-md"
+                    >
+                      Ver Justificante del Pedido
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setLastPurchased(null)}
+                    className="py-2 px-4 rounded-xl border border-gold-500/30 text-gold-400 font-sans text-xs hover:bg-gold-500/10"
+                  >
+                    Cerrar Aviso
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Barra de Estadísticas & Contadores */}
-            <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto text-center">
-              <div className="legibility-shield p-4 rounded-xl border border-gold-500/30">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl mx-auto text-center">
+              <div className="legibility-shield p-3.5 rounded-xl border border-gold-500/30">
                 <span className="block text-2xl md:text-3xl font-mono font-bold text-ivory-100">{totalRaffle}</span>
                 <span className="text-[10px] sm:text-xs font-sans tracking-wider uppercase text-gray-400">Total Papeletas</span>
               </div>
-              <div className="legibility-shield p-4 rounded-xl border border-gold-500/50 bg-gold-500/10 shadow-lg shadow-gold-500/10">
+              <div className="legibility-shield p-3.5 rounded-xl border border-gold-500/50 bg-gold-500/10 shadow-lg shadow-gold-500/10">
                 <span className="block text-2xl md:text-3xl font-mono font-bold text-gold-300">{availableCount}</span>
                 <span className="text-[10px] sm:text-xs font-sans tracking-wider uppercase text-gold-400 font-semibold">Disponibles</span>
               </div>
-              <div className="legibility-shield p-4 rounded-xl border border-bordeaux-500/50 bg-bordeaux-600/30 shadow-lg shadow-bordeaux-700/30">
+              <div className="legibility-shield p-3.5 rounded-xl border border-bordeaux-500/50 bg-bordeaux-600/30 shadow-lg shadow-bordeaux-700/30">
                 <span className="block text-2xl md:text-3xl font-mono font-bold text-bordeaux-300">{assignedCount}</span>
-                <span className="text-[10px] sm:text-xs font-sans tracking-wider uppercase text-bordeaux-300 font-semibold">Vendidas / Reservadas</span>
+                <span className="text-[10px] sm:text-xs font-sans tracking-wider uppercase text-bordeaux-300 font-semibold">Vendidas</span>
+              </div>
+              <div className="legibility-shield p-3.5 rounded-xl border border-gold-400 bg-gradient-to-br from-gold-500/20 to-bordeaux-700/30 shadow-lg shadow-gold-500/15">
+                <span className="block text-2xl md:text-3xl font-mono font-bold text-gold-300">3,00€</span>
+                <span className="text-[10px] sm:text-xs font-sans tracking-wider uppercase text-gold-200 font-bold">Por Número</span>
+              </div>
+            </div>
+
+            {/* Barra de Selección Rápida y Acciones */}
+            <div className="p-4 rounded-2xl bg-dark-950/80 border border-gold-500/30 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-sans text-gold-400 font-semibold">Selección Rápida:</span>
+                <button
+                  type="button"
+                  onClick={() => handleSelectRandom(1)}
+                  className="py-1.5 px-3 rounded-lg bg-dark-900 border border-gold-500/30 hover:border-gold-400 text-gold-300 text-xs font-sans transition-all flex items-center gap-1.5"
+                >
+                  <Dice5 className="w-3.5 h-3.5 text-gold-400" />
+                  +1 al azar (3€)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectRandom(3)}
+                  className="py-1.5 px-3 rounded-lg bg-dark-900 border border-gold-500/30 hover:border-gold-400 text-gold-300 text-xs font-sans transition-all flex items-center gap-1.5"
+                >
+                  <Dice5 className="w-3.5 h-3.5 text-gold-400" />
+                  +3 al azar (9€)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectRandom(5)}
+                  className="py-1.5 px-3 rounded-lg bg-dark-900 border border-gold-500/30 hover:border-gold-400 text-gold-300 text-xs font-sans transition-all flex items-center gap-1.5"
+                >
+                  <Dice5 className="w-3.5 h-3.5 text-gold-400" />
+                  +5 al azar (15€)
+                </button>
+                {selectedNumbers.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedNumbers([])}
+                    className="py-1.5 px-3 rounded-lg border border-gray-700 hover:border-gray-500 text-gray-400 hover:text-white text-xs font-sans transition-all"
+                  >
+                    Deseleccionar todos
+                  </button>
+                )}
+              </div>
+
+              {/* Action Button */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedNumbers.length === 0) {
+                      handleSelectRandom(1);
+                    }
+                    setIsPurchaseModalOpen(true);
+                  }}
+                  className="btn-royal-bordeaux py-2 px-5 text-xs font-bold flex items-center gap-2 shadow-lg"
+                >
+                  <ShoppingCart className="w-4 h-4 text-gold-400" />
+                  {selectedNumbers.length > 0 ? (
+                    <span>Comprar Selección ({selectedNumbers.length} nº = {(selectedNumbers.length * 3).toFixed(2)}€)</span>
+                  ) : (
+                    <span>Comprar Números (3€ c/u)</span>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -274,7 +424,7 @@ export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDe
                       : 'bg-dark-950 border border-gold-500/20 text-ivory-400 hover:text-white'
                   }`}
                 >
-                  Reservadas ({assignedCount})
+                  Vendidas ({assignedCount})
                 </button>
               </div>
 
@@ -283,18 +433,19 @@ export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDe
                   type="text"
                   value={searchRaffleQuery}
                   onChange={e => setSearchRaffleQuery(e.target.value)}
-                  placeholder="Buscar nº (ej: 07) o alias..."
+                  placeholder="Buscar nº (ej: 07) o alias de X..."
                   className="w-full bg-dark-950 border border-gold-500/30 rounded-lg px-3 py-2 text-xs text-white"
                 />
               </div>
             </div>
 
             {/* Grid de Números de la Rifa */}
-            <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2.5 max-h-[28rem] overflow-y-auto pr-1">
+            <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2.5 max-h-[30rem] overflow-y-auto pr-1">
               {Array.from({ length: totalRaffle }).map((_, idx) => {
                 const numStr = String(idx).padStart(totalRaffle > 100 ? 3 : 2, '0');
                 const assignedData = assignedMap[numStr];
                 const isAssigned = !!assignedData;
+                const isSelected = selectedNumbers.includes(numStr);
 
                 // Filtro tab
                 if (numberTab === 'available' && isAssigned) return null;
@@ -311,23 +462,49 @@ export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDe
                 return (
                   <div
                     key={numStr}
-                    className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center min-h-[4rem] relative overflow-hidden ${
-                      isAssigned
-                        ? 'bg-bordeaux-700/70 border-bordeaux-500 text-ivory-100 shadow-md shadow-bordeaux-700/40'
-                        : 'bg-dark-950/90 border-gold-500/40 text-gold-300 hover:border-gold-400 hover:bg-gold-500/10 hover:scale-105'
+                    onClick={() => handleToggleNumber(numStr)}
+                    className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center min-h-[4.2rem] relative overflow-hidden cursor-pointer select-none ${
+                      isSelected
+                        ? 'bg-gradient-to-b from-bordeaux-600 to-bordeaux-700 border-2 border-gold-400 text-white shadow-lg shadow-gold-500/30 scale-105 ring-2 ring-gold-400/50'
+                        : isAssigned
+                          ? 'bg-bordeaux-950/80 border-bordeaux-800 text-gray-400 cursor-not-allowed opacity-80'
+                          : 'bg-dark-950/90 border-gold-500/40 text-gold-300 hover:border-gold-400 hover:bg-gold-500/15 hover:scale-105'
                     }`}
+                    title={
+                      isSelected
+                        ? `Número #${numStr} seleccionado (3€) - Clic para deseleccionar`
+                        : isAssigned
+                          ? `Número #${numStr} comprado por ${assignedData?.buyer || 'otro devoto'}`
+                          : `Número #${numStr} disponible (3€) - Clic para seleccionar`
+                    }
                   >
-                    <span className={`font-mono text-sm font-bold tracking-widest ${isAssigned ? 'text-ivory-200 line-through opacity-80' : 'text-gold-300'}`}>
+                    {isSelected && (
+                      <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-gold-400 text-dark-950 flex items-center justify-center">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </div>
+                    )}
+
+                    <span className={`font-mono text-sm font-bold tracking-widest ${
+                      isSelected
+                        ? 'text-white'
+                        : isAssigned
+                          ? 'text-gray-400 line-through'
+                          : 'text-gold-300'
+                    }`}>
                       #{numStr}
                     </span>
 
-                    {isAssigned ? (
-                      <span className="text-[9px] font-sans font-bold text-gold-300 truncate max-w-full block mt-1 bg-dark-950/80 px-1.5 py-0.5 rounded border border-gold-500/30">
+                    {isSelected ? (
+                      <span className="text-[8px] font-mono tracking-wider uppercase text-gold-300 font-bold block mt-1 bg-dark-950/80 px-1 py-0.5 rounded">
+                        3,00€ ✓
+                      </span>
+                    ) : isAssigned ? (
+                      <span className="text-[9px] font-sans font-bold text-gold-400/90 truncate max-w-full block mt-1 bg-dark-950/90 px-1 py-0.5 rounded border border-gold-500/20">
                         {assignedData.buyer}
                       </span>
                     ) : (
                       <span className="text-[8px] font-mono tracking-wider uppercase text-gold-400/80 block mt-1">
-                        DISPONIBLE
+                        3,00€
                       </span>
                     )}
                   </div>
@@ -338,15 +515,28 @@ export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDe
             {/* CTA para conseguir número */}
             <div className="pt-4 border-t border-gold-500/20 text-center space-y-3">
               <p className="text-xs text-ivory-300 font-sans">
-                ¿Quieres asegurar tu número para el sorteo de la Casa? Adquiere tu participación directa o consulta con la Princesa.
+                ¿Quieres asegurar tu número para el sorteo de la Casa? Haz clic sobre cualquier número disponible o pulsa el botón para formalizar tu compra directa por 3€ indicando tu usuario de X.
               </p>
-              <button
-                onClick={onBackToStore}
-                className="btn-royal-bordeaux"
-              >
-                <Sparkles className="w-4 h-4 text-gold-400" />
-                Ver Piezas & Conseguir Número
-              </button>
+              <div className="flex flex-wrap justify-center gap-3">
+                <button
+                  onClick={() => {
+                    if (selectedNumbers.length === 0) {
+                      handleSelectRandom(1);
+                    }
+                    setIsPurchaseModalOpen(true);
+                  }}
+                  className="btn-royal-bordeaux"
+                >
+                  <Sparkles className="w-4 h-4 text-gold-400" />
+                  <span>Comprar Papeleta Oficial (3€ / número)</span>
+                </button>
+                <button
+                  onClick={onBackToStore}
+                  className="py-3 px-6 rounded-xl border border-gold-500/40 text-gold-300 hover:bg-gold-500/10 font-sans text-xs uppercase tracking-wider font-semibold transition-all"
+                >
+                  Explorar la Tienda
+                </button>
+              </div>
             </div>
 
           </div>
@@ -413,6 +603,56 @@ export default function GiveawayPage({ launch, onBackToStore, onBuyNow, onViewDe
           </button>
         </Reveal>
       </section>
+
+      {/* BARRA FLOTANTE DE PAPELETAS SELECCIONADAS */}
+      {selectedNumbers.length > 0 && (
+        <div className="fixed bottom-6 inset-x-4 max-w-2xl mx-auto z-40 animate-slide-up">
+          <div className="p-4 sm:p-5 rounded-2xl bg-dark-950/95 border-2 border-gold-500/60 shadow-[0_15px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="w-10 h-10 rounded-xl bg-gold-500/20 text-gold-400 border border-gold-500/30 flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-mono font-bold text-gold-300 uppercase tracking-wider">
+                  {selectedNumbers.length} {selectedNumbers.length === 1 ? 'número seleccionado' : 'números seleccionados'} (3,00€ / ud.)
+                </p>
+                <p className="text-xs text-ivory-200 truncate font-mono">
+                  {selectedNumbers.map(n => `#${n}`).join(', ')}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+              <button
+                onClick={() => setSelectedNumbers([])}
+                className="p-2 text-gray-400 hover:text-gold-400 transition-colors"
+                title="Deseleccionar todo"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setIsPurchaseModalOpen(true)}
+                className="btn-royal-bordeaux py-2.5 px-5 text-xs shadow-lg shadow-gold-500/20 whitespace-nowrap flex items-center gap-2"
+              >
+                <ShoppingCart className="w-4 h-4" />
+                <span>Comprar por {(selectedNumbers.length * 3).toFixed(2)}€</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE COMPRA DE NÚMEROS */}
+      <RafflePurchaseModal
+        isOpen={isPurchaseModalOpen}
+        onClose={() => setIsPurchaseModalOpen(false)}
+        selectedNumbers={selectedNumbers}
+        availableNumbers={allAvailableNumbers}
+        onToggleNumber={handleToggleNumber}
+        onClearNumbers={() => setSelectedNumbers([])}
+        onPurchaseSuccess={handlePurchaseSuccess}
+        currentMember={currentMember}
+      />
     </main>
   );
 }
