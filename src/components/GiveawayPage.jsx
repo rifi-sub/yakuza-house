@@ -56,6 +56,7 @@ export default function GiveawayPage({
   const allAvailableNumbers = Array.from({ length: totalRaffle })
     .map((_, idx) => String(idx).padStart(padLen, '0'))
     .filter(numStr => !assignedMap[numStr]);
+  const availableCount = allAvailableNumbers.length;
 
   const handleToggleNumber = (numStr) => {
     if (assignedMap[numStr]) {
