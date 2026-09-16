@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Edit, Trash2, Eye, EyeOff, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart, Crown, Users, Castle, BookOpen, Inbox } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Eye, EyeOff, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart, Crown, Users, Castle, BookOpen, Inbox, ShoppingBag, Gift } from 'lucide-react';
 import { API_BASE, resolveMediaUrl, safeFetchJson } from '../config';
 import princessVideo from '../princess-yakuza.mp4';
 import { MediaPickerModal } from './MediaPickerModal';
@@ -811,6 +811,57 @@ export default function AdminPanel({ onBackToStore }) {
     );
   }
 
+  const pendingOrdersCount = orders.filter(o => o.orderStatus === 'PAGO_PENDIENTE' || o.paymentStatus !== 'PAID').length;
+  const pendingRaffleCount = Object.values(launch.raffleNumbers?.assigned || {}).filter(a => a.status === 'PENDING').length;
+
+  const tabGroups = [
+    {
+      id: 'store',
+      label: 'Tienda & Pedidos',
+      icon: ShoppingBag,
+      badge: pendingOrdersCount > 0 ? `${pendingOrdersCount} pend.` : null,
+      subTabs: [
+        { id: 'orders', label: `Pedidos (${orders.length})`, icon: Package, badge: pendingOrdersCount > 0 ? `${pendingOrdersCount}` : null },
+        { id: 'items', label: `Artículos & Catálogo (${items.length})`, icon: Sparkles },
+        { id: 'categories', label: `Categorías (${categories.length})`, icon: Filter },
+        { id: 'extras', label: `Extras (${extras.length})`, icon: Plus },
+        { id: 'packaging', label: `Embalaje (${packaging.length})`, icon: Package }
+      ]
+    },
+    {
+      id: 'kingdom',
+      label: 'El Reino (Club Privado)',
+      icon: Castle,
+      subTabs: [
+        { id: 'kingdom_crm', label: 'CRM Miembros', icon: Users },
+        { id: 'kingdom_hierarchy', label: 'Jerarquía Reino', icon: Castle },
+        { id: 'kingdom_activities', label: 'Biblioteca Actividades', icon: BookOpen },
+        { id: 'kingdom_requests', label: 'Solicitudes', icon: Inbox }
+      ]
+    },
+    {
+      id: 'events',
+      label: 'Sorteo 2K & Eventos',
+      icon: Gift,
+      badge: pendingRaffleCount > 0 ? `${pendingRaffleCount} pend.` : null,
+      subTabs: [
+        { id: 'launch', label: 'Gran Sorteo 2K / Giveaway', icon: Gift, badge: pendingRaffleCount > 0 ? `${pendingRaffleCount}` : null }
+      ]
+    },
+    {
+      id: 'branding',
+      label: 'Identidad & Web',
+      icon: Crown,
+      subTabs: [
+        { id: 'princess', label: 'Yakuza Princess (Perfil)', icon: Crown },
+        { id: 'banner', label: 'Portada / Hero', icon: ImageIcon },
+        { id: 'reviews', label: `Reseñas & Fotos (${reviews.length})`, icon: Heart }
+      ]
+    }
+  ];
+
+  const activeGroup = tabGroups.find(g => g.subTabs.some(s => s.id === activeTab)) || tabGroups[0];
+
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 text-gray-100">
       
@@ -838,129 +889,76 @@ export default function AdminPanel({ onBackToStore }) {
         </div>
       </div>
 
-      {/* Tabs Bar */}
-      <div className="flex items-center gap-2 mb-6 border-b border-gray-800 overflow-x-auto pb-2 font-mono text-xs">
-        <button
-          onClick={() => setActiveTab('orders')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
-            activeTab === 'orders' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          Pedidos ({orders.length})
-        </button>
+      {/* NAVEGACIÓN EN 2 NIVELES */}
+      <div className="space-y-3 mb-8">
+        {/* Nivel 1: Categorías Maestras */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 bg-dark-950/90 p-2 rounded-2xl border border-gold-500/25 shadow-xl backdrop-blur-md">
+          {tabGroups.map(group => {
+            const isGroupActive = activeGroup.id === group.id;
+            const IconComponent = group.icon;
 
-        <button
-          onClick={() => setActiveTab('items')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
-            activeTab === 'items' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          Artículos & Drag/Drop ({items.length})
-        </button>
+            return (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => {
+                  if (!isGroupActive) {
+                    setActiveTab(group.subTabs[0].id);
+                  }
+                }}
+                className={`py-3 px-3.5 rounded-xl font-sans text-xs font-bold transition-all flex items-center justify-between relative overflow-hidden group ${
+                  isGroupActive
+                    ? 'bg-gradient-to-r from-bordeaux-700 via-bordeaux-600 to-dark-950 border border-gold-400 text-gold-200 shadow-lg shadow-gold-500/15 ring-1 ring-gold-400/40'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 truncate">
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                    isGroupActive ? 'bg-gold-500/25 text-gold-300' : 'bg-dark-900 text-gray-400 group-hover:text-gold-400'
+                  }`}>
+                    <IconComponent className="w-4 h-4" />
+                  </div>
+                  <span className="tracking-wide truncate">{group.label}</span>
+                </div>
 
-        <button
-          onClick={() => setActiveTab('categories')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
-            activeTab === 'categories' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          Categorías ({categories.length})
-        </button>
+                {group.badge && (
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+                    {group.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
 
-        <button
-          onClick={() => setActiveTab('reviews')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
-            activeTab === 'reviews' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          Reseñas & Fotos ({reviews.length})
-        </button>
+        {/* Nivel 2: Sub-pestañas del Grupo Activo */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1.5 font-mono text-xs border-b border-gold-500/20 pt-1">
+          {activeGroup.subTabs.map(sub => {
+            const isSubActive = activeTab === sub.id;
+            const SubIcon = sub.icon;
 
-        <button
-          onClick={() => setActiveTab('banner')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
-            activeTab === 'banner' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          Portada / Hero
-        </button>
-
-        <button
-          onClick={() => setActiveTab('princess')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            activeTab === 'princess' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          <Crown className="w-3.5 h-3.5 text-gold-400" />
-          👑 Yakuza Princess
-        </button>
-
-        <button
-          onClick={() => setActiveTab('kingdom_crm')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            activeTab === 'kingdom_crm' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          <Users className="w-3.5 h-3.5 text-gold-400" />
-          👥 CRM Miembros
-        </button>
-
-        <button
-          onClick={() => setActiveTab('kingdom_hierarchy')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            activeTab === 'kingdom_hierarchy' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          <Castle className="w-3.5 h-3.5 text-gold-400" />
-          🏛️ Jerarquía Reino
-        </button>
-
-        <button
-          onClick={() => setActiveTab('kingdom_activities')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            activeTab === 'kingdom_activities' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          <BookOpen className="w-3.5 h-3.5 text-gold-400" />
-          📚 Biblioteca Actividades
-        </button>
-
-        <button
-          onClick={() => setActiveTab('kingdom_requests')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            activeTab === 'kingdom_requests' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          <Inbox className="w-3.5 h-3.5 text-gold-400" />
-          📬 Solicitudes
-        </button>
-
-        <button
-          onClick={() => setActiveTab('launch')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
-            activeTab === 'launch' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          🎉 Lanzamiento / Sorteo
-        </button>
-
-        <button
-          onClick={() => setActiveTab('extras')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
-            activeTab === 'extras' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          Extras ({extras.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('packaging')}
-          className={`py-2 px-4 rounded-t-lg font-bold transition-all whitespace-nowrap ${
-            activeTab === 'packaging' ? 'bg-crimson-600 text-white border-b-2 border-crimson-400' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          Embalaje ({packaging.length})
-        </button>
+            return (
+              <button
+                key={sub.id}
+                type="button"
+                onClick={() => setActiveTab(sub.id)}
+                className={`py-2 px-3.5 rounded-lg font-bold transition-all whitespace-nowrap flex items-center gap-2 text-xs ${
+                  isSubActive
+                    ? 'bg-gold-500/20 text-gold-300 border border-gold-400/50 shadow-sm'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+                }`}
+              >
+                {SubIcon && <SubIcon className="w-3.5 h-3.5 text-gold-400" />}
+                <span>{sub.label}</span>
+                {sub.badge && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    {sub.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* TAB 1: ORDERS */}
