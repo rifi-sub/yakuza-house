@@ -369,23 +369,29 @@ export default function AdminPanel({ onBackToStore }) {
   };
 
   // Update Order Status
-  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+  const handleUpdateOrderStatus = async (orderId, newStatus, paymentStatus) => {
     try {
+      const body = {
+        orderStatus: newStatus,
+        internalNotes: internalNotesInput
+      };
+      if (paymentStatus) body.paymentStatus = paymentStatus;
+
       const res = await fetch(`${API_BASE}/api/store/admin/orders/${orderId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({
-          orderStatus: newStatus,
-          internalNotes: internalNotesInput
-        })
+        body: JSON.stringify(body)
       });
       const updated = await res.json();
       setOrders(orders.map(o => o.id === orderId ? updated : o));
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder(updated);
+      }
+      if (updated.itemCode === 'SORTEO-2K') {
+        fetchAllData();
       }
     } catch (err) {
       alert('Error actualizando pedido');
@@ -993,7 +999,14 @@ export default function AdminPanel({ onBackToStore }) {
                   ) : (
                     orders.map(ord => (
                       <tr key={ord.id} className="hover:bg-white/5 transition-colors">
-                        <td className="p-3.5 font-bold text-gold-400">{ord.orderNumber}</td>
+                        <td className="p-3.5 font-bold text-gold-400">
+                          {ord.orderNumber}
+                          {ord.itemCode === 'SORTEO-2K' && (
+                            <span className="block mt-1 text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 w-fit font-bold font-sans">
+                              🎟️ Sorteo 2K
+                            </span>
+                          )}
+                        </td>
                         <td className="p-3.5">
                           <span className="text-white block font-sans font-semibold">{ord.itemName}</span>
                           <span className="text-[10px] text-gray-400">{ord.tierName}</span>
@@ -1024,16 +1037,42 @@ export default function AdminPanel({ onBackToStore }) {
                           </select>
                         </td>
                         <td className="p-3.5 text-right">
-                          <button
-                            onClick={() => {
-                              setSelectedOrder(ord);
-                              setInternalNotesInput(ord.internalNotes || '');
-                            }}
-                            className="p-1.5 rounded bg-dark-900 border border-gray-700 text-gray-300 hover:text-white"
-                            title="Ver Detalle Pedido"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {ord.itemCode === 'SORTEO-2K' && (ord.orderStatus === 'PAGO_PENDIENTE' || ord.paymentStatus !== 'PAID') && (
+                              <button
+                                onClick={() => handleUpdateOrderStatus(ord.id, 'PAGADO', 'PAID')}
+                                className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-sans font-bold text-[10px] flex items-center gap-1 shadow transition-all whitespace-nowrap"
+                                title="Confirmar Pago y Asignar Papeletas Oficialmente"
+                              >
+                                <CheckCircle className="w-3 h-3" />
+                                Confirmar Pago
+                              </button>
+                            )}
+                            {ord.itemCode === 'SORTEO-2K' && ord.orderStatus === 'PAGO_PENDIENTE' && (
+                              <button
+                                onClick={() => {
+                                  if (confirm(`¿Cancelar solicitud del pedido ${ord.orderNumber} y liberar las papeletas?`)) {
+                                    handleUpdateOrderStatus(ord.id, 'CANCELADO');
+                                  }
+                                }}
+                                className="px-1.5 py-1 rounded bg-red-950 border border-red-800 hover:bg-red-900 text-red-300 font-sans text-[10px] flex items-center gap-0.5"
+                                title="Cancelar solicitud y liberar papeletas"
+                              >
+                                <X className="w-3 h-3" />
+                                Liberar
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                setSelectedOrder(ord);
+                                setInternalNotesInput(ord.internalNotes || '');
+                              }}
+                              className="p-1.5 rounded bg-dark-900 border border-gray-700 text-gray-300 hover:text-white"
+                              title="Ver Detalle Pedido"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1711,14 +1750,30 @@ export default function AdminPanel({ onBackToStore }) {
                       }}
                       className={`p-2 rounded-lg border text-center font-mono text-xs transition-all flex flex-col items-center justify-center min-h-[3.2rem] ${
                         isAssigned
-                          ? 'bg-bordeaux-700/80 border-bordeaux-400 text-ivory-100 shadow-md hover:bg-bordeaux-600'
+                          ? assignedData.status === 'PENDING'
+                            ? 'bg-amber-950/80 border-amber-500/70 text-amber-200 shadow-md hover:bg-amber-900'
+                            : 'bg-bordeaux-700/80 border-bordeaux-400 text-ivory-100 shadow-md hover:bg-bordeaux-600'
                           : 'bg-dark-950 hover:bg-gold-500/20 border-gray-800 hover:border-gold-500/60 text-gold-400'
                       }`}
-                      title={isAssigned ? `Vendido a: ${assignedData.buyer}` : `Número #${numStr} Disponible`}
+                      title={
+                        isAssigned
+                          ? assignedData.status === 'PENDING'
+                            ? `Pendiente de pago: ${assignedData.buyer}`
+                            : `Vendido oficial a: ${assignedData.buyer}`
+                          : `Número #${numStr} Disponible`
+                      }
                     >
-                      <span className={`font-bold text-xs ${isAssigned ? 'text-gold-300' : 'text-gold-400'}`}>#{numStr}</span>
+                      <span className={`font-bold text-xs ${
+                        isAssigned
+                          ? assignedData.status === 'PENDING'
+                            ? 'text-amber-300'
+                            : 'text-gold-300'
+                          : 'text-gold-400'
+                      }`}>
+                        #{numStr}
+                      </span>
                       <span className="text-[9px] truncate max-w-full block text-ivory-300 font-sans mt-0.5 opacity-90">
-                        {isAssigned ? assignedData.buyer : 'Libre'}
+                        {isAssigned ? (assignedData.status === 'PENDING' ? `⏳ ${assignedData.buyer}` : assignedData.buyer) : 'Libre'}
                       </span>
                     </button>
                   );
@@ -3283,6 +3338,47 @@ export default function AdminPanel({ onBackToStore }) {
                   className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
                 />
               </div>
+
+              {/* Indicador de Estado del Pago */}
+              {launch.raffleNumbers?.assigned?.[selectedRaffleNum]?.status === 'PENDING' ? (
+                <div className="p-3 bg-amber-950/50 border border-amber-500/40 rounded-xl text-xs space-y-2">
+                  <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" /> Estado: Reserva Provisional (Pago Pendiente)
+                  </span>
+                  <p className="text-gray-300 text-[11px] leading-relaxed">
+                    El devoto solicitó este número y está a la espera de comprobar el pago de 3€.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLaunch(prev => ({
+                        ...prev,
+                        raffleNumbers: {
+                          ...prev.raffleNumbers,
+                          assigned: {
+                            ...(prev.raffleNumbers?.assigned || {}),
+                            [selectedRaffleNum]: {
+                              ...prev.raffleNumbers?.assigned?.[selectedRaffleNum],
+                              buyer: raffleBuyerInput.trim(),
+                              notes: raffleNotesInput.trim(),
+                              status: 'CONFIRMED',
+                              confirmedAt: new Date().toISOString()
+                            }
+                          }
+                        }
+                      }));
+                      setSelectedRaffleNum(null);
+                    }}
+                    className="py-1.5 px-3 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 shadow"
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" /> Confirmar Pago Oficial
+                  </button>
+                </div>
+              ) : launch.raffleNumbers?.assigned?.[selectedRaffleNum] ? (
+                <div className="p-2.5 bg-emerald-950/30 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 font-bold flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5" /> Estado: Asignación Oficial Confirmada
+                </div>
+              ) : null}
             </div>
 
             <div className="flex flex-wrap gap-2 justify-end pt-2 border-t border-gold-500/20">
@@ -3325,7 +3421,8 @@ export default function AdminPanel({ onBackToStore }) {
                         [selectedRaffleNum]: {
                           buyer: raffleBuyerInput.trim(),
                           notes: raffleNotesInput.trim(),
-                          assignedAt: new Date().toISOString()
+                          assignedAt: prev.raffleNumbers?.assigned?.[selectedRaffleNum]?.assignedAt || new Date().toISOString(),
+                          status: prev.raffleNumbers?.assigned?.[selectedRaffleNum]?.status || 'CONFIRMED'
                         }
                       }
                     }

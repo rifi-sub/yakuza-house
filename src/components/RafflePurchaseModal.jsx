@@ -281,9 +281,11 @@ export default function RafflePurchaseModal({
           )}
 
           {/* Security & Terms note */}
-          <div className="pt-2 flex items-center gap-2 text-[11px] text-ivory-400 font-sans">
-            <ShieldCheck className="w-4 h-4 text-gold-400 shrink-0" />
-            <span>Asignación automática y trazabilidad garantizada por el Club Privado.</span>
+          <div className="pt-2 flex items-start gap-2 text-[11px] text-ivory-400 font-sans">
+            <ShieldCheck className="w-4 h-4 text-gold-400 shrink-0 mt-0.5" />
+            <span>
+              Tus números quedarán en reserva provisional. Una vez verificado el abono (Bizum, tarjeta o transferencia) por administración, se confirmarán oficialmente a tu nombre de X.
+            </span>
           </div>
 
           {/* Submit CTA */}
@@ -300,12 +302,12 @@ export default function RafflePurchaseModal({
               {submitting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
-                  <span>Procesando adquisición...</span>
+                  <span>Procesando solicitud...</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 text-gold-400" />
-                  <span>Confirmar y Comprar por {totalAmount.toFixed(2)}€</span>
+                  <span>Solicitar Papeletas ({totalAmount.toFixed(2)}€)</span>
                 </>
               )}
             </button>

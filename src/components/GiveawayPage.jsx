@@ -60,8 +60,13 @@ export default function GiveawayPage({
 
   const handleToggleNumber = (numStr) => {
     if (assignedMap[numStr]) {
-      setToastMessage(`El número #${numStr} ya pertenece a ${assignedMap[numStr].buyer || 'otro participante'}.`);
-      setTimeout(() => setToastMessage(null), 4000);
+      const assignedData = assignedMap[numStr];
+      if (assignedData.status === 'PENDING') {
+        setToastMessage(`El número #${numStr} tiene una solicitud pendiente de confirmación de pago por ${assignedData.buyer || 'otro participante'}. Si no se completa el abono, quedará libre.`);
+      } else {
+        setToastMessage(`El número #${numStr} ya pertenece oficialmente a ${assignedData.buyer || 'otro participante'}.`);
+      }
+      setTimeout(() => setToastMessage(null), 4500);
       return;
     }
     setSelectedNumbers(prev => 
@@ -287,9 +292,12 @@ export default function GiveawayPage({
                 <div className="w-12 h-12 rounded-full bg-gold-500/20 text-gold-400 border border-gold-400/50 flex items-center justify-center mx-auto">
                   <CheckCircle2 className="w-7 h-7" />
                 </div>
-                <h3 className="font-brand font-bold text-xl text-gold-300">¡Papeletas Asignadas con Éxito!</h3>
-                <p className="text-xs text-ivory-200">
+                <h3 className="font-brand font-bold text-xl text-gold-300">¡Papeletas Reservadas Provisionalmente!</h3>
+                <p className="text-xs text-ivory-200 max-w-lg mx-auto leading-relaxed">
                   Tus números <strong className="text-gold-400">{lastPurchased.numbers.map(n => `#${n}`).join(', ')}</strong> han sido registrados para el usuario <strong className="text-gold-300">{lastPurchased.buyer}</strong>.
+                </p>
+                <p className="text-[11px] text-amber-300/90 font-sans">
+                  ⏳ Tus papeletas se encuentran en reserva provisional a la espera de comprobar el pago de {lastPurchased.totalAmount.toFixed(2)}€. Una vez verificado por la administración, quedarán asignadas de forma oficial y definitiva.
                 </p>
                 <p className="text-[11px] font-mono text-gray-400">
                   Pedido Nº: <span className="text-gold-400 font-bold">{lastPurchased.orderNumber}</span> · Total: {lastPurchased.totalAmount.toFixed(2)}€
@@ -460,6 +468,9 @@ export default function GiveawayPage({
                   if (!matchesNum && !matchesBuyer) return null;
                 }
 
+                const isPending = isAssigned && assignedData.status === 'PENDING';
+                const isConfirmed = isAssigned && (!assignedData.status || assignedData.status === 'CONFIRMED');
+
                 return (
                   <div
                     key={numStr}
@@ -467,16 +478,20 @@ export default function GiveawayPage({
                     className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center min-h-[4.2rem] relative overflow-hidden cursor-pointer select-none ${
                       isSelected
                         ? 'bg-gradient-to-b from-bordeaux-600 to-bordeaux-700 border-2 border-gold-400 text-white shadow-lg shadow-gold-500/30 scale-105 ring-2 ring-gold-400/50'
-                        : isAssigned
-                          ? 'bg-bordeaux-950/80 border-bordeaux-800 text-gray-400 cursor-not-allowed opacity-80'
-                          : 'bg-dark-950/90 border-gold-500/40 text-gold-300 hover:border-gold-400 hover:bg-gold-500/15 hover:scale-105'
+                        : isPending
+                          ? 'bg-amber-950/40 border-amber-500/60 text-amber-200 hover:border-amber-400/80 hover:bg-amber-950/60 shadow-inner'
+                          : isConfirmed
+                            ? 'bg-bordeaux-950/80 border-bordeaux-800 text-gray-400 cursor-not-allowed opacity-80'
+                            : 'bg-dark-950/90 border-gold-500/40 text-gold-300 hover:border-gold-400 hover:bg-gold-500/15 hover:scale-105'
                     }`}
                     title={
                       isSelected
                         ? `Número #${numStr} seleccionado (3€) - Clic para deseleccionar`
-                        : isAssigned
-                          ? `Número #${numStr} comprado por ${assignedData?.buyer || 'otro devoto'}`
-                          : `Número #${numStr} disponible (3€) - Clic para seleccionar`
+                        : isPending
+                          ? `Número #${numStr} reservado provisionalmente por ${assignedData?.buyer} (pendiente de confirmación de pago)`
+                          : isConfirmed
+                            ? `Número #${numStr} asignado oficialmente a ${assignedData?.buyer}`
+                            : `Número #${numStr} disponible (3€) - Clic para seleccionar`
                     }
                   >
                     {isSelected && (
@@ -488,9 +503,11 @@ export default function GiveawayPage({
                     <span className={`font-mono text-sm font-bold tracking-widest ${
                       isSelected
                         ? 'text-white'
-                        : isAssigned
-                          ? 'text-gray-400 line-through'
-                          : 'text-gold-300'
+                        : isPending
+                          ? 'text-amber-300'
+                          : isConfirmed
+                            ? 'text-gray-400 line-through'
+                            : 'text-gold-300'
                     }`}>
                       #{numStr}
                     </span>
@@ -499,9 +516,13 @@ export default function GiveawayPage({
                       <span className="text-[8px] font-mono tracking-wider uppercase text-gold-300 font-bold block mt-1 bg-dark-950/80 px-1 py-0.5 rounded">
                         3,00€ ✓
                       </span>
-                    ) : isAssigned ? (
+                    ) : isPending ? (
+                      <span className="text-[8.5px] font-sans font-medium text-amber-300 truncate max-w-full block mt-1 bg-dark-950/90 px-1 py-0.5 rounded border border-amber-500/30">
+                        ⏳ {assignedData.buyer} (Pendiente)
+                      </span>
+                    ) : isConfirmed ? (
                       <span className="text-[9px] font-sans font-bold text-gold-400/90 truncate max-w-full block mt-1 bg-dark-950/90 px-1 py-0.5 rounded border border-gold-500/20">
-                        {assignedData.buyer}
+                        ✓ {assignedData.buyer}
                       </span>
                     ) : (
                       <span className="text-[8px] font-mono tracking-wider uppercase text-gold-400/80 block mt-1">
