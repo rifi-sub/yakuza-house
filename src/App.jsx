@@ -209,11 +209,20 @@ export default function App() {
                   {banner?.badge || '✦ CLUB PRIVADO & BOUTIQUE FETISH EXCLUSIVA ✦'}
                 </div>
 
-                <h1 className="font-brand font-black text-4xl sm:text-6xl lg:text-7xl tracking-widest text-ivory-100 display-shadow">
-                  {banner?.title ? banner.title : (
-                    <>YAKUZA <span className="text-gold-400">HOUSE</span></>
+                <div className="flex flex-col items-center justify-center my-3">
+                  <h1 className="sr-only">{banner?.title || 'YAKUZA HOUSE'}</h1>
+                  {(!banner?.title || banner.title === 'YAKUZA HOUSE' || banner.title === 'YAKUZA HOUSE ') ? (
+                    <img 
+                      src="/yakuza-house-banner-title.png" 
+                      alt="YAKUZA HOUSE" 
+                      className="h-14 sm:h-20 md:h-24 lg:h-28 max-w-[90vw] w-auto object-contain mx-auto drop-shadow-[0_4px_30px_rgba(201,162,39,0.45)] hover:scale-[1.01] transition-transform duration-300"
+                    />
+                  ) : (
+                    <h1 className="font-luxury font-normal text-4xl sm:text-6xl lg:text-7xl tracking-[0.2em] uppercase text-ivory-100 display-shadow">
+                      {banner.title}
+                    </h1>
                   )}
-                </h1>
+                </div>
 
                 {/* Art Déco Divider */}
                 <div className="artdeco-divider max-w-md mx-auto">
