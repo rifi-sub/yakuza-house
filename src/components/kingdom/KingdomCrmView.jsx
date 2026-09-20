@@ -311,6 +311,8 @@ export function KingdomCrmView({ token }) {
           memberId={selectedMemberId}
           token={token}
           allGroups={allGroups}
+          allMembers={members}
+          onSelectMember={(id) => setSelectedMemberId(id)}
           onClose={() => setSelectedMemberId(null)}
           onRefreshList={fetchMembers}
         />

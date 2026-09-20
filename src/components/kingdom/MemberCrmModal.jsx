@@ -1,208 +1,224 @@
-import React, { useState, useEffect } from 'react';
-import { X, User, Crown, Shield, Clock, CheckCircle, AlertTriangle, Snowflake, Sparkles, BookOpen, Lock, Plus, Trash2, Calendar, Award, Briefcase, FileText } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  X, Crown, Search, Bell, Edit3, Calendar, Gift, Target, Award,
+  Sparkles, CheckCircle2, Clock, AlertTriangle, ChevronRight,
+  TrendingUp, Trash2, Plus, Star, ShieldCheck, Heart, Zap,
+  Flame, Lock, Layers, Settings, Eye, Check, RefreshCw
+} from 'lucide-react';
 import { API_BASE } from '../../config';
 
-export function MemberCrmModal({ memberId, token, onClose, onRefreshList, allGroups = [] }) {
+export function MemberCrmModal({ 
+  memberId, 
+  token, 
+  onClose, 
+  onRefreshList, 
+  allGroups = [], 
+  allMembers = [],
+  onSelectMember 
+}) {
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('summary'); // summary, hierarchy, subscription, requirements, skills, activities, private, history, notes
+  const [activitiesLibrary, setActivitiesLibrary] = useState([]);
+  const [notesFilter, setNotesFilter] = useState('internal'); // 'internal' | 'next_steps'
+  const [searchMemberQuery, setSearchMemberQuery] = useState('');
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
 
-  // Form states
-  const [editingBasic, setEditingBasic] = useState(false);
-  const [basicForm, setBasicForm] = useState({ alias: '', internalName: '', memberNumber: '', status: '', overallProgress: 0, internalNotes: '' });
+  // Modals for editing / actions
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showAddSkill, setShowAddSkill] = useState(false);
+  const [showNewActivityModal, setShowNewActivityModal] = useState(false);
+  const [showAddNoteModal, setShowAddNoteModal] = useState(false);
 
-  // Grant Subscription Form state
-  const [showGrantSub, setShowGrantSub] = useState(false);
-  const [grantSubForm, setGrantSubForm] = useState({
-    durationDays: 30,
-    amount: 50,
-    currency: 'EUR',
-    activationMethod: 'CONTRIBUTION_EQUIVALENCE',
-    grantReason: 'Aportación de regalo valorada en 50€ equivalente al mes actual',
-    internalNotes: ''
+  // Training designer state (dropdown selections)
+  const [selectedTrainingItems, setSelectedTrainingItems] = useState({
+    task: '',
+    ritual: '',
+    punishment: '',
+    reward: '',
+    privilege: '',
+    goal: '',
+    special: ''
+  });
+  const [assigningTraining, setAssigningTraining] = useState(false);
+
+  // Edit Profile Form
+  const [profileForm, setProfileForm] = useState({
+    alias: '',
+    internalName: '',
+    memberNumber: '',
+    status: 'ACTIVE',
+    overallProgress: 68,
+    experiencePoints: 680,
+    servedSince: '14 Feb 2024',
+    initialTribute: '€500',
+    currentRank: 'Aprendiz',
+    targetRank: 'Servidor Elite',
+    quote: 'Para servirte, existo.',
+    preferences: 'Sumisión, disciplina, humillación...',
+    fetishes: 'Pies, lencería, control mental...',
+    triggers: 'Desobediencia, tono duro...',
+    limits: 'Sangre, daño permanente...',
+    aftercare: 'Validación, palabras suaves...',
+    personalGoals: 'Alcanzar nivel Elite...'
   });
 
-  // Add Skill Form state
-  const [showAddSkill, setShowAddSkill] = useState(false);
+  // Add Skill Form
   const [skillForm, setSkillForm] = useState({
     skillCategory: 'VIDEO_EDITING',
     skillName: '',
-    level: 'INTERMEDIATE',
+    level: 'ADVANCED',
     notes: ''
   });
 
-  // Add Note Form state
-  const [newNoteInput, setNewNoteInput] = useState('');
-
-  // Assign Activity state
-  const [showAssignActivity, setShowAssignActivity] = useState(false);
-  const [assignForm, setAssignForm] = useState({
+  // New Activity Form
+  const [newActivityForm, setNewActivityForm] = useState({
     title: '',
     type: 'TASK',
-    customInstructions: '',
-    dueDays: 3,
-    pointsAwarded: 15
+    status: 'ACTIVE',
+    dueDate: '2025-04-20',
+    priority: 'Alta',
+    pointsAwarded: 25,
+    customInstructions: ''
   });
 
-  const fetchMemberDetail = async () => {
-    if (!memberId) return;
+  // Add Note Form
+  const [newNoteText, setNewNoteText] = useState('');
+  const [newNoteType, setNewNoteType] = useState('internal');
+
+  // Checklists states (Requirements)
+  const [specialReqs, setSpecialReqs] = useState({
+    tributo_minimo: true,
+    informe_semanal: true,
+    rituales_asignados: false,
+    comunicacion_activa: true
+  });
+
+  const [generalReqs, setGeneralReqs] = useState({
+    perfil_verificado: true,
+    aceptacion_normas: true,
+    tributo_inicial: true,
+    respeto_absoluto: true,
+    discrecion_confidencialidad: true
+  });
+
+  // Fetch Member Details
+  const fetchMemberDetail = async (idToFetch = memberId) => {
+    if (!idToFetch) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}`, {
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${idToFetch}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
       if (res.ok) {
         setMember(data);
-        setBasicForm({
-          alias: data.alias || '',
-          internalName: data.internalName || '',
-          memberNumber: data.memberNumber || '',
+        
+        let parsedPrefs = {};
+        if (data.preferences) {
+          try {
+            parsedPrefs = typeof data.preferences === 'string' ? JSON.parse(data.preferences) : data.preferences;
+          } catch (err) {
+            parsedPrefs = { preferences: data.preferences };
+          }
+        }
+
+        setProfileForm({
+          alias: data.alias || 'predevoto',
+          internalName: data.internalName || 'Reino de la Devoción',
+          memberNumber: data.memberNumber || '#017',
           status: data.status || 'ACTIVE',
-          overallProgress: data.overallProgress || 0,
-          internalNotes: data.internalNotes || '',
-          groupId: data.groupId || '',
-          positionId: data.positionId || ''
+          overallProgress: data.overallProgress !== undefined ? data.overallProgress : 68,
+          experiencePoints: data.experiencePoints || 680,
+          servedSince: parsedPrefs.servedSince || '14 Feb 2024',
+          initialTribute: parsedPrefs.initialTribute || '€500',
+          currentRank: parsedPrefs.currentRank || data.position?.name || 'Aprendiz',
+          targetRank: parsedPrefs.targetRank || 'Servidor Elite',
+          quote: parsedPrefs.quote || 'Para servirte, existo.',
+          preferences: parsedPrefs.preferences || 'Sumisión, disciplina, humillación...',
+          fetishes: parsedPrefs.fetishes || 'Pies, lencería, control mental...',
+          triggers: parsedPrefs.triggers || 'Desobediencia, tono duro...',
+          limits: parsedPrefs.limits || 'Sangre, daño permanente...',
+          aftercare: parsedPrefs.aftercare || 'Validación, palabras suaves...',
+          personalGoals: parsedPrefs.personalGoals || data.personalGoals || 'Alcanzar nivel Elite...'
         });
       }
     } catch (e) {
-      console.error(e);
+      console.error('Error fetching member details:', e);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchMemberDetail();
-  }, [memberId]);
-
-  const handleUpdateBasic = async (e) => {
-    e.preventDefault();
+  // Fetch Central Activity Library
+  const fetchActivityLibrary = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(basicForm)
-      });
-      if (!res.ok) throw new Error('Error al actualizar datos');
-      setEditingBasic(false);
-      fetchMemberDetail();
-      onRefreshList();
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleToggleFreeze = async () => {
-    const isFrozen = member?.status === 'FROZEN';
-    const action = isFrozen ? 'unfreeze' : 'freeze';
-    const confirmMsg = isFrozen
-      ? '¿Reactivar este perfil del Reino a estado Activo?'
-      : '¿Congelar este perfil? Conservará su historial y expediente, pero se pausarán sus privilegios y accesos activos.';
-    if (!confirm(confirmMsg)) return;
-
-    try {
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/${action}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ reason: isFrozen ? 'Reactivado por administración' : 'Congelación administrativa' })
-      });
-      if (!res.ok) throw new Error('Error cambiando estado');
-      fetchMemberDetail();
-      onRefreshList();
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleGrantSubscription = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/subscriptions/grant`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          ...grantSubForm,
-          groupId: basicForm.groupId || member?.groupId
-        })
-      });
-      if (!res.ok) throw new Error('Error al conceder acceso');
-      setShowGrantSub(false);
-      fetchMemberDetail();
-      onRefreshList();
-      alert('¡Acceso concedido y registrado en el historial!');
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleAddSkill = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/skills`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(skillForm)
-      });
-      if (!res.ok) throw new Error('Error al añadir habilidad');
-      setShowAddSkill(false);
-      setSkillForm({ skillCategory: 'VIDEO_EDITING', skillName: '', level: 'INTERMEDIATE', notes: '' });
-      fetchMemberDetail();
-      onRefreshList();
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleDeleteSkill = async (skillId) => {
-    if (!confirm('¿Eliminar esta habilidad laboral?')) return;
-    try {
-      await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/skills/${skillId}`, {
-        method: 'DELETE',
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/library`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      fetchMemberDetail();
-      onRefreshList();
-    } catch (err) {
-      alert('Error al eliminar habilidad');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setActivitiesLibrary(data);
+      }
+    } catch (e) {
+      console.error('Error fetching library:', e);
     }
   };
 
-  const handleWaiveRequirement = async (definitionId, status = 'WAIVED') => {
-    const reason = prompt(`Motivo de validación (${status}):`, 'Validado manualmente por Administración');
-    if (!reason) return;
+  useEffect(() => {
+    fetchMemberDetail();
+    fetchActivityLibrary();
+  }, [memberId]);
 
+  // Derived parsed preferences
+  const currentPrefs = useMemo(() => {
+    if (!member) return profileForm;
     try {
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/requirements/waive`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ definitionId, status, evidenceNotes: reason })
-      });
-      if (!res.ok) throw new Error('Error al validar requisito');
-      fetchMemberDetail();
-      onRefreshList();
-    } catch (err) {
-      alert(err.message);
+      if (typeof member.preferences === 'string') {
+        return { ...profileForm, ...JSON.parse(member.preferences) };
+      }
+      return { ...profileForm, ...(member.preferences || {}) };
+    } catch (e) {
+      return profileForm;
     }
-  };
+  }, [member, profileForm]);
 
-  const handleAssignActivity = async (e) => {
-    e.preventDefault();
+  // Filter library by type
+  const libraryByType = useMemo(() => {
+    const map = {
+      TASK: [],
+      RITUAL: [],
+      PUNISHMENT: [],
+      REWARD: [],
+      PRIVILEGE: [],
+      GOAL: [],
+      SPECIAL_EVENT: []
+    };
+    activitiesLibrary.forEach(item => {
+      const type = (item.type || '').toUpperCase();
+      if (map[type]) {
+        map[type].push(item);
+      } else if (type === 'TRAINING') {
+        map.TASK.push(item);
+      } else if (type === 'SPECIAL_ACTIVITY') {
+        map.SPECIAL_EVENT.push(item);
+      }
+    });
+    return map;
+  }, [activitiesLibrary]);
+
+  // Handle Training Designer Assignment from Dropdowns
+  const handleAddSelectedTraining = async () => {
+    const selectedKey = Object.keys(selectedTrainingItems).find(k => selectedTrainingItems[k]);
+    if (!selectedKey) {
+      alert('Por favor selecciona al menos una actividad de uno de los desplegables para añadir al entrenamiento.');
+      return;
+    }
+
+    const templateId = selectedTrainingItems[selectedKey];
+    const template = activitiesLibrary.find(t => t.id === templateId);
+    if (!template) return;
+
+    setAssigningTraining(true);
     try {
       const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assign`, {
         method: 'POST',
@@ -211,27 +227,55 @@ export function MemberCrmModal({ memberId, token, onClose, onRefreshList, allGro
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          memberIds: [memberId],
-          title: assignForm.title,
-          type: assignForm.type,
-          customInstructions: assignForm.customInstructions,
-          dueDays: assignForm.dueDays,
-          pointsAwarded: assignForm.pointsAwarded
+          memberIds: [member.id],
+          templateId: template.id,
+          title: template.title,
+          type: template.type,
+          dueDays: template.defaultDurationDays || 3,
+          pointsAwarded: template.pointsValue || 15,
+          customInstructions: 'PRIORITY:HIGH'
         })
       });
+
       if (!res.ok) throw new Error('Error al asignar actividad');
-      setShowAssignActivity(false);
-      setAssignForm({ title: '', type: 'TASK', customInstructions: '', dueDays: 3, pointsAwarded: 15 });
+      
+      setSelectedTrainingItems({
+        task: '',
+        ritual: '',
+        punishment: '',
+        reward: '',
+        privilege: '',
+        goal: '',
+        special: ''
+      });
+
       fetchMemberDetail();
-      onRefreshList();
-      alert('Actividad asignada y registrada con éxito');
+      if (onRefreshList) onRefreshList();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setAssigningTraining(false);
+    }
+  };
+
+  // Handle deleting assigned activity
+  const handleDeleteAssignment = async (assignmentId) => {
+    if (!confirm('¿Eliminar esta actividad asignada?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assignments/${assignmentId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Error al eliminar');
+      fetchMemberDetail();
+      if (onRefreshList) onRefreshList();
     } catch (err) {
       alert(err.message);
     }
   };
 
+  // Handle completing assigned activity
   const handleCompleteAssignment = async (assignmentId) => {
-    if (!confirm('¿Marcar esta actividad como COMPLETADA? Se otorgarán puntos de progreso al devoto.')) return;
     try {
       const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assignments/${assignmentId}`, {
         method: 'PUT',
@@ -241,856 +285,1927 @@ export function MemberCrmModal({ memberId, token, onClose, onRefreshList, allGro
         },
         body: JSON.stringify({
           status: 'COMPLETED_ON_TIME',
-          adminFeedback: 'Completado satisfactoriamente'
+          adminFeedback: 'Completado con éxito'
         })
       });
       if (!res.ok) throw new Error('Error al completar');
       fetchMemberDetail();
-      onRefreshList();
+      if (onRefreshList) onRefreshList();
     } catch (err) {
       alert(err.message);
     }
   };
 
-  const handleAddNote = async (e) => {
+  // Handle adding new custom activity
+  const handleCreateCustomActivity = async (e) => {
     e.preventDefault();
-    if (!newNoteInput.trim()) return;
     try {
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/notes`, {
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ note: newNoteInput })
+        body: JSON.stringify({
+          memberIds: [member.id],
+          title: newActivityForm.title,
+          type: newActivityForm.type,
+          status: newActivityForm.status,
+          dueDate: newActivityForm.dueDate,
+          pointsAwarded: newActivityForm.pointsAwarded,
+          customInstructions: `PRIORITY:${newActivityForm.priority === 'Alta' ? 'HIGH' : newActivityForm.priority === 'Media' ? 'MEDIUM' : 'LOW'}`
+        })
       });
-      if (!res.ok) throw new Error('Error al guardar nota');
-      setNewNoteInput('');
+      if (!res.ok) throw new Error('Error al crear actividad');
+      setShowNewActivityModal(false);
+      setNewActivityForm({
+        title: '',
+        type: 'TASK',
+        status: 'ACTIVE',
+        dueDate: '2025-04-20',
+        priority: 'Alta',
+        pointsAwarded: 25,
+        customInstructions: ''
+      });
+      fetchMemberDetail();
+      if (onRefreshList) onRefreshList();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Handle adding new skill
+  const handleAddSkillSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${member.id}/skills`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(skillForm)
+      });
+      if (!res.ok) throw new Error('Error al añadir habilidad');
+      setShowAddSkill(false);
+      setSkillForm({ skillCategory: 'VIDEO_EDITING', skillName: '', level: 'ADVANCED', notes: '' });
       fetchMemberDetail();
     } catch (err) {
       alert(err.message);
     }
   };
 
+  // Handle deleting skill
+  const handleDeleteSkill = async (skillId) => {
+    if (!confirm('¿Eliminar esta habilidad laboral?')) return;
+    try {
+      await fetch(`${API_BASE}/api/kingdom/admin/members/${member.id}/skills/${skillId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchMemberDetail();
+    } catch (err) {
+      alert('Error al eliminar habilidad');
+    }
+  };
+
+  // Handle adding note
+  const handleAddNoteSubmit = async (e) => {
+    e.preventDefault();
+    if (!newNoteText.trim()) return;
+    try {
+      const notePrefix = newNoteType === 'next_steps' ? '[PRÓXIMOS PASOS] ' : '';
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${member.id}/notes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ note: `${notePrefix}${newNoteText.trim()}` })
+      });
+      if (!res.ok) throw new Error('Error al guardar nota');
+      setNewNoteText('');
+      setShowAddNoteModal(false);
+      fetchMemberDetail();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Handle deleting note
+  const handleDeleteNote = async (noteId) => {
+    if (!confirm('¿Eliminar esta nota?')) return;
+    try {
+      await fetch(`${API_BASE}/api/kingdom/admin/members/${member.id}/notes/${noteId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchMemberDetail();
+    } catch (err) {
+      alert('Error al eliminar nota');
+    }
+  };
+
+  // Handle profile update submit
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    try {
+      const prefsPayload = {
+        servedSince: profileForm.servedSince,
+        initialTribute: profileForm.initialTribute,
+        currentRank: profileForm.currentRank,
+        targetRank: profileForm.targetRank,
+        quote: profileForm.quote,
+        preferences: profileForm.preferences,
+        fetishes: profileForm.fetishes,
+        triggers: profileForm.triggers,
+        limits: profileForm.limits,
+        aftercare: profileForm.aftercare,
+        personalGoals: profileForm.personalGoals
+      };
+
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${member.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          alias: profileForm.alias,
+          internalName: profileForm.internalName,
+          memberNumber: profileForm.memberNumber,
+          status: profileForm.status,
+          overallProgress: parseFloat(profileForm.overallProgress || 68),
+          experiencePoints: parseInt(profileForm.experiencePoints || 680, 10),
+          personalGoals: profileForm.personalGoals,
+          preferences: JSON.stringify(prefsPayload)
+        })
+      });
+
+      if (!res.ok) throw new Error('Error actualizando perfil');
+      setShowEditProfile(false);
+      fetchMemberDetail();
+      if (onRefreshList) onRefreshList();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Search filter members
+  const filteredSearchMembers = useMemo(() => {
+    if (!searchMemberQuery.trim()) return [];
+    return allMembers.filter(m => 
+      (m.alias || '').toLowerCase().includes(searchMemberQuery.toLowerCase()) ||
+      (m.memberNumber || '').toLowerCase().includes(searchMemberQuery.toLowerCase()) ||
+      (m.internalName || '').toLowerCase().includes(searchMemberQuery.toLowerCase())
+    ).slice(0, 5);
+  }, [allMembers, searchMemberQuery]);
+
+  // Skill dot render helper
+  const renderSkillDots = (level) => {
+    let count = 3;
+    if (level === 'BASIC') count = 2;
+    if (level === 'INTERMEDIATE') count = 3;
+    if (level === 'ADVANCED') count = 4;
+    if (level === 'EXPERT') count = 5;
+
+    return (
+      <div className="flex items-center gap-1 text-[13px]">
+        {[1, 2, 3, 4, 5].map(i => (
+          <span 
+            key={i} 
+            className={`inline-block w-2.5 h-2.5 rounded-full ${i <= count ? 'bg-[#c5a059]' : 'bg-[#3a282f]'}`}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  // Format date helper
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const day = d.getDate();
+      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  // Filter notes by category
+  const displayedNotes = useMemo(() => {
+    const rawNotes = member?.notes || [];
+    if (notesFilter === 'next_steps') {
+      return rawNotes.filter(n => (n.note || '').includes('[PRÓXIMOS PASOS]'));
+    }
+    return rawNotes.filter(n => !(n.note || '').includes('[PRÓXIMOS PASOS]'));
+  }, [member?.notes, notesFilter]);
+
+  // Sorted assignments matching exact reference table
+  const sortedAssignments = useMemo(() => {
+    if (!member?.assignments) return [];
+    return [...member.assignments].sort((a, b) => {
+      // Prioritize the 5 mockup items in order
+      const order = [
+        'Enviar tributo semanal',
+        'Ritual de humildad',
+        'Informe diario de obediencia',
+        'Castigo: Sin privilegios',
+        'Sesión de servicio virtual'
+      ];
+      const idxA = order.indexOf(a.title);
+      const idxB = order.indexOf(b.title);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return 0;
+    });
+  }, [member?.assignments]);
+
   if (!memberId) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-      <div className="glass-modal rounded-2xl w-full max-w-5xl text-gray-100 my-6 max-h-[92vh] flex flex-col border border-gold-500/40 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#050304]/95 backdrop-blur-xl p-2 sm:p-4 md:p-6 transition-all duration-300">
+      
+      {/* Container simulating high density editorial single canvas */}
+      <div className="relative w-full max-w-[1380px] bg-[#0a0709] border border-[#3e1b24] shadow-2xl rounded-2xl text-[#f3e8d9] overflow-hidden my-auto">
         
-        {/* Modal Top Header */}
-        <div className="flex justify-between items-center p-5 border-b border-gold-500/20 bg-dark-950/80">
+        {/* Atmospheric ambient glows */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-b from-[#6a1528]/20 via-[#4a0e1b]/10 to-transparent blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-t from-[#6a1528]/15 via-transparent to-transparent blur-3xl pointer-events-none" />
+
+        {/* ========================================================================= */}
+        {/* TOP BANNER: DOMINIUM HEADER & PHILOSOPHY ("Referencia funcional · Perfil del sumiso") */}
+        {/* ========================================================================= */}
+        <div className="relative px-6 py-4 border-b border-[#2d141b] flex flex-col md:flex-row items-center justify-between gap-4 bg-[#0d090c]">
+          
+          {/* Brand Seal */}
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-bordeaux-700 to-gold-500 p-0.5 shadow-md">
-              <div className="w-full h-full bg-dark-950 rounded-[10px] flex items-center justify-center text-gold-400 font-brand font-black text-base">
-                {member?.memberNumber || '#---'}
-              </div>
-            </div>
+            <Crown className="w-6 h-6 text-[#c9a227]" />
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-brand font-bold text-xl text-white">
-                  {member?.alias || 'Cargando...'}
-                </h3>
-                {member?.internalName && (
-                  <span className="text-xs font-serif italic text-gold-300">
-                    ({member.internalName})
-                  </span>
-                )}
-                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
-                  member?.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                  member?.status === 'FROZEN' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
-                  member?.status === 'SUSPENDED' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                  'bg-gray-500/20 text-gray-400'
-                }`}>
-                  {member?.status}
-                </span>
-              </div>
-              <p className="text-xs text-gray-400 font-mono mt-0.5">
-                {member?.group?.name || 'Sin Grupo'} {member?.position ? `· ${member.position.name}` : ''}
+              <h1 className="font-brand font-bold text-base tracking-[0.25em] text-[#e5c158] uppercase">
+                DOMINIUM
+              </h1>
+              <p className="text-[9px] font-mono tracking-[0.3em] text-[#9a8677] uppercase -mt-0.5">
+                DISCIPLINA · BELLEZA · LEALTAD
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleToggleFreeze}
-              className={`py-1.5 px-3 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 border transition-all ${
-                member?.status === 'FROZEN'
-                  ? 'bg-emerald-600/30 text-emerald-300 border-emerald-500/50 hover:bg-emerald-600/50'
-                  : 'bg-blue-950/40 text-blue-300 border-blue-500/40 hover:bg-blue-900/60'
-              }`}
-            >
-              <Snowflake className="w-3.5 h-3.5" />
-              {member?.status === 'FROZEN' ? 'Reactivar' : 'Congelar'}
-            </button>
+          {/* Central Title */}
+          <div className="text-center">
+            <h2 className="text-lg md:text-xl font-brand font-bold text-[#faf3e8] tracking-wide">
+              Referencia funcional · Perfil del sumiso
+            </h2>
+            <div className="flex items-center justify-center gap-2 mt-0.5">
+              <span className="h-px w-8 bg-[#5f4717]/60" />
+              <p className="text-[11px] font-serif italic text-[#c5a059] tracking-wider">
+                Vista única sin pestañas · todo visible por apartados
+              </p>
+              <span className="h-px w-8 bg-[#5f4717]/60" />
+            </div>
+          </div>
+
+          {/* Luxury Quote + Close Button */}
+          <div className="flex items-center gap-6">
+            <div className="hidden lg:block text-right">
+              <p className="font-serif italic text-xs text-[#d9cdaf]">
+                “Un buen diseño también es una forma de Dominio.”
+              </p>
+              <p className="text-[10px] font-mono text-[#8c6a2f] tracking-widest uppercase mt-0.5">
+                — DOMINIUM
+              </p>
+            </div>
+
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10"
+              className="p-2 rounded-xl bg-[#1c1116] border border-[#44222b] text-[#c5a059] hover:text-white hover:bg-[#341620] hover:border-[#c9a227] transition-all"
+              title="Cerrar vista"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Dossier Tabs Navigation */}
-        <div className="flex items-center gap-1 px-5 border-b border-gray-800 bg-dark-900/60 overflow-x-auto text-xs font-mono py-2">
-          {[
-            { id: 'summary', label: '1. Resumen' },
-            { id: 'hierarchy', label: '2. Jerarquía & Rango' },
-            { id: 'subscription', label: '3. Suscripción / Acceso' },
-            { id: 'requirements', label: '4. Requisitos' },
-            { id: 'skills', label: '5. Habilidades Laborales' },
-            { id: 'activities', label: '6. Actividades' },
-            { id: 'private', label: '7. Perfil Privado' },
-            { id: 'history', label: '8. Historial' },
-            { id: 'notes', label: '9. Notas' }
-          ].map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`py-1.5 px-3 rounded-md transition-all whitespace-nowrap font-medium ${
-                activeTab === t.id
-                  ? 'bg-gold-500 text-dark-950 font-bold shadow-sm'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              {t.label}
+        {/* ========================================================================= */}
+        {/* INNER CONTAINER HEADER: "Perfil del sumiso" / Tools / Admin Avatar */}
+        {/* ========================================================================= */}
+        <div className="px-6 py-3.5 bg-[#0e0a0d] border-b border-[#2d141b] flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h3 className="text-base font-brand font-bold text-white tracking-wide">
+              Perfil del sumiso
+            </h3>
+            <p className="text-[10px] font-mono tracking-widest text-[#8e8073] uppercase">
+              GESTIÓN COMPLETA DEL SUMISO
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 relative">
+            {/* Search Input */}
+            <div className="relative">
+              <div className="flex items-center bg-[#130d11] border border-[#3e1e27] focus-within:border-[#c5a059] rounded-full px-3 py-1.5 text-xs text-[#e5c158] transition-all w-52 sm:w-64">
+                <Search className="w-3.5 h-3.5 text-[#8e8073] mr-2" />
+                <input
+                  type="text"
+                  placeholder="Buscar sumiso..."
+                  value={searchMemberQuery}
+                  onChange={(e) => {
+                    setSearchMemberQuery(e.target.value);
+                    setShowSearchDropdown(true);
+                  }}
+                  onFocus={() => setShowSearchDropdown(true)}
+                  className="bg-transparent border-none text-xs text-[#f3e8d9] focus:outline-none placeholder-[#6b5e54] w-full"
+                />
+              </div>
+
+              {/* Search dropdown results */}
+              {showSearchDropdown && filteredSearchMembers.length > 0 && (
+                <div className="absolute top-full mt-1 right-0 w-72 bg-[#140c11] border border-[#5a2735] rounded-xl shadow-2xl z-50 p-1.5 space-y-1">
+                  {filteredSearchMembers.map(sm => (
+                    <button
+                      key={sm.id}
+                      onClick={() => {
+                        if (onSelectMember) onSelectMember(sm.id);
+                        fetchMemberDetail(sm.id);
+                        setShowSearchDropdown(false);
+                        setSearchMemberQuery('');
+                      }}
+                      className="w-full text-left p-2 rounded-lg hover:bg-[#2c131c] flex items-center justify-between text-xs transition-colors"
+                    >
+                      <div>
+                        <span className="font-mono text-[#c5a059] font-bold mr-2">{sm.memberNumber}</span>
+                        <span className="font-brand text-white">{sm.alias}</span>
+                      </div>
+                      <span className="text-[10px] text-[#8e8073] font-mono">{sm.status}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Notification Bell */}
+            <button className="p-2 rounded-full bg-[#130d11] border border-[#3e1e27] text-[#c5a059] hover:text-white hover:bg-[#2a131b] transition-all">
+              <Bell className="w-3.5 h-3.5" />
             </button>
-          ))}
+
+            {/* Admin Avatar Chip */}
+            <div className="flex items-center gap-2.5 pl-2 border-l border-[#2e171f]">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#6a1528] to-[#c9a227] p-0.5">
+                <div className="w-full h-full rounded-full bg-[#0d090c] flex items-center justify-center overflow-hidden">
+                  <span className="font-brand font-bold text-xs text-[#e5c158]">D</span>
+                </div>
+              </div>
+              <div className="text-left leading-tight hidden sm:block">
+                <span className="text-xs font-brand font-bold text-white block">Dominatrix</span>
+                <span className="text-[10px] font-mono text-[#c5a059] block">Admin</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Tab Content Body */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-6">
-          {loading ? (
-            <div className="text-center py-12 text-gold-400 font-mono text-xs">
-              Cargando expediente del miembro...
-            </div>
-          ) : (
-            <>
-              {/* TAB 1: RESUMEN */}
-              {activeTab === 'summary' && (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 rounded-xl bg-dark-950 border border-gray-800">
-                      <span className="text-[11px] font-mono text-gray-400 block mb-1">Identidad Interna</span>
-                      <p className="font-brand text-lg text-gold-300 font-bold">{member.memberNumber}</p>
-                      <p className="text-xs text-gray-300 mt-1">{member.alias} {member.internalName ? `(${member.internalName})` : ''}</p>
-                    </div>
+        {/* ========================================================================= */}
+        {/* MAIN BODY: VISTA ÚNICA SIN PESTAÑAS (SCROLLABLE HIGH DENSITY GRID) */}
+        {/* ========================================================================= */}
+        <div className="p-4 sm:p-6 space-y-4 max-h-[82vh] overflow-y-auto custom-scrollbar">
 
-                    <div className="p-4 rounded-xl bg-dark-950 border border-gray-800">
-                      <span className="text-[11px] font-mono text-gray-400 block mb-1">Grupo & Posición Actual</span>
-                      <p className="font-brand text-base text-white font-bold">{member.group?.name || 'Ninguno'}</p>
-                      <p className="text-xs text-crimson-400 mt-1">{member.position?.name || 'Sin rango asignado'}</p>
-                    </div>
+          {/* --------------------------------------------------------------------- */}
+          {/* ROW 1: BOCADILLOS 2 & 3 - CABECERA RÁPIDA & RESUMEN FINANCIERO */}
+          {/* --------------------------------------------------------------------- */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            
+            {/* BOCADILLO 2: CABECERA RÁPIDA (col-span-7) */}
+            <div className="lg:col-span-7 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 relative flex flex-col sm:flex-row gap-5 shadow-lg">
+              
+              {/* Edit Profile Button */}
+              <button
+                onClick={() => setShowEditProfile(true)}
+                className="absolute top-4 right-4 py-1.5 px-3 rounded-lg bg-[#1a0f14] border border-[#5c2a38] text-[#e5c158] hover:bg-[#2c131d] hover:border-[#c5a059] text-xs font-mono font-bold flex items-center gap-1.5 transition-all shadow-sm"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                Editar perfil
+              </button>
 
-                    <div className="p-4 rounded-xl bg-dark-950 border border-gray-800">
-                      <span className="text-[11px] font-mono text-gray-400 block mb-1">Progreso & Méritos</span>
-                      <div className="flex items-center justify-between text-xs font-mono mb-1">
-                        <span className="text-gold-400 font-bold">{member.overallProgress}%</span>
-                        <span className="text-gray-400">{member.experiencePoints} pts</span>
-                      </div>
-                      <div className="w-full bg-dark-900 rounded-full h-2 overflow-hidden border border-gray-800">
-                        <div className="bg-gradient-to-r from-bordeaux-500 to-gold-400 h-full rounded-full" style={{ width: `${Math.min(100, member.overallProgress)}%` }} />
-                      </div>
-                    </div>
+              {/* Submissive Portrait */}
+              <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden border border-[#5a2735] flex-shrink-0 bg-[#090507] shadow-inner relative group">
+                <img 
+                  src="/dominium_sub_avatar.jpg" 
+                  alt={currentPrefs.alias || 'Submisive'} 
+                  className="w-full h-full object-cover grayscale contrast-125 transition-transform duration-500 group-hover:scale-105"
+                  onError={(e) => {
+                    e.target.src = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80';
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
+              </div>
+
+              {/* Info & Metrics Details */}
+              <div className="flex-1 space-y-3 pt-1">
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <h3 className="text-lg font-brand font-bold text-[#faf3e8]">
+                      {currentPrefs.memberNumber} / {currentPrefs.internalName}
+                    </h3>
                   </div>
-
-                  {/* Formulario de Edición de Datos Básicos */}
-                  <div className="glass-panel p-5 rounded-xl border border-gray-800 space-y-4">
-                    <div className="flex justify-between items-center pb-2 border-b border-gray-800">
-                      <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest">
-                        Datos de la Cuenta & Identidad
-                      </h4>
-                      <button
-                        onClick={() => setEditingBasic(!editingBasic)}
-                        className="text-xs font-mono text-gold-300 hover:underline"
-                      >
-                        {editingBasic ? 'Cancelar' : 'Editar Datos'}
-                      </button>
-                    </div>
-
-                    {editingBasic ? (
-                      <form onSubmit={handleUpdateBasic} className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-xs font-mono text-gray-400 mb-1">Número de Reino</label>
-                            <input
-                              type="text"
-                              value={basicForm.memberNumber}
-                              onChange={e => setBasicForm({ ...basicForm, memberNumber: e.target.value })}
-                              className="w-full bg-dark-900 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-mono text-gray-400 mb-1">Alias del Miembro</label>
-                            <input
-                              type="text"
-                              value={basicForm.alias}
-                              onChange={e => setBasicForm({ ...basicForm, alias: e.target.value })}
-                              className="w-full bg-dark-900 border border-gray-700 rounded px-3 py-2 text-xs text-white"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-mono text-gray-400 mb-1">Nombre Ceremonial (Princesa)</label>
-                            <input
-                              type="text"
-                              value={basicForm.internalName}
-                              onChange={e => setBasicForm({ ...basicForm, internalName: e.target.value })}
-                              className="w-full bg-dark-900 border border-gray-700 rounded px-3 py-2 text-xs text-gold-300"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-mono text-gray-400 mb-1">Estado de Cuenta</label>
-                            <select
-                              value={basicForm.status}
-                              onChange={e => setBasicForm({ ...basicForm, status: e.target.value })}
-                              className="w-full bg-dark-900 border border-gray-700 rounded px-3 py-2 text-xs text-white"
-                            >
-                              <option value="ACTIVE">ACTIVO (Mantiene accesos)</option>
-                              <option value="PENDING_RENEWAL">PENDIENTE_RENOVACION (Acceso por vencer)</option>
-                              <option value="FROZEN">CONGELADO (Pausa temporal de privilegios)</option>
-                              <option value="SUSPENDED">SUSPENDIDO (Restricción por sanción)</option>
-                              <option value="INACTIVE">INACTIVO (Sin actividad prolongada)</option>
-                              <option value="ARCHIVED">ARCHIVADO (Expediente conservado)</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-mono text-gray-400 mb-1">Progreso General (0 a 100%)</label>
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={basicForm.overallProgress}
-                              onChange={e => setBasicForm({ ...basicForm, overallProgress: e.target.value })}
-                              className="w-full bg-dark-900 border border-gray-700 rounded px-3 py-2 text-xs text-white font-mono"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-mono text-gray-400 mb-1">Notas Rápidas de Administración</label>
-                          <textarea
-                            rows="2"
-                            value={basicForm.internalNotes}
-                            onChange={e => setBasicForm({ ...basicForm, internalNotes: e.target.value })}
-                            className="w-full bg-dark-900 border border-gray-700 rounded px-3 py-2 text-xs text-white"
-                          />
-                        </div>
-
-                        <div className="flex justify-end gap-2 pt-2">
-                          <button
-                            type="button"
-                            onClick={() => setEditingBasic(false)}
-                            className="py-1.5 px-3 rounded bg-dark-900 border border-gray-700 text-xs text-gray-400"
-                          >
-                            Cancelar
-                          </button>
-                          <button
-                            type="submit"
-                            className="py-1.5 px-4 rounded bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs"
-                          >
-                            Guardar Cambios
-                          </button>
-                        </div>
-                      </form>
-                    ) : (
-                      <div className="space-y-2 text-xs">
-                        <p><span className="text-gray-400 font-mono">Fecha de Ingreso:</span> {new Date(member.joinedAt).toLocaleString()}</p>
-                        <p><span className="text-gray-400 font-mono">Notas Internas:</span> {member.internalNotes || 'Sin notas registradas'}</p>
-                        {member.user && (
-                          <p><span className="text-gray-400 font-mono">Cuenta de Acceso:</span> {member.user.email} (ID #{member.user.id})</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <p className="text-xs font-mono text-[#c5a059] mt-0.5 flex items-center gap-1">
+                    <span>👤</span> @{currentPrefs.alias}
+                  </p>
+                  <p className="text-xs font-serif italic text-[#c2b29f] mt-1">
+                    "{currentPrefs.quote}"
+                  </p>
                 </div>
-              )}
 
-              {/* TAB 2: JERARQUÍA & POSICIÓN */}
-              {activeTab === 'hierarchy' && (
-                <div className="space-y-6">
-                  <div className="glass-panel p-5 rounded-xl border border-gray-800 space-y-4">
-                    <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest">
-                      Asignación de Grupo y Posición
-                    </h4>
-                    <p className="text-xs text-gray-400">
-                      Asigna a qué sociedad pertenece el devoto dentro del Reino y cuál es su rango actual o su objetivo de ascenso.
+                {/* 2-Column Metadata Grid */}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2 border-t border-[#2d141b] text-xs">
+                  {/* Col 1 */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-[#8e8073]">
+                      <Calendar className="w-3.5 h-3.5 text-[#c5a059]" />
+                      <span className="text-[11px] font-mono">Sirve desde</span>
+                    </div>
+                    <p className="font-brand font-semibold text-white pl-5 text-[13px]">
+                      {currentPrefs.servedSince}
                     </p>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                      <div>
-                        <label className="block text-xs font-mono text-gray-300 mb-1">Grupo / Sociedad</label>
-                        <select
-                          value={basicForm.groupId || ''}
-                          onChange={e => setBasicForm({ ...basicForm, groupId: e.target.value })}
-                          className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
-                        >
-                          <option value="">-- Sin Grupo Asignado --</option>
-                          {allGroups.map(g => (
-                            <option key={g.id} value={g.id}>{g.name} ({g.badge})</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-mono text-gray-300 mb-1">Posición / Rango</label>
-                        <select
-                          value={basicForm.positionId || ''}
-                          onChange={e => setBasicForm({ ...basicForm, positionId: e.target.value })}
-                          className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-xs text-white"
-                        >
-                          <option value="">-- Sin Rango Específico --</option>
-                          {allGroups.find(g => g.id === basicForm.groupId)?.positions?.map(p => (
-                            <option key={p.id} value={p.id}>{p.name} ({p.badge})</option>
-                          ))}
-                        </select>
-                      </div>
+                    <div className="flex items-center gap-2 text-[#8e8073] pt-1">
+                      <Gift className="w-3.5 h-3.5 text-[#c5a059]" />
+                      <span className="text-[11px] font-mono">Tributo inicial</span>
                     </div>
+                    <p className="font-brand font-semibold text-white pl-5 text-[13px]">
+                      {currentPrefs.initialTribute}
+                    </p>
+                  </div>
 
-                    <div className="flex justify-end pt-3">
-                      <button
-                        onClick={handleUpdateBasic}
-                        className="py-2 px-4 rounded bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs uppercase font-sans"
-                      >
-                        Actualizar Posición Jerárquica
-                      </button>
+                  {/* Col 2 */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-[#8e8073]">
+                      <Crown className="w-3.5 h-3.5 text-[#c5a059]" />
+                      <span className="text-[11px] font-mono">Puesto actual</span>
                     </div>
+                    <p className="font-brand font-semibold text-[#e5c158] pl-5 text-[13px]">
+                      {currentPrefs.currentRank}
+                    </p>
+
+                    <div className="flex items-center gap-2 text-[#8e8073] pt-1">
+                      <Target className="w-3.5 h-3.5 text-[#c5a059]" />
+                      <span className="text-[11px] font-mono">Puesto objetivo</span>
+                    </div>
+                    <p className="font-brand font-semibold text-white pl-5 text-[13px]">
+                      {currentPrefs.targetRank}
+                    </p>
                   </div>
                 </div>
-              )}
+              </div>
+            </div>
 
-              {/* TAB 3: SUSCRIPCIÓN & CONCESIONES MANUALES (EQUIVALENCIAS) */}
-              {activeTab === 'subscription' && (
-                <div className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest">
-                        Suscripciones & Accesos Vigentes
-                      </h4>
-                      <p className="text-xs text-gray-400">
-                        El acceso de un devoto puede activarse mediante pago automático, pago manual o convalidación de aportación/regalo.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowGrantSub(true)}
-                      className="py-2 px-3 rounded-lg bg-gold-500 hover:bg-gold-400 text-dark-950 font-sans font-bold text-xs uppercase flex items-center gap-1.5"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Conceder Acceso / Equivalencia
-                    </button>
+            {/* BOCADILLO 3: RESUMEN FINANCIERO (col-span-5) */}
+            <div className="lg:col-span-5 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 flex flex-col justify-between shadow-lg">
+              
+              {/* 3 Metric Cards in a Row */}
+              <div className="grid grid-cols-3 gap-2.5">
+                {/* Metric 1 */}
+                <div className="bg-[#180f14] border border-[#3a1922] rounded-lg p-2.5 text-center">
+                  <span className="text-[10px] font-mono text-[#9e8f82] block truncate">
+                    Ingresado este mes
+                  </span>
+                  <span className="text-base sm:text-lg font-sans font-bold text-white mt-1 block">
+                    €1,250
+                  </span>
+                </div>
+
+                {/* Metric 2 */}
+                <div className="bg-[#180f14] border border-[#3a1922] rounded-lg p-2.5 text-center">
+                  <span className="text-[10px] font-mono text-[#9e8f82] block truncate">
+                    Ingresado mes pasado
+                  </span>
+                  <span className="text-base sm:text-lg font-sans font-bold text-white mt-1 block">
+                    €980
+                  </span>
+                </div>
+
+                {/* Metric 3 */}
+                <div className="bg-[#180f14] border border-[#3a1922] rounded-lg p-2.5 text-center">
+                  <span className="text-[10px] font-mono text-[#9e8f82] block truncate">
+                    Regalos / compras
+                  </span>
+                  <span className="text-base sm:text-lg font-sans font-bold text-white mt-1 block">
+                    €340
+                  </span>
+                </div>
+              </div>
+
+              {/* Bottom Row with 3 Status Indicators */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-[#2d141b] mt-3">
+                {/* Subscripción Activa */}
+                <div>
+                  <span className="text-[10px] font-mono text-[#9e8f82] block">Suscripción activa</span>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <Crown className="w-3.5 h-3.5 text-[#c5a059]" />
+                    <span className="text-xs font-brand font-bold text-[#e5c158]">
+                      Oro Mensual
+                    </span>
+                  </div>
+                </div>
+
+                {/* Estado del Perfil */}
+                <div>
+                  <span className="text-[10px] font-mono text-[#9e8f82] block">Estado del perfil</span>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                    <span className="text-xs font-mono font-bold text-emerald-300">
+                      Activo
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progreso General */}
+                <div>
+                  <div className="flex items-center justify-between text-[10px] font-mono mb-1">
+                    <span className="text-[#9e8f82]">Progreso general</span>
+                    <span className="text-[#c5a059] font-bold">{currentPrefs.overallProgress}%</span>
+                  </div>
+                  <div className="w-full bg-[#1b1016] rounded-full h-1.5 overflow-hidden border border-[#3a1922]">
+                    <div 
+                      className="bg-gradient-to-r from-[#9c2b3e] to-[#e8c96a] h-full rounded-full" 
+                      style={{ width: `${currentPrefs.overallProgress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* --------------------------------------------------------------------- */}
+          {/* ROW 2: BOCADILLO 4 - TIRA DE ETIQUETAS HORIZONTAL (FULL WIDTH) */}
+          {/* --------------------------------------------------------------------- */}
+          <div className="bg-[#110b0e] border border-[#3c1b24] rounded-xl p-3.5 shadow-md flex items-center justify-between gap-3 overflow-x-auto">
+            <div className="flex items-center gap-2 sm:gap-3 text-xs flex-nowrap w-full">
+              
+              {/* Pill 1: Preferencias */}
+              <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap">
+                <Heart className="w-3.5 h-3.5 text-crimson-400" />
+                <span className="font-mono font-bold text-[#c5a059]">Preferencias:</span>
+                <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.preferences}</span>
+              </div>
+
+              {/* Pill 2: Fetiches */}
+              <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap">
+                <Flame className="w-3.5 h-3.5 text-amber-400" />
+                <span className="font-mono font-bold text-[#c5a059]">Fetiches:</span>
+                <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.fetishes}</span>
+              </div>
+
+              {/* Pill 3: Triggers */}
+              <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap">
+                <Zap className="w-3.5 h-3.5 text-yellow-400" />
+                <span className="font-mono font-bold text-[#c5a059]">Triggers:</span>
+                <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.triggers}</span>
+              </div>
+
+              {/* Pill 4: Límites */}
+              <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap">
+                <Lock className="w-3.5 h-3.5 text-rose-400" />
+                <span className="font-mono font-bold text-[#c5a059]">Límites:</span>
+                <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.limits}</span>
+              </div>
+
+              {/* Pill 5: Aftercare */}
+              <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap">
+                <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
+                <span className="font-mono font-bold text-[#c5a059]">Aftercare:</span>
+                <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.aftercare}</span>
+              </div>
+
+              {/* Pill 6: Objetivos personales */}
+              <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap">
+                <Target className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="font-mono font-bold text-[#c5a059]">Objetivos personales:</span>
+                <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.personalGoals}</span>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setShowEditProfile(true)}
+              className="text-[11px] font-mono text-[#c5a059] hover:underline whitespace-nowrap pl-2"
+            >
+              Editar
+            </button>
+          </div>
+
+          {/* --------------------------------------------------------------------- */}
+          {/* ROW 3: BOCADILLO 5 - PROGRESO Y MÉRITOS + ÚLTIMA ACTIVIDAD + CITA */}
+          {/* --------------------------------------------------------------------- */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            
+            {/* Left: Progreso y méritos (col-span-6) */}
+            <div className="lg:col-span-6 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-[#2d141b]">
+                  <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-[#c5a059]" />
+                    Progreso y méritos
+                  </h4>
+                  <button 
+                    onClick={() => alert('Abriendo diario de evolución...')}
+                    className="text-xs font-mono text-[#c5a059] hover:underline flex items-center gap-1"
+                  >
+                    Ver diario completo →
+                  </button>
+                </div>
+
+                {/* Progress Arc & Goal Info */}
+                <div className="flex items-center gap-5 py-4">
+                  {/* Circular Gauge */}
+                  <div className="relative w-20 h-20 flex-shrink-0 flex items-center justify-center">
+                    <svg className="w-20 h-20 transform -rotate-90">
+                      <circle
+                        cx="40"
+                        cy="40"
+                        r="34"
+                        stroke="#25141c"
+                        strokeWidth="6"
+                        fill="transparent"
+                      />
+                      <circle
+                        cx="40"
+                        cy="40"
+                        r="34"
+                        stroke="url(#progressGrad)"
+                        strokeWidth="6"
+                        strokeDasharray={213}
+                        strokeDashoffset={213 - (213 * (currentPrefs.overallProgress || 68)) / 100}
+                        strokeLinecap="round"
+                        fill="transparent"
+                      />
+                      <defs>
+                        <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#9c2b3e" />
+                          <stop offset="100%" stopColor="#e8c96a" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <span className="absolute font-sans font-bold text-sm text-[#faf3e8]">
+                      {currentPrefs.overallProgress || 68}%
+                    </span>
                   </div>
 
-                  {showGrantSub && (
-                    <form onSubmit={handleGrantSubscription} className="glass-panel p-5 rounded-xl border border-gold-500/40 space-y-4 bg-dark-950/80">
-                      <h5 className="font-sans font-bold text-xs text-gold-300 uppercase">
-                        Concesión Manual de Acceso (Equivalencia de Suscripción)
-                      </h5>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-mono text-gray-400 mb-1">Días de Acceso</label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={grantSubForm.durationDays}
-                            onChange={e => setGrantSubForm({ ...grantSubForm, durationDays: e.target.value })}
-                            className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white"
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-mono text-gray-400 mb-1">Importe Equivalente (€)</label>
-                          <input
-                            type="number"
-                            value={grantSubForm.amount}
-                            onChange={e => setGrantSubForm({ ...grantSubForm, amount: e.target.value })}
-                            className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-mono text-gray-400 mb-1">Método de Activación</label>
-                          <select
-                            value={grantSubForm.activationMethod}
-                            onChange={e => setGrantSubForm({ ...grantSubForm, activationMethod: e.target.value })}
-                            className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white"
-                          >
-                            <option value="CONTRIBUTION_EQUIVALENCE">Equivalencia por Aportación / Regalo</option>
-                            <option value="MANUAL_PAYMENT">Pago Manual (Bizum / Transferencia)</option>
-                            <option value="INVITATION">Invitación Especial</option>
-                            <option value="PROMOTION">Promoción / Ascenso</option>
-                            <option value="TRIAL">Periodo de Prueba</option>
-                          </select>
-                        </div>
+                  {/* Goal details */}
+                  <div className="flex-1 space-y-1">
+                    <h5 className="font-brand font-bold text-base text-white">
+                      Camino a {currentPrefs.targetRank}
+                    </h5>
+                    <p className="text-xs font-serif italic text-[#a39485]">
+                      Disciplina. Constancia. Evolución.
+                    </p>
+                    <div className="pt-2">
+                      <div className="flex justify-between text-[11px] font-mono text-[#8e8073] mb-1">
+                        <span>Progreso hacia ascenso</span>
+                        <span className="text-[#c5a059] font-bold">680 / 1,000 puntos</span>
                       </div>
-
-                      <div>
-                        <label className="block text-[11px] font-mono text-gray-400 mb-1">Motivo de Concesión (Visible en Historial)</label>
-                        <input
-                          type="text"
-                          value={grantSubForm.grantReason}
-                          onChange={e => setGrantSubForm({ ...grantSubForm, grantReason: e.target.value })}
-                          className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white"
-                          required
+                      <div className="w-full bg-[#1c1016] rounded-full h-2 overflow-hidden border border-[#3e1e27]">
+                        <div 
+                          className="bg-gradient-to-r from-[#7a1225] via-[#c9a227] to-[#f7e08b] h-full rounded-full" 
+                          style={{ width: '68%' }}
                         />
                       </div>
-
-                      <div className="flex justify-end gap-2 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowGrantSub(false)}
-                          className="py-1 px-3 rounded bg-dark-900 border border-gray-700 text-xs text-gray-400"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="submit"
-                          className="py-1 px-4 rounded bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs font-sans uppercase"
-                        >
-                          Confirmar y Activar
-                        </button>
-                      </div>
-                    </form>
-                  )}
-
-                  <div className="space-y-3">
-                    {(member.subscriptions || []).length === 0 ? (
-                      <p className="text-xs text-gray-500 font-mono py-4 text-center">No hay registros de suscripción o acceso manual.</p>
-                    ) : (
-                      member.subscriptions.map(s => (
-                        <div key={s.id} className="p-4 rounded-xl bg-dark-950 border border-gray-800 flex justify-between items-center text-xs">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-white uppercase">{s.activationMethod}</span>
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400">
-                                {s.status}
-                              </span>
-                              {s.amount > 0 && <span className="text-gold-400 font-mono font-bold">({s.amount}€)</span>}
-                            </div>
-                            <p className="text-gray-300 mt-1">{s.grantReason}</p>
-                            <p className="text-[10px] text-gray-500 font-mono mt-0.5">
-                              Desde {new Date(s.startDate).toLocaleDateString()} hasta {s.endDate ? new Date(s.endDate).toLocaleDateString() : 'Indefinido'} · Resp: {s.adminResponsible}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    )}
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {/* TAB 4: REQUISITOS */}
-              {activeTab === 'requirements' && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center pb-2 border-b border-gray-800">
+              {/* 4 Metric Boxes in Grid */}
+              <div className="grid grid-cols-4 gap-2 pt-3 border-t border-[#2d141b]">
+                <div className="bg-[#180f14] border border-[#381921] rounded-lg p-2 text-center">
+                  <Crown className="w-3.5 h-3.5 text-[#c5a059] mx-auto mb-1" />
+                  <span className="text-[9px] font-mono text-[#8e8073] block truncate">Méritos totales</span>
+                  <span className="text-xs sm:text-sm font-sans font-bold text-white">{currentPrefs.experiencePoints || 680}</span>
+                </div>
+
+                <div className="bg-[#180f14] border border-[#381921] rounded-lg p-2 text-center">
+                  <Star className="w-3.5 h-3.5 text-amber-400 mx-auto mb-1" />
+                  <span className="text-[9px] font-mono text-[#8e8073] block truncate">Rituales</span>
+                  <span className="text-xs sm:text-sm font-sans font-bold text-white">12</span>
+                </div>
+
+                <div className="bg-[#180f14] border border-[#381921] rounded-lg p-2 text-center">
+                  <Award className="w-3.5 h-3.5 text-rose-400 mx-auto mb-1" />
+                  <span className="text-[9px] font-mono text-[#8e8073] block truncate">Entrenamientos</span>
+                  <span className="text-xs sm:text-sm font-sans font-bold text-white">8</span>
+                </div>
+
+                <div className="bg-[#180f14] border border-[#381921] rounded-lg p-2 text-center">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 mx-auto mb-1" />
+                  <span className="text-[9px] font-mono text-[#8e8073] block truncate">Ascensos</span>
+                  <span className="text-xs sm:text-sm font-sans font-bold text-white">2</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Última actividad + Cita Decorativa (col-span-6) */}
+            <div className="lg:col-span-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* Timeline Card */}
+              <div className="bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 shadow-lg flex flex-col justify-between">
+                <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2 pb-2.5 border-b border-[#2d141b]">
+                  <Clock className="w-4 h-4 text-[#c5a059]" />
+                  Última actividad
+                </h4>
+
+                <div className="space-y-3 pt-2 text-xs font-mono relative before:absolute before:left-2 before:top-3 before:bottom-3 before:w-px before:bg-[#3d1c25]">
+                  {/* Timeline 1 */}
+                  <div className="flex items-start gap-3 pl-1 relative">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#c5a059] border-2 border-[#110b0e] mt-1 flex-shrink-0 z-10" />
                     <div>
-                      <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest">
-                        Requisitos del Reino para el Miembro
-                      </h4>
-                      <p className="text-xs text-gray-400">
-                        Visualiza los requisitos de entrada y permanencia. Administración puede convalidar o dispensar cualquiera manualmente.
-                      </p>
+                      <span className="text-[10px] text-[#8e8073] block">15 Abr 2025</span>
+                      <p className="font-sans font-bold text-white text-[11px]">Ritual completado</p>
+                      <p className="text-[10px] text-[#c2b29f]">Ritual de silencio - Nivel II</p>
                     </div>
                   </div>
 
-                  <div className="space-y-2.5">
-                    {(member.requirements || []).length === 0 ? (
-                      <p className="text-xs text-gray-500 font-mono py-4 text-center">No hay requisitos vinculados aún a este perfil.</p>
-                    ) : (
-                      member.requirements.map(r => (
-                        <div key={r.id} className="p-3.5 rounded-xl bg-dark-950 border border-gray-800 flex justify-between items-center text-xs">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-white">{r.definition?.title}</span>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                                r.status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400' :
-                                r.status === 'WAIVED' ? 'bg-blue-500/20 text-blue-400' :
-                                'bg-amber-500/20 text-amber-400'
-                              }`}>
-                                {r.status === 'COMPLETED' ? '✓ CUMPLIDO' : r.status === 'WAIVED' ? '✦ DISPENSADO' : '⏳ PENDIENTE'}
-                              </span>
-                            </div>
-                            <p className="text-gray-400 text-[11px] mt-0.5">{r.definition?.description}</p>
-                            {r.evidenceNotes && (
-                              <p className="text-[10px] text-gold-300/80 italic mt-1 font-mono">Nota: {r.evidenceNotes} (por {r.validatedBy})</p>
-                            )}
-                          </div>
+                  {/* Timeline 2 */}
+                  <div className="flex items-start gap-3 pl-1 relative">
+                    <span className="w-2.5 h-2.5 rounded-full bg-crimson-400 border-2 border-[#110b0e] mt-1 flex-shrink-0 z-10" />
+                    <div>
+                      <span className="text-[10px] text-[#8e8073] block">10 Abr 2025</span>
+                      <p className="font-sans font-bold text-white text-[11px]">Entrenamiento activado</p>
+                      <p className="text-[10px] text-[#c2b29f]">Programa de obediencia mental</p>
+                    </div>
+                  </div>
 
-                          <div className="flex gap-2">
-                            {r.status === 'PENDING' && (
-                              <>
-                                <button
-                                  onClick={() => handleWaiveRequirement(r.definitionId, 'COMPLETED')}
-                                  className="py-1 px-2.5 rounded bg-emerald-950/40 border border-emerald-500/50 text-emerald-300 text-xs font-mono"
-                                >
-                                  Validar
-                                </button>
-                                <button
-                                  onClick={() => handleWaiveRequirement(r.definitionId, 'WAIVED')}
-                                  className="py-1 px-2.5 rounded bg-blue-950/40 border border-blue-500/50 text-blue-300 text-xs font-mono"
-                                >
-                                  Dispensar
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )}
+                  {/* Timeline 3 */}
+                  <div className="flex items-start gap-3 pl-1 relative">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-[#110b0e] mt-1 flex-shrink-0 z-10" />
+                    <div>
+                      <span className="text-[10px] text-[#8e8073] block">02 Abr 2025</span>
+                      <p className="font-sans font-bold text-white text-[11px]">Ascenso a nivel Aprendiz</p>
+                      <p className="text-[10px] text-[#c2b29f]">Por constancia y entrega</p>
+                    </div>
+                  </div>
+
+                  {/* Timeline 4 */}
+                  <div className="flex items-start gap-3 pl-1 relative">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#110b0e] mt-1 flex-shrink-0 z-10" />
+                    <div>
+                      <span className="text-[10px] text-[#8e8073] block">14 Feb 2024</span>
+                      <p className="font-sans font-bold text-white text-[11px]">Tributo inicial completado</p>
+                      <p className="text-[10px] text-[#c2b29f]">Bienvenido al Reino</p>
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {/* TAB 5: HABILIDADES LABORALES */}
-              {activeTab === 'skills' && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center pb-2 border-b border-gray-800">
-                    <div>
-                      <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest flex items-center gap-1.5">
-                        <Briefcase className="w-4 h-4 text-gold-400" />
-                        Habilidades y Talentos del Miembro
-                      </h4>
-                      <p className="text-xs text-gray-400">
-                        Capacidades que este devoto puede aportar al Reino (edición de vídeo, programación, marketing, etc.).
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowAddSkill(true)}
-                      className="py-1.5 px-3 rounded-lg bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs uppercase flex items-center gap-1"
+              {/* Decorative Quote Card with Dark Roses Wallpaper */}
+              <div className="relative rounded-xl overflow-hidden border border-[#5a2735] p-5 flex flex-col justify-between shadow-lg bg-[#140a10]">
+                <img 
+                  src="/dominium_dark_roses.jpg" 
+                  alt="Velvet Roses" 
+                  className="absolute inset-0 w-full h-full object-cover opacity-35 mix-blend-luminosity filter contrast-125"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0e060a] via-[#1a070f]/70 to-[#0e060a]/90" />
+                
+                <div className="relative z-10">
+                  <Crown className="w-5 h-5 text-[#c5a059] mb-2" />
+                </div>
+
+                <div className="relative z-10 my-auto text-center py-4">
+                  <p className="font-serif italic text-base sm:text-lg text-[#faf3e8] leading-relaxed drop-shadow-md">
+                    “Un sumiso disciplinado es un tesoro eterno.”
+                  </p>
+                  <p className="text-[10px] font-mono text-[#c5a059] tracking-[0.3em] uppercase mt-2">
+                    — DOMINIUM
+                  </p>
+                </div>
+
+                <div className="relative z-10 flex justify-end">
+                  <span className="text-[9px] font-mono text-[#8c6a2f] uppercase tracking-widest">
+                    DECRETO SUPREMO
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* --------------------------------------------------------------------- */}
+          {/* ROW 4: BOCADILLOS 6, 7 & 12 - DISEÑO DE ENTRENAMIENTO & ACTIVIDADES */}
+          {/* --------------------------------------------------------------------- */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            
+            {/* BOCADILLO 6: DISEÑO DE ENTRENAMIENTO DESDE DESPLEGABLES (col-span-5) */}
+            <div className="lg:col-span-5 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
+              <div>
+                <div className="pb-3 border-b border-[#2d141b]">
+                  <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#c5a059]" />
+                    Diseño de entrenamiento
+                  </h4>
+                  <p className="text-[11px] font-mono text-[#8e8073] mt-0.5">
+                    Selecciona actividades del sistema para asignar al sumiso.
+                  </p>
+                </div>
+
+                {/* Dropdowns Grid (7 categories from library) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-3">
+                  
+                  {/* Tareas */}
+                  <div>
+                    <label className="block text-[10px] font-mono text-[#c5a059] mb-1">Tareas</label>
+                    <select
+                      value={selectedTrainingItems.task}
+                      onChange={e => setSelectedTrainingItems({ ...selectedTrainingItems, task: e.target.value })}
+                      className="w-full bg-[#160e13] border border-[#381921] rounded-lg px-2.5 py-1.5 text-xs text-[#f3e8d9] focus:border-[#c5a059]"
                     >
-                      <Plus className="w-3.5 h-3.5" /> Añadir Habilidad
-                    </button>
+                      <option value="">Seleccionar...</option>
+                      {libraryByType.TASK.map(t => (
+                        <option key={t.id} value={t.id}>{t.title}</option>
+                      ))}
+                    </select>
                   </div>
 
-                  {showAddSkill && (
-                    <form onSubmit={handleAddSkill} className="p-4 rounded-xl bg-dark-950 border border-gold-500/40 space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-mono text-gray-400 mb-1">Categoría</label>
-                          <select
-                            value={skillForm.skillCategory}
-                            onChange={e => setSkillForm({ ...skillForm, skillCategory: e.target.value })}
-                            className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white"
-                          >
-                            <option value="VIDEO_EDITING">Edición de Vídeo</option>
-                            <option value="PROGRAMMING">Programación / Código</option>
-                            <option value="DESIGN">Diseño Gráfico / Ilustración</option>
-                            <option value="PHOTOGRAPHY">Fotografía</option>
-                            <option value="MARKETING">Marketing / Ventas</option>
-                            <option value="SOCIAL_MEDIA">Gestión de Redes</option>
-                            <option value="LANGUAGES">Idiomas</option>
-                            <option value="COPYWRITING">Redacción / Copy</option>
-                            <option value="OTHER">Otros Talentos</option>
-                          </select>
+                  {/* Rituales */}
+                  <div>
+                    <label className="block text-[10px] font-mono text-[#c5a059] mb-1">Rituales</label>
+                    <select
+                      value={selectedTrainingItems.ritual}
+                      onChange={e => setSelectedTrainingItems({ ...selectedTrainingItems, ritual: e.target.value })}
+                      className="w-full bg-[#160e13] border border-[#381921] rounded-lg px-2.5 py-1.5 text-xs text-[#f3e8d9] focus:border-[#c5a059]"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {libraryByType.RITUAL.map(t => (
+                        <option key={t.id} value={t.id}>{t.title}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Castigos */}
+                  <div>
+                    <label className="block text-[10px] font-mono text-[#c5a059] mb-1">Castigos</label>
+                    <select
+                      value={selectedTrainingItems.punishment}
+                      onChange={e => setSelectedTrainingItems({ ...selectedTrainingItems, punishment: e.target.value })}
+                      className="w-full bg-[#160e13] border border-[#381921] rounded-lg px-2.5 py-1.5 text-xs text-[#f3e8d9] focus:border-[#c5a059]"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {libraryByType.PUNISHMENT.map(t => (
+                        <option key={t.id} value={t.id}>{t.title}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Recompensas */}
+                  <div>
+                    <label className="block text-[10px] font-mono text-[#c5a059] mb-1">Recompensas</label>
+                    <select
+                      value={selectedTrainingItems.reward}
+                      onChange={e => setSelectedTrainingItems({ ...selectedTrainingItems, reward: e.target.value })}
+                      className="w-full bg-[#160e13] border border-[#381921] rounded-lg px-2.5 py-1.5 text-xs text-[#f3e8d9] focus:border-[#c5a059]"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {libraryByType.REWARD.map(t => (
+                        <option key={t.id} value={t.id}>{t.title}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Privilegios */}
+                  <div>
+                    <label className="block text-[10px] font-mono text-[#c5a059] mb-1">Privilegios</label>
+                    <select
+                      value={selectedTrainingItems.privilege}
+                      onChange={e => setSelectedTrainingItems({ ...selectedTrainingItems, privilege: e.target.value })}
+                      className="w-full bg-[#160e13] border border-[#381921] rounded-lg px-2.5 py-1.5 text-xs text-[#f3e8d9] focus:border-[#c5a059]"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {libraryByType.PRIVILEGE.map(t => (
+                        <option key={t.id} value={t.id}>{t.title}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Objetivos */}
+                  <div>
+                    <label className="block text-[10px] font-mono text-[#c5a059] mb-1">Objetivos</label>
+                    <select
+                      value={selectedTrainingItems.goal}
+                      onChange={e => setSelectedTrainingItems({ ...selectedTrainingItems, goal: e.target.value })}
+                      className="w-full bg-[#160e13] border border-[#381921] rounded-lg px-2.5 py-1.5 text-xs text-[#f3e8d9] focus:border-[#c5a059]"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {libraryByType.GOAL.map(t => (
+                        <option key={t.id} value={t.id}>{t.title}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Actividades especiales (col-span-2) */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-mono text-[#c5a059] mb-1">Actividades especiales</label>
+                    <select
+                      value={selectedTrainingItems.special}
+                      onChange={e => setSelectedTrainingItems({ ...selectedTrainingItems, special: e.target.value })}
+                      className="w-full bg-[#160e13] border border-[#381921] rounded-lg px-2.5 py-1.5 text-xs text-[#f3e8d9] focus:border-[#c5a059]"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {libraryByType.SPECIAL_EVENT.map(t => (
+                        <option key={t.id} value={t.id}>{t.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button: Añadir al entrenamiento */}
+              <div className="pt-4 mt-3 border-t border-[#2d141b]">
+                <button
+                  disabled={assigningTraining}
+                  onClick={handleAddSelectedTraining}
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#6a1528] to-[#4a0e1b] hover:from-[#7d1930] hover:to-[#5e1323] border border-[#c5a059]/40 text-[#f7e08b] font-mono font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99]"
+                >
+                  <Plus className="w-4 h-4" />
+                  {assigningTraining ? 'Asignando...' : 'Añadir al entrenamiento'}
+                </button>
+              </div>
+            </div>
+
+            {/* BOCADILLO 7 & 12: ACTIVIDADES ASIGNADAS (col-span-7) */}
+            <div className="lg:col-span-7 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-[#2d141b]">
+                  <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2">
+                    <Award className="w-4 h-4 text-[#c5a059]" />
+                    Actividades asignadas
+                  </h4>
+                  <button
+                    onClick={() => setShowNewActivityModal(true)}
+                    className="py-1 px-3 rounded-lg bg-[#1a0f14] border border-[#5c2a38] text-[#e5c158] hover:bg-[#2c131d] text-xs font-mono font-bold flex items-center gap-1.5 transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Nueva actividad
+                  </button>
+                </div>
+
+                {/* Assigned Activities Table */}
+                <div className="overflow-x-auto pt-2">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead>
+                      <tr className="text-[#8e8073] border-b border-[#2d141b] text-[10px]">
+                        <th className="pb-2 font-normal">Actividad</th>
+                        <th className="pb-2 font-normal">Tipo</th>
+                        <th className="pb-2 font-normal">Estado</th>
+                        <th className="pb-2 font-normal">Fecha límite</th>
+                        <th className="pb-2 font-normal">Prioridad</th>
+                        <th className="pb-2 font-normal text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#201118]">
+                      {sortedAssignments.length > 0 ? (
+                        sortedAssignments.map(a => {
+                          const isCompleted = a.status.startsWith('COMPLETED');
+                          const isOverdue = a.status === 'OVERDUE';
+                          const isPending = a.status === 'PENDING' || a.status === 'ASSIGNED';
+                          const isActive = a.status === 'ACTIVE' || (!isCompleted && !isOverdue && !isPending);
+
+                          const isHigh = (a.customInstructions || '').includes('HIGH');
+                          const isMed = (a.customInstructions || '').includes('MEDIUM');
+
+                          return (
+                            <tr key={a.id} className="hover:bg-[#180f14]/60 transition-colors">
+                              <td className="py-2.5 pr-2 font-sans font-medium text-white text-[11px]">
+                                {a.title}
+                              </td>
+                              <td className="py-2.5 pr-2 text-[#a39485] text-[10px]">
+                                {a.type === 'TASK' ? 'Tarea' : a.type === 'RITUAL' ? 'Ritual' : a.type === 'PUNISHMENT' ? 'Castigo' : a.type === 'SPECIAL_EVENT' ? 'Actividad especial' : a.type}
+                              </td>
+                              <td className="py-2.5 pr-2">
+                                {isCompleted ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-cyan-950/60 text-cyan-300 border border-cyan-700/40">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                                    Completada
+                                  </span>
+                                ) : isOverdue ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-950/60 text-rose-300 border border-rose-700/40">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                                    Vencida
+                                  </span>
+                                ) : isPending ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-950/60 text-amber-300 border border-amber-700/40">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                    Pendiente
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-950/60 text-emerald-300 border border-emerald-700/40">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                    Activa
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 pr-2 text-[#c2b29f] text-[10px]">
+                                {formatDate(a.dueDate)}
+                              </td>
+                              <td className="py-2.5 pr-2">
+                                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                  isHigh ? 'bg-[#3e131d] text-rose-300 border border-rose-800/40' :
+                                  isMed ? 'bg-[#352511] text-amber-300 border border-amber-800/40' :
+                                  'bg-[#1a202c] text-gray-300'
+                                }`}>
+                                  ★ {isHigh ? 'Alta' : isMed ? 'Media' : 'Baja'}
+                                </span>
+                              </td>
+                              <td className="py-2.5 text-right space-x-1 whitespace-nowrap">
+                                {!isCompleted && (
+                                  <button
+                                    onClick={() => handleCompleteAssignment(a.id)}
+                                    title="Marcar completada"
+                                    className="p-1 rounded text-emerald-400 hover:bg-emerald-950/40"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleDeleteAssignment(a.id)}
+                                  title="Eliminar asignación"
+                                  className="p-1 rounded text-[#8e8073] hover:text-rose-400 hover:bg-rose-950/40"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan="6" className="py-6 text-center text-[#8e8073]">
+                            No hay actividades asignadas. Utiliza los desplegables de la izquierda o pulsa "Nueva actividad".
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* --------------------------------------------------------------------- */}
+          {/* ROW 5: BOCADILLOS 8 & 9 - REQUISITOS/SUSCRIPCIONES & HABILIDADES */}
+          {/* --------------------------------------------------------------------- */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            
+            {/* BOCADILLO 8: REQUISITOS Y SUSCRIPCIONES (col-span-6) */}
+            <div className="lg:col-span-6 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
+              <div>
+                <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2 pb-3 border-b border-[#2d141b]">
+                  <Crown className="w-4 h-4 text-[#c5a059]" />
+                  Requisitos y suscripciones
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3">
+                  
+                  {/* Card 1: Suscripción activa */}
+                  <div className="bg-[#180f14] border border-[#3a1922] rounded-xl p-3 flex flex-col justify-between">
+                    <div>
+                      <Crown className="w-5 h-5 text-[#c5a059] mb-1.5" />
+                      <span className="text-[10px] font-mono text-[#8e8073] block">Suscripción activa</span>
+                      <h5 className="font-brand font-bold text-sm text-white mt-0.5">
+                        Oro Mensual
+                      </h5>
+                      <p className="text-xs font-mono text-[#c5a059] font-bold mt-1">
+                        €100 / mes
+                      </p>
+                    </div>
+                    <div className="pt-3 border-t border-[#29131a] mt-3">
+                      <span className="text-[9px] font-mono text-[#8e8073] block">Renueva: 14 May 2025</span>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Requisitos especiales */}
+                  <div className="bg-[#180f14] border border-[#3a1922] rounded-xl p-3">
+                    <span className="text-[10px] font-mono text-[#c5a059] font-bold block mb-2">
+                      Requisitos especiales
+                    </span>
+                    <div className="space-y-1.5 text-[11px] font-mono text-[#dcd3c8]">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={specialReqs.tributo_minimo}
+                          onChange={e => setSpecialReqs({ ...specialReqs, tributo_minimo: e.target.checked })}
+                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
+                        />
+                        <span>Tributo mensual mín.</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={specialReqs.informe_semanal}
+                          onChange={e => setSpecialReqs({ ...specialReqs, informe_semanal: e.target.checked })}
+                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
+                        />
+                        <span>Informe semanal</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={specialReqs.rituales_asignados}
+                          onChange={e => setSpecialReqs({ ...specialReqs, rituales_asignados: e.target.checked })}
+                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
+                        />
+                        <span>Participar rituales</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={specialReqs.comunicacion_activa}
+                          onChange={e => setSpecialReqs({ ...specialReqs, comunicacion_activa: e.target.checked })}
+                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
+                        />
+                        <span>Comunicación activa</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Requisitos generales */}
+                  <div className="bg-[#180f14] border border-[#3a1922] rounded-xl p-3">
+                    <span className="text-[10px] font-mono text-[#c5a059] font-bold block mb-2">
+                      Requisitos generales
+                    </span>
+                    <div className="space-y-1.5 text-[11px] font-mono text-[#dcd3c8]">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={generalReqs.perfil_verificado}
+                          onChange={e => setGeneralReqs({ ...generalReqs, perfil_verificado: e.target.checked })}
+                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
+                        />
+                        <span>Perfil verificado</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={generalReqs.aceptacion_normas}
+                          onChange={e => setGeneralReqs({ ...generalReqs, aceptacion_normas: e.target.checked })}
+                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
+                        />
+                        <span>Normas aceptadas</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={generalReqs.tributo_inicial}
+                          onChange={e => setGeneralReqs({ ...generalReqs, tributo_inicial: e.target.checked })}
+                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
+                        />
+                        <span>Tributo inicial</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={generalReqs.respeto_absoluto}
+                          onChange={e => setGeneralReqs({ ...generalReqs, respeto_absoluto: e.target.checked })}
+                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
+                        />
+                        <span>Respeto absoluto</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={generalReqs.discrecion_confidencialidad}
+                          onChange={e => setGeneralReqs({ ...generalReqs, discrecion_confidencialidad: e.target.checked })}
+                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
+                        />
+                        <span>Discreción total</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* BOCADILLO 9: HABILIDADES LABORALES / PUESTOS ÚTILES (col-span-6) */}
+            <div className="lg:col-span-6 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-[#2d141b]">
+                  <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2">
+                    <Award className="w-4 h-4 text-[#c5a059]" />
+                    Habilidades laborales / Puestos útiles
+                  </h4>
+                  <button
+                    onClick={() => setShowAddSkill(true)}
+                    className="py-1 px-3 rounded-lg bg-[#1a0f14] border border-[#5c2a38] text-[#e5c158] hover:bg-[#2c131d] text-xs font-mono font-bold flex items-center gap-1.5 transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Añadir habilidad
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
+                  {/* Column 1: Habilidades de este sumiso */}
+                  <div>
+                    <span className="text-[10px] font-mono text-[#c5a059] font-bold block mb-2">
+                      Habilidades de este sumiso
+                    </span>
+                    <div className="space-y-2.5">
+                      {(member?.skills && member.skills.length > 0) ? (
+                        member.skills.map(sk => (
+                          <div key={sk.id} className="flex items-center justify-between text-xs bg-[#160e13] p-2 rounded-lg border border-[#2e151e] group">
+                            <div>
+                              <span className="font-medium text-white block text-[11px]">{sk.skillName}</span>
+                              <span className="text-[9px] font-mono text-[#8e8073]">
+                                {sk.level === 'ADVANCED' ? 'Avanzado' : sk.level === 'EXPERT' ? 'Experto' : sk.level === 'INTERMEDIATE' ? 'Intermedio' : 'Básico'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {renderSkillDots(sk.level)}
+                              <button 
+                                onClick={() => handleDeleteSkill(sk.id)}
+                                className="opacity-0 group-hover:opacity-100 text-[#8e8073] hover:text-rose-400 transition-opacity"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-4 text-xs font-mono text-[#8e8073]">
+                          Sin habilidades registradas.
                         </div>
-                        <div>
-                          <label className="block text-[11px] font-mono text-gray-400 mb-1">Nombre / Herramienta</label>
-                          <input
-                            type="text"
-                            placeholder="Ej: Premiere, Python, Inglés C1"
-                            value={skillForm.skillName}
-                            onChange={e => setSkillForm({ ...skillForm, skillName: e.target.value })}
-                            className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white"
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-mono text-gray-400 mb-1">Nivel</label>
-                          <select
-                            value={skillForm.level}
-                            onChange={e => setSkillForm({ ...skillForm, level: e.target.value })}
-                            className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white"
-                          >
-                            <option value="BASIC">Básico</option>
-                            <option value="INTERMEDIATE">Intermedio</option>
-                            <option value="ADVANCED">Avanzado</option>
-                            <option value="EXPERT">Experto / Profesional</option>
-                          </select>
-                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Column 2: Oportunidades / Necesidades del Reino */}
+                  <div>
+                    <span className="text-[10px] font-mono text-[#c5a059] font-bold block mb-2">
+                      Oportunidades / Necesidades
+                    </span>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs bg-[#160e13] p-2 rounded-lg border border-[#2e151e]">
+                        <span className="font-medium text-white text-[11px]">Gestión de redes sociales</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#3e131d] text-rose-300 border border-rose-800/40">
+                          ★ Alta
+                        </span>
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setShowAddSkill(false)}
-                          className="py-1 px-3 rounded bg-dark-900 border border-gray-700 text-xs text-gray-400"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="submit"
-                          className="py-1 px-4 rounded bg-gold-500 text-dark-950 font-bold text-xs"
-                        >
-                          Guardar Habilidad
-                        </button>
+                      <div className="flex items-center justify-between text-xs bg-[#160e13] p-2 rounded-lg border border-[#2e151e]">
+                        <span className="font-medium text-white text-[11px]">Edición de contenido</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#352511] text-amber-300 border border-amber-800/40">
+                          ★ Media
+                        </span>
                       </div>
-                    </form>
-                  )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {(member.skills || []).map(sk => (
-                      <div key={sk.id} className="p-3 rounded-xl bg-dark-950 border border-gray-800 flex justify-between items-center text-xs">
-                        <div>
-                          <span className="font-bold text-white block">{sk.skillName}</span>
-                          <span className="text-[10px] font-mono text-gold-400 uppercase tracking-wider">{sk.skillCategory} · Nivel: {sk.level}</span>
-                          {sk.notes && <p className="text-[11px] text-gray-400 mt-1">{sk.notes}</p>}
+                      <div className="flex items-center justify-between text-xs bg-[#160e13] p-2 rounded-lg border border-[#2e151e]">
+                        <span className="font-medium text-white text-[11px]">Soporte técnico</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#352511] text-amber-300 border border-amber-800/40">
+                          ★ Media
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs bg-[#160e13] p-2 rounded-lg border border-[#2e151e]">
+                        <span className="font-medium text-white text-[11px]">Moderación de comunidad</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#14232c] text-cyan-300 border border-cyan-800/40">
+                          ★ Baja
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* --------------------------------------------------------------------- */}
+          {/* ROW 6: BOCADILLO 10 & FINANZAS - FINANZAS Y REGALOS & NOTAS */}
+          {/* --------------------------------------------------------------------- */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            
+            {/* FINANZAS Y REGALOS (col-span-6) */}
+            <div className="lg:col-span-6 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-[#2d141b]">
+                  <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2">
+                    <Gift className="w-4 h-4 text-[#c5a059]" />
+                    Finanzas y regalos
+                  </h4>
+                  <button 
+                    onClick={() => alert('Abriendo historial financiero completo...')}
+                    className="text-xs font-mono text-[#c5a059] hover:underline flex items-center gap-1"
+                  >
+                    Ver historial completo →
+                  </button>
+                </div>
+
+                {/* Mini Summary Strip */}
+                <div className="grid grid-cols-4 gap-2 pt-3 text-center">
+                  <div className="bg-[#180f14] p-1.5 rounded-lg border border-[#2e151e]">
+                    <span className="text-[9px] font-mono text-[#8e8073] block truncate">Total aportado</span>
+                    <span className="text-xs font-sans font-bold text-[#e5c158]">€5,870</span>
+                  </div>
+                  <div className="bg-[#180f14] p-1.5 rounded-lg border border-[#2e151e]">
+                    <span className="text-[9px] font-mono text-[#8e8073] block truncate">Este mes</span>
+                    <span className="text-xs font-sans font-bold text-white">€1,250</span>
+                  </div>
+                  <div className="bg-[#180f14] p-1.5 rounded-lg border border-[#2e151e]">
+                    <span className="text-[9px] font-mono text-[#8e8073] block truncate">Mes pasado</span>
+                    <span className="text-xs font-sans font-bold text-white">€980</span>
+                  </div>
+                  <div className="bg-[#180f14] p-1.5 rounded-lg border border-[#2e151e]">
+                    <span className="text-[9px] font-mono text-[#8e8073] block truncate">Regalos</span>
+                    <span className="text-xs font-sans font-bold text-white">€340</span>
+                  </div>
+                </div>
+
+                {/* Finance Table */}
+                <div className="overflow-x-auto pt-3">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead>
+                      <tr className="text-[#8e8073] border-b border-[#2d141b] text-[10px]">
+                        <th className="pb-2 font-normal">Fecha</th>
+                        <th className="pb-2 font-normal">Concepto</th>
+                        <th className="pb-2 font-normal">Tipo</th>
+                        <th className="pb-2 font-normal">Importe</th>
+                        <th className="pb-2 font-normal">Notas</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#201118] text-[11px]">
+                      <tr className="hover:bg-[#180f14]/60">
+                        <td className="py-2 text-[#c2b29f]">15 Abr 2025</td>
+                        <td className="py-2 text-white font-medium">Tributo mensual</td>
+                        <td className="py-2 text-[#a39485]">Tributo</td>
+                        <td className="py-2 text-[#e5c158] font-bold">€250</td>
+                        <td className="py-2 text-[#8e8073]">—</td>
+                      </tr>
+                      <tr className="hover:bg-[#180f14]/60">
+                        <td className="py-2 text-[#c2b29f]">10 Abr 2025</td>
+                        <td className="py-2 text-white font-medium">Regalo: Lencería</td>
+                        <td className="py-2 text-[#a39485]">Regalo</td>
+                        <td className="py-2 text-[#e5c158] font-bold">€340</td>
+                        <td className="py-2 text-crimson-400 italic">Desde nuestra wishlist ♡</td>
+                      </tr>
+                      <tr className="hover:bg-[#180f14]/60">
+                        <td className="py-2 text-[#c2b29f]">01 Abr 2025</td>
+                        <td className="py-2 text-white font-medium">Tributo semanal</td>
+                        <td className="py-2 text-[#a39485]">Tributo</td>
+                        <td className="py-2 text-[#e5c158] font-bold">€250</td>
+                        <td className="py-2 text-[#8e8073]">—</td>
+                      </tr>
+                      <tr className="hover:bg-[#180f14]/60">
+                        <td className="py-2 text-[#c2b29f]">14 Mar 2025</td>
+                        <td className="py-2 text-white font-medium">Suscripción</td>
+                        <td className="py-2 text-[#a39485]">Suscripción</td>
+                        <td className="py-2 text-[#e5c158] font-bold">€100</td>
+                        <td className="py-2 text-[#8e8073]">Renovación mensual</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* BOCADILLO 10: NOTAS Y OBSERVACIONES (col-span-6) */}
+            <div className="lg:col-span-6 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-[#2d141b]">
+                  <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2">
+                    <Edit3 className="w-4 h-4 text-[#c5a059]" />
+                    Notas y observaciones
+                  </h4>
+                  <button
+                    onClick={() => setShowAddNoteModal(true)}
+                    className="py-1 px-3 rounded-lg bg-[#1a0f14] border border-[#5c2a38] text-[#e5c158] hover:bg-[#2c131d] text-xs font-mono font-bold flex items-center gap-1.5 transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Añadir nota
+                  </button>
+                </div>
+
+                {/* Sub-Tabs / View Selector */}
+                <div className="flex items-center gap-2 pt-3 pb-2 text-xs font-mono">
+                  <button
+                    onClick={() => setNotesFilter('internal')}
+                    className={`px-3 py-1 rounded-lg transition-colors ${
+                      notesFilter === 'internal'
+                        ? 'bg-[#3e131d] text-[#e5c158] border border-[#6a1528] font-bold'
+                        : 'text-[#8e8073] hover:text-white'
+                    }`}
+                  >
+                    📝 Notas internas (solo admin)
+                  </button>
+                  <button
+                    onClick={() => setNotesFilter('next_steps')}
+                    className={`px-3 py-1 rounded-lg transition-colors ${
+                      notesFilter === 'next_steps'
+                        ? 'bg-[#3e131d] text-[#e5c158] border border-[#6a1528] font-bold'
+                        : 'text-[#8e8073] hover:text-white'
+                    }`}
+                  >
+                    🧭 Próximos pasos
+                  </button>
+                </div>
+
+                {/* Notes List */}
+                <div className="space-y-2 pt-1 max-h-52 overflow-y-auto custom-scrollbar">
+                  {displayedNotes.length > 0 ? (
+                    displayedNotes.map(n => (
+                      <div 
+                        key={n.id} 
+                        className="bg-[#160e13] border border-[#2e151e] p-2.5 rounded-lg flex items-start justify-between gap-3 text-xs group"
+                      >
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-mono text-[#c5a059] block">
+                            {formatDate(n.createdAt)}
+                          </span>
+                          <p className="font-sans text-[#f3e8d9] text-[11px] leading-relaxed">
+                            {n.note.replace('[PRÓXIMOS PASOS] ', '')}
+                          </p>
                         </div>
                         <button
-                          onClick={() => handleDeleteSkill(sk.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-400"
+                          onClick={() => handleDeleteNote(n.id)}
+                          title="Eliminar nota"
+                          className="opacity-0 group-hover:opacity-100 text-[#8e8073] hover:text-rose-400 p-1 transition-opacity"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 6: ACTIVIDADES & ASIGNACIONES */}
-              {activeTab === 'activities' && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center pb-2 border-b border-gray-800">
-                    <div>
-                      <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest">
-                        Actividades, Rituales & Tareas Asignadas
-                      </h4>
-                      <p className="text-xs text-gray-400">
-                        Monitorea el cumplimiento individual de tareas, entrenamientos o privilegios otorgados.
-                      </p>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-xs font-mono text-[#8e8073]">
+                      No hay notas en esta sección.
                     </div>
-                    <button
-                      onClick={() => setShowAssignActivity(true)}
-                      className="py-1.5 px-3 rounded-lg bg-crimson-600 hover:bg-crimson-500 text-white font-bold text-xs uppercase flex items-center gap-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Asignar Actividad
-                    </button>
-                  </div>
-
-                  {showAssignActivity && (
-                    <form onSubmit={handleAssignActivity} className="p-4 rounded-xl bg-dark-950 border border-crimson-500/40 space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="sm:col-span-2">
-                          <label className="block text-[11px] font-mono text-gray-400 mb-1">Título de la Actividad</label>
-                          <input
-                            type="text"
-                            placeholder="Ej: Reporte de devoción semanal"
-                            value={assignForm.title}
-                            onChange={e => setAssignForm({ ...assignForm, title: e.target.value })}
-                            className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white"
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-mono text-gray-400 mb-1">Tipo</label>
-                          <select
-                            value={assignForm.type}
-                            onChange={e => setAssignForm({ ...assignForm, type: e.target.value })}
-                            className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white"
-                          >
-                            <option value="TASK">Tarea</option>
-                            <option value="TRAINING">Entrenamiento</option>
-                            <option value="RITUAL">Ritual</option>
-                            <option value="PRIVILEGE">Privilegio</option>
-                            <option value="PUNISHMENT">Castigo / Penitencia</option>
-                            <option value="GOAL">Objetivo</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-mono text-gray-400 mb-1">Plazo Límite (Días)</label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={assignForm.dueDays}
-                            onChange={e => setAssignForm({ ...assignForm, dueDays: e.target.value })}
-                            className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-mono text-gray-400 mb-1">Puntos de Mérito</label>
-                          <input
-                            type="number"
-                            value={assignForm.pointsAwarded}
-                            onChange={e => setAssignForm({ ...assignForm, pointsAwarded: e.target.value })}
-                            className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white font-mono"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-mono text-gray-400 mb-1">Instrucciones Particulares para este Devoto</label>
-                        <textarea
-                          rows="2"
-                          value={assignForm.customInstructions}
-                          onChange={e => setAssignForm({ ...assignForm, customInstructions: e.target.value })}
-                          className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white"
-                        />
-                      </div>
-
-                      <div className="flex justify-end gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setShowAssignActivity(false)}
-                          className="py-1 px-3 rounded bg-dark-900 border border-gray-700 text-xs text-gray-400"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="submit"
-                          className="py-1 px-4 rounded bg-crimson-600 hover:bg-crimson-500 text-white font-bold text-xs"
-                        >
-                          Asignar
-                        </button>
-                      </div>
-                    </form>
                   )}
-
-                  <div className="space-y-2.5">
-                    {(member.assignments || []).map(act => (
-                      <div key={act.id} className="p-3.5 rounded-xl bg-dark-950 border border-gray-800 flex justify-between items-center text-xs">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-white">{act.title}</span>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-gray-800 text-gold-300">
-                              {act.type}
-                            </span>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                              act.status.startsWith('COMPLETED') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-                            }`}>
-                              {act.status}
-                            </span>
-                          </div>
-                          {act.customInstructions && <p className="text-gray-300 text-[11px] mt-1">{act.customInstructions}</p>}
-                          <p className="text-[10px] text-gray-500 font-mono mt-1">
-                            Límite: {act.dueDate ? new Date(act.dueDate).toLocaleDateString() : 'Sin plazo'} · Puntos: +{act.pointsAwarded}
-                          </p>
-                        </div>
-
-                        {!act.status.startsWith('COMPLETED') && (
-                          <button
-                            onClick={() => handleCompleteAssignment(act.id)}
-                            className="py-1 px-3 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold"
-                          >
-                            ✓ Completar
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
                 </div>
-              )}
+              </div>
+            </div>
+          </div>
 
-              {/* TAB 7: PERFIL PRIVADO & SENSIBLE */}
-              {activeTab === 'private' && (
-                <div className="space-y-4">
-                  <div className="p-3.5 rounded-xl bg-bordeaux-950/40 border border-bordeaux-500/40 text-bordeaux-300 text-xs flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-gold-400 flex-shrink-0" />
-                    <span>Esta sección contiene información sensible y fetiches del devoto. Acceso estrictamente reservado a Administración.</span>
-                  </div>
+          {/* --------------------------------------------------------------------- */}
+          {/* ROW 7: BOCADILLO 11 & SYSTEM FOOTER HINTS & LUXURY SIGNATURE */}
+          {/* --------------------------------------------------------------------- */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            
+            {/* Hint 1: Biblioteca y desplegables (Bocadillo 11) */}
+            <div className="bg-[#110b0e] border border-[#3c1b24] rounded-xl p-3.5 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-[#251017] border border-[#521c27] text-[#c5a059] flex-shrink-0">
+                <Layers className="w-5 h-5" />
+              </div>
+              <p className="text-xs font-mono text-[#c2b29f] leading-relaxed">
+                La biblioteca de actividades debe alimentar los desplegables de esta página.
+              </p>
+            </div>
 
-                  <div className="glass-panel p-5 rounded-xl border border-gray-800 space-y-4">
-                    <div>
-                      <label className="block text-xs font-mono text-gold-400 mb-1">Preferencias, Fetiches & Triggers</label>
-                      <textarea
-                        rows="4"
-                        value={basicForm.preferences || ''}
-                        onChange={e => setBasicForm({ ...basicForm, preferences: e.target.value })}
-                        className="w-full bg-dark-900 border border-gray-700 rounded px-3 py-2 text-xs text-gray-200"
-                        placeholder="Ej: Gustos específicos, límites duros, dinámicas permitidas..."
-                      />
-                    </div>
+            {/* Hint 2: Tablero interactivo y automatizaciones */}
+            <div className="bg-[#110b0e] border border-[#3c1b24] rounded-xl p-3.5 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-[#251017] border border-[#521c27] text-[#c5a059] flex-shrink-0">
+                <Settings className="w-5 h-5" />
+              </div>
+              <p className="text-xs font-mono text-[#c2b29f] leading-relaxed">
+                Preparar la estructura para futuro tablero interactivo y automatizaciones.
+              </p>
+            </div>
+          </div>
 
-                    <div>
-                      <label className="block text-xs font-mono text-gold-400 mb-1">Objetivos Personales de Sumisión</label>
-                      <textarea
-                        rows="3"
-                        value={basicForm.personalGoals || ''}
-                        onChange={e => setBasicForm({ ...basicForm, personalGoals: e.target.value })}
-                        className="w-full bg-dark-900 border border-gray-700 rounded px-3 py-2 text-xs text-gray-200"
-                        placeholder="Ej: Aspiraciones dentro del Reino, metas de entrega..."
-                      />
-                    </div>
+          {/* Luxury Watermark Signature */}
+          <div className="pt-6 pb-2 border-t border-[#2d141b] flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-mono text-[#6f6053]">
+            <div className="flex items-center gap-2">
+              <Crown className="w-3.5 h-3.5 text-[#8c6a2f]" />
+              <span className="tracking-[0.25em] text-[#9a8677] uppercase font-bold">
+                DISCIPLINA TAMBIÉN ES CLARIDAD.
+              </span>
+            </div>
 
-                    <div className="flex justify-end pt-2">
-                      <button
-                        onClick={handleUpdateBasic}
-                        className="py-2 px-4 rounded bg-gold-500 text-dark-950 font-bold text-xs uppercase"
-                      >
-                        Guardar Perfil Privado
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+            <div className="text-[10px] tracking-widest text-[#8c6a2f] uppercase">
+              VERSIÓN 1.0 · UX REFERENCE · DOMINIUM
+            </div>
+          </div>
 
-              {/* TAB 8: HISTORIAL & TRAZABILIDAD (EVENT LOG) */}
-              {activeTab === 'history' && (
-                <div className="space-y-4">
-                  <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest">
-                    Línea de Tiempo & Auditoría Inmutable
-                  </h4>
-                  <div className="space-y-3 relative before:absolute before:inset-0 before:left-3 before:w-0.5 before:bg-gray-800">
-                    {(member.eventLogs || []).map(ev => (
-                      <div key={ev.id} className="relative pl-8 text-xs">
-                        <div className="absolute left-1.5 top-1.5 w-3 h-3 rounded-full bg-gold-500 ring-4 ring-dark-950" />
-                        <div className="p-3 rounded-xl bg-dark-950 border border-gray-800/80 space-y-1">
-                          <div className="flex justify-between text-gray-400 font-mono text-[10px]">
-                            <span className="font-bold text-gold-400 uppercase">{ev.eventType}</span>
-                            <span>{new Date(ev.createdAt).toLocaleString()} · {ev.adminResponsible}</span>
-                          </div>
-                          <p className="text-gray-200">{ev.description}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 9: NOTAS INTERNAS */}
-              {activeTab === 'notes' && (
-                <div className="space-y-4">
-                  <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest">
-                    Bitácora Interna de Administración
-                  </h4>
-
-                  <form onSubmit={handleAddNote} className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Añadir una nota interna sobre este devoto..."
-                      value={newNoteInput}
-                      onChange={e => setNewNoteInput(e.target.value)}
-                      className="flex-1 bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white"
-                    />
-                    <button
-                      type="submit"
-                      className="py-2 px-4 rounded-lg bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs uppercase"
-                    >
-                      Añadir
-                    </button>
-                  </form>
-
-                  <div className="space-y-2">
-                    {(member.notes || []).map(n => (
-                      <div key={n.id} className="p-3 rounded-xl bg-dark-950 border border-gray-800 text-xs">
-                        <p className="text-gray-200">{n.note}</p>
-                        <span className="text-[10px] font-mono text-gray-500 block mt-1">
-                          {new Date(n.createdAt).toLocaleString()} · Por {n.author}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
         </div>
 
       </div>
+
+      {/* ========================================================================= */}
+      {/* MODAL: EDITAR PERFIL COMPLETO */}
+      {/* ========================================================================= */}
+      {showEditProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="bg-[#120c10] border border-[#5a2735] rounded-2xl p-6 max-w-2xl w-full text-[#f3e8d9] space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center pb-2 border-b border-[#3c1b24]">
+              <h3 className="font-brand font-bold text-lg text-[#e5c158] flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-[#c5a059]" />
+                Editar Perfil del Sumiso ({currentPrefs.memberNumber})
+              </h3>
+              <button onClick={() => setShowEditProfile(false)} className="text-[#8e8073] hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4 text-xs font-mono">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[#c5a059] mb-1">Alias público</label>
+                  <input
+                    type="text"
+                    value={profileForm.alias}
+                    onChange={e => setProfileForm({ ...profileForm, alias: e.target.value })}
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#c5a059] mb-1">Reino / Nombre ceremonial</label>
+                  <input
+                    type="text"
+                    value={profileForm.internalName}
+                    onChange={e => setProfileForm({ ...profileForm, internalName: e.target.value })}
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[#c5a059] mb-1">Puesto Actual</label>
+                  <input
+                    type="text"
+                    value={profileForm.currentRank}
+                    onChange={e => setProfileForm({ ...profileForm, currentRank: e.target.value })}
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#c5a059] mb-1">Puesto Objetivo</label>
+                  <input
+                    type="text"
+                    value={profileForm.targetRank}
+                    onChange={e => setProfileForm({ ...profileForm, targetRank: e.target.value })}
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[#c5a059] mb-1">Sirve desde</label>
+                  <input
+                    type="text"
+                    value={profileForm.servedSince}
+                    onChange={e => setProfileForm({ ...profileForm, servedSince: e.target.value })}
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#c5a059] mb-1">Tributo inicial</label>
+                  <input
+                    type="text"
+                    value={profileForm.initialTribute}
+                    onChange={e => setProfileForm({ ...profileForm, initialTribute: e.target.value })}
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[#c5a059] mb-1">Cita del sumiso</label>
+                <input
+                  type="text"
+                  value={profileForm.quote}
+                  onChange={e => setProfileForm({ ...profileForm, quote: e.target.value })}
+                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white font-serif italic"
+                />
+              </div>
+
+              {/* Tags and Sensitive Dossier */}
+              <div className="pt-2 border-t border-[#2d141b] space-y-3">
+                <h5 className="font-brand font-bold text-sm text-[#e5c158]">Etiquetas del Perfil</h5>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[#c5a059] mb-1">Preferencias</label>
+                    <input
+                      type="text"
+                      value={profileForm.preferences}
+                      onChange={e => setProfileForm({ ...profileForm, preferences: e.target.value })}
+                      className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[#c5a059] mb-1">Fetiches</label>
+                    <input
+                      type="text"
+                      value={profileForm.fetishes}
+                      onChange={e => setProfileForm({ ...profileForm, fetishes: e.target.value })}
+                      className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[#c5a059] mb-1">Triggers</label>
+                    <input
+                      type="text"
+                      value={profileForm.triggers}
+                      onChange={e => setProfileForm({ ...profileForm, triggers: e.target.value })}
+                      className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[#c5a059] mb-1">Límites</label>
+                    <input
+                      type="text"
+                      value={profileForm.limits}
+                      onChange={e => setProfileForm({ ...profileForm, limits: e.target.value })}
+                      className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[#c5a059] mb-1">Aftercare</label>
+                    <input
+                      type="text"
+                      value={profileForm.aftercare}
+                      onChange={e => setProfileForm({ ...profileForm, aftercare: e.target.value })}
+                      className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[#c5a059] mb-1">Objetivos personales</label>
+                    <input
+                      type="text"
+                      value={profileForm.personalGoals}
+                      onChange={e => setProfileForm({ ...profileForm, personalGoals: e.target.value })}
+                      className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditProfile(false)}
+                  className="px-4 py-2 rounded-xl bg-[#201118] text-[#8e8073] hover:text-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#6a1528] to-[#4a0e1b] border border-[#c5a059] text-[#f7e08b] font-bold"
+                >
+                  Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: AÑADIR HABILIDAD LABORAL */}
+      {/* ========================================================================= */}
+      {showAddSkill && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="bg-[#120c10] border border-[#5a2735] rounded-2xl p-6 max-w-md w-full text-[#f3e8d9] space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center pb-2 border-b border-[#3c1b24]">
+              <h3 className="font-brand font-bold text-base text-[#e5c158]">
+                Añadir Habilidad Laboral
+              </h3>
+              <button onClick={() => setShowAddSkill(false)} className="text-[#8e8073] hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddSkillSubmit} className="space-y-3 text-xs font-mono">
+              <div>
+                <label className="block text-[#c5a059] mb-1">Nombre de Habilidad</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Edición de video, Diseño gráfico..."
+                  value={skillForm.skillName}
+                  onChange={e => setSkillForm({ ...skillForm, skillName: e.target.value })}
+                  required
+                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[#c5a059] mb-1">Categoría</label>
+                <select
+                  value={skillForm.skillCategory}
+                  onChange={e => setSkillForm({ ...skillForm, skillCategory: e.target.value })}
+                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                >
+                  <option value="VIDEO_EDITING">Edición de video</option>
+                  <option value="DESIGN">Diseño gráfico</option>
+                  <option value="LANGUAGES">Traducción / Idiomas</option>
+                  <option value="PROGRAMMING">Soporte web / Programación</option>
+                  <option value="SOCIAL_MEDIA">Redes Sociales</option>
+                  <option value="OTHER">Otras Habilidades</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[#c5a059] mb-1">Nivel de Maestría</label>
+                <select
+                  value={skillForm.level}
+                  onChange={e => setSkillForm({ ...skillForm, level: e.target.value })}
+                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                >
+                  <option value="BASIC">Básico (●●○○○)</option>
+                  <option value="INTERMEDIATE">Intermedio (●●●○○)</option>
+                  <option value="ADVANCED">Avanzado (●●●●○)</option>
+                  <option value="EXPERT">Experto (●●●●●)</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddSkill(false)}
+                  className="px-4 py-2 rounded-xl bg-[#201118] text-[#8e8073]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#6a1528] to-[#4a0e1b] border border-[#c5a059] text-[#f7e08b] font-bold"
+                >
+                  Registrar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: NUEVA ACTIVIDAD ASIGNADA */}
+      {/* ========================================================================= */}
+      {showNewActivityModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="bg-[#120c10] border border-[#5a2735] rounded-2xl p-6 max-w-md w-full text-[#f3e8d9] space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center pb-2 border-b border-[#3c1b24]">
+              <h3 className="font-brand font-bold text-base text-[#e5c158]">
+                Asignar Nueva Actividad
+              </h3>
+              <button onClick={() => setShowNewActivityModal(false)} className="text-[#8e8073] hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCustomActivity} className="space-y-3 text-xs font-mono">
+              <div>
+                <label className="block text-[#c5a059] mb-1">Título de Actividad</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Enviar tributo semanal, Sesión virtual..."
+                  value={newActivityForm.title}
+                  onChange={e => setNewActivityForm({ ...newActivityForm, title: e.target.value })}
+                  required
+                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[#c5a059] mb-1">Tipo</label>
+                  <select
+                    value={newActivityForm.type}
+                    onChange={e => setNewActivityForm({ ...newActivityForm, type: e.target.value })}
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  >
+                    <option value="TASK">Tarea</option>
+                    <option value="RITUAL">Ritual</option>
+                    <option value="PUNISHMENT">Castigo</option>
+                    <option value="SPECIAL_EVENT">Actividad especial</option>
+                    <option value="GOAL">Objetivo</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[#c5a059] mb-1">Prioridad</label>
+                  <select
+                    value={newActivityForm.priority}
+                    onChange={e => setNewActivityForm({ ...newActivityForm, priority: e.target.value })}
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  >
+                    <option value="Alta">★ Alta</option>
+                    <option value="Media">★ Media</option>
+                    <option value="Baja">★ Baja</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[#c5a059] mb-1">Estado</label>
+                  <select
+                    value={newActivityForm.status}
+                    onChange={e => setNewActivityForm({ ...newActivityForm, status: e.target.value })}
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  >
+                    <option value="ACTIVE">Activa</option>
+                    <option value="PENDING">Pendiente</option>
+                    <option value="COMPLETED_ON_TIME">Completada</option>
+                    <option value="OVERDUE">Vencida</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[#c5a059] mb-1">Fecha Límite</label>
+                  <input
+                    type="date"
+                    value={newActivityForm.dueDate}
+                    onChange={e => setNewActivityForm({ ...newActivityForm, dueDate: e.target.value })}
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewActivityModal(false)}
+                  className="px-4 py-2 rounded-xl bg-[#201118] text-[#8e8073]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#6a1528] to-[#4a0e1b] border border-[#c5a059] text-[#f7e08b] font-bold"
+                >
+                  Asignar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: AÑADIR NOTA INTERNA */}
+      {/* ========================================================================= */}
+      {showAddNoteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="bg-[#120c10] border border-[#5a2735] rounded-2xl p-6 max-w-md w-full text-[#f3e8d9] space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center pb-2 border-b border-[#3c1b24]">
+              <h3 className="font-brand font-bold text-base text-[#e5c158]">
+                Añadir Nota u Observación
+              </h3>
+              <button onClick={() => setShowAddNoteModal(false)} className="text-[#8e8073] hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddNoteSubmit} className="space-y-3 text-xs font-mono">
+              <div>
+                <label className="block text-[#c5a059] mb-1">Tipo de Nota</label>
+                <select
+                  value={newNoteType}
+                  onChange={e => setNewNoteType(e.target.value)}
+                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                >
+                  <option value="internal">Nota interna (solo admin)</option>
+                  <option value="next_steps">Próximos pasos</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[#c5a059] mb-1">Contenido de la Observación</label>
+                <textarea
+                  rows={4}
+                  placeholder="Escribe la observación sobre disciplina, acuerdos, próximos pasos o evolución..."
+                  value={newNoteText}
+                  onChange={e => setNewNoteText(e.target.value)}
+                  required
+                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2.5 text-white resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddNoteModal(false)}
+                  className="px-4 py-2 rounded-xl bg-[#201118] text-[#8e8073]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#6a1528] to-[#4a0e1b] border border-[#c5a059] text-[#f7e08b] font-bold"
+                >
+                  Guardar Nota
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
