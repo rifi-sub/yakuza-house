@@ -51,7 +51,8 @@ export function KingdomActivitiesView({ token }) {
           tags: tagsArray
         })
       });
-      if (!res.ok) throw new Error('Error al crear actividad');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Error al crear actividad');
       setShowCreateModal(false);
       setForm({ title: '', type: 'TASK', instructions: '', pointsValue: 15, defaultDurationDays: 3, tags: '' });
       fetchActivities();

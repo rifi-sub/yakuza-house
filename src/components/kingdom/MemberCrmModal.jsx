@@ -51,12 +51,14 @@ export function MemberCrmModal({
     ageStatus: '',
     motivation: '',
     status: 'ACTIVE',
+    groupId: '',
+    targetGroupId: '',
     overallProgress: 0,
     experiencePoints: 0,
     servedSince: '',
     initialTribute: '',
-    currentRank: 'Aspirante',
-    targetRank: 'Servidor Elite',
+    currentRank: '',
+    targetRank: '',
     quote: '',
     preferences: '',
     fetishes: '',
@@ -79,7 +81,7 @@ export function MemberCrmModal({
     title: '',
     type: 'TASK',
     status: 'ACTIVE',
-    dueDate: '2025-04-20',
+    dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
     priority: 'Alta',
     pointsAwarded: 25,
     customInstructions: ''
@@ -141,12 +143,14 @@ export function MemberCrmModal({
           ageStatus: effectiveAgeStatus,
           motivation: effectiveMotivation,
           status: data.status || 'ACTIVE',
+          groupId: data.groupId || '',
+          targetGroupId: data.targetGroupId || '',
           overallProgress: data.overallProgress !== undefined ? data.overallProgress : 0,
           experiencePoints: data.experiencePoints || 0,
           servedSince: parsedPrefs.servedSince || (data.joinedAt ? new Date(data.joinedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Reciente'),
           initialTribute: parsedPrefs.initialTribute || 'Pendiente',
-          currentRank: parsedPrefs.currentRank || data.position?.name || 'Aspirante',
-          targetRank: parsedPrefs.targetRank || 'Servidor Elite',
+          currentRank: data.group?.name || parsedPrefs.currentRank || data.position?.name || 'PLEBEYOS',
+          targetRank: data.targetGroup?.name || parsedPrefs.targetRank || 'SIRVIENTES',
           quote: parsedPrefs.quote || effectiveMotivation || 'Para servirte, existo.',
           preferences: effectivePreferences,
           fetishes: parsedPrefs.fetishes || '',
@@ -195,6 +199,52 @@ export function MemberCrmModal({
       return profileForm;
     }
   }, [member, profileForm]);
+
+  // Derived official groups from KingdomGroup table
+  const currentGroupObj = useMemo(() => {
+    const gId = profileForm.groupId || member?.groupId;
+    return allGroups.find(g => g.id === gId) || member?.group || null;
+  }, [allGroups, profileForm.groupId, member?.groupId, member?.group]);
+
+  const targetGroupObj = useMemo(() => {
+    const tgId = profileForm.targetGroupId || member?.targetGroupId;
+    return allGroups.find(g => g.id === tgId) || member?.targetGroup || null;
+  }, [allGroups, profileForm.targetGroupId, member?.targetGroupId, member?.targetGroup]);
+
+  // Real financial transactions (combining Store Orders and Kingdom Subscriptions)
+  const financialTransactions = useMemo(() => {
+    const list = [];
+    if (member?.finances?.orders && Array.isArray(member.finances.orders)) {
+      member.finances.orders.forEach(o => {
+        const isGift = o.packagingOptionName?.toLowerCase().includes('regalo') || 
+                       o.itemName?.toLowerCase().includes('regalo') ||
+                       (o.specialInstructions && o.specialInstructions.toLowerCase().includes('regalo'));
+        list.push({
+          id: `order_${o.id}`,
+          date: o.createdAt,
+          concept: o.itemName || (o.items && o.items[0]?.name) || 'Pedido Tienda',
+          type: isGift ? 'Regalo' : 'Tributo / Tienda',
+          amount: o.totalAmount || 0,
+          notes: o.orderStatus || o.paymentStatus || 'Pagado'
+        });
+      });
+    }
+
+    if (member?.subscriptions && Array.isArray(member.subscriptions)) {
+      member.subscriptions.forEach(s => {
+        list.push({
+          id: `sub_${s.id}`,
+          date: s.startedAt || s.createdAt,
+          concept: `Suscripción Reino (${s.group?.name || 'Membresía'})`,
+          type: 'Suscripción',
+          amount: s.price || 0,
+          notes: s.status === 'ACTIVE' ? 'Activa' : s.status
+        });
+      });
+    }
+
+    return list.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+  }, [member?.finances?.orders, member?.subscriptions]);
 
   // Filter library by type
   const libraryByType = useMemo(() => {
@@ -251,7 +301,10 @@ export function MemberCrmModal({
         })
       });
 
-      if (!res.ok) throw new Error('Error al asignar actividad');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Error al asignar actividad');
+      }
       
       setSelectedTrainingItems({
         task: '',
@@ -313,7 +366,16 @@ export function MemberCrmModal({
   // Handle adding new custom activity
   const handleCreateCustomActivity = async (e) => {
     e.preventDefault();
+    if (!newActivityForm.title.trim()) {
+      alert('Por favor introduce un título para la actividad');
+      return;
+    }
     try {
+      const priorityTag = `PRIORITY:${newActivityForm.priority === 'Alta' ? 'HIGH' : newActivityForm.priority === 'Media' ? 'MEDIUM' : 'LOW'}`;
+      const instructions = newActivityForm.customInstructions.trim() 
+        ? `${newActivityForm.customInstructions.trim()} [${priorityTag}]`
+        : priorityTag;
+
       const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assign`, {
         method: 'POST',
         headers: {
@@ -322,21 +384,23 @@ export function MemberCrmModal({
         },
         body: JSON.stringify({
           memberIds: [member.id],
-          title: newActivityForm.title,
+          title: newActivityForm.title.trim(),
           type: newActivityForm.type,
           status: newActivityForm.status,
           dueDate: newActivityForm.dueDate,
-          pointsAwarded: newActivityForm.pointsAwarded,
-          customInstructions: `PRIORITY:${newActivityForm.priority === 'Alta' ? 'HIGH' : newActivityForm.priority === 'Media' ? 'MEDIUM' : 'LOW'}`
+          pointsAwarded: parseFloat(newActivityForm.pointsAwarded) || 0,
+          customInstructions: instructions
         })
       });
-      if (!res.ok) throw new Error('Error al crear actividad');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Error al crear actividad');
+
       setShowNewActivityModal(false);
       setNewActivityForm({
         title: '',
         type: 'TASK',
         status: 'ACTIVE',
-        dueDate: '2025-04-20',
+        dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
         priority: 'Alta',
         pointsAwarded: 25,
         customInstructions: ''
@@ -457,6 +521,8 @@ export function MemberCrmModal({
           ageStatus: profileForm.ageStatus,
           motivation: profileForm.motivation,
           status: profileForm.status,
+          groupId: profileForm.groupId || null,
+          targetGroupId: profileForm.targetGroupId || null,
           overallProgress: parseFloat(profileForm.overallProgress || 0),
           experiencePoints: parseInt(profileForm.experiencePoints || 0, 10),
           personalGoals: profileForm.personalGoals,
@@ -464,7 +530,10 @@ export function MemberCrmModal({
         })
       });
 
-      if (!res.ok) throw new Error('Error actualizando perfil');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Error actualizando perfil');
+      }
       setShowEditProfile(false);
       fetchMemberDetail();
       if (onRefreshList) onRefreshList();
@@ -795,25 +864,49 @@ export function MemberCrmModal({
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 text-[#8e8073]">
                       <Crown className="w-3.5 h-3.5 text-[#c5a059]" />
-                      <span className="text-[11px] font-mono">Puesto actual</span>
+                      <span className="text-[11px] font-mono">Rango actual</span>
                     </div>
-                    <p className="font-brand font-semibold text-[#e5c158] pl-5 text-[13px]">
-                      {currentPrefs.currentRank}
-                    </p>
+                    <div className="pl-5">
+                      <div className="font-brand font-semibold text-[#e5c158] text-[13px] flex items-center gap-1.5">
+                        <span>{currentGroupObj?.name || member?.group?.name || 'PLEBEYOS'}</span>
+                        {(currentGroupObj?.badge || member?.group?.badge) && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#3a1922] text-[#c5a059] border border-[#5a2735] font-mono">
+                            {currentGroupObj?.badge || member?.group?.badge}
+                          </span>
+                        )}
+                      </div>
+                      {(currentGroupObj?.subtitle || member?.group?.subtitle) && (
+                        <p className="text-[10px] text-[#8e8073] font-mono truncate">
+                          {currentGroupObj?.subtitle || member?.group?.subtitle}
+                        </p>
+                      )}
+                    </div>
 
                     <div className="flex items-center gap-2 text-[#8e8073] pt-1">
                       <Target className="w-3.5 h-3.5 text-[#c5a059]" />
-                      <span className="text-[11px] font-mono">Puesto objetivo</span>
+                      <span className="text-[11px] font-mono">Rango objetivo</span>
                     </div>
-                    <p className="font-brand font-semibold text-white pl-5 text-[13px]">
-                      {currentPrefs.targetRank}
-                    </p>
+                    <div className="pl-5">
+                      <div className="font-brand font-semibold text-white text-[13px] flex items-center gap-1.5">
+                        <span>{targetGroupObj?.name || member?.targetGroup?.name || 'SIRVIENTES'}</span>
+                        {(targetGroupObj?.badge || member?.targetGroup?.badge) && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#201118] text-[#8e8073] border border-[#3e1e27] font-mono">
+                            {targetGroupObj?.badge || member?.targetGroup?.badge}
+                          </span>
+                        )}
+                      </div>
+                      {(targetGroupObj?.subtitle || member?.targetGroup?.subtitle) && (
+                        <p className="text-[10px] text-[#8e8073] font-mono truncate">
+                          {targetGroupObj?.subtitle || member?.targetGroup?.subtitle}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* BOCADILLO 3: RESUMEN FINANCIERO (col-span-5) */}
+            {/* BOCADILLO 3: RESUMEN FINANCIERO REAL (col-span-5) */}
             <div className="lg:col-span-5 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 flex flex-col justify-between shadow-lg">
               
               {/* 3 Metric Cards in a Row */}
@@ -824,7 +917,7 @@ export function MemberCrmModal({
                     Ingresado este mes
                   </span>
                   <span className="text-base sm:text-lg font-sans font-bold text-white mt-1 block">
-                    €1,250
+                    €{member?.finances?.thisMonth !== undefined ? member.finances.thisMonth : 0}
                   </span>
                 </div>
 
@@ -834,17 +927,17 @@ export function MemberCrmModal({
                     Ingresado mes pasado
                   </span>
                   <span className="text-base sm:text-lg font-sans font-bold text-white mt-1 block">
-                    €980
+                    €{member?.finances?.lastMonth !== undefined ? member.finances.lastMonth : 0}
                   </span>
                 </div>
 
                 {/* Metric 3 */}
                 <div className="bg-[#180f14] border border-[#3a1922] rounded-lg p-2.5 text-center">
                   <span className="text-[10px] font-mono text-[#9e8f82] block truncate">
-                    Regalos / compras
+                    Total aportado
                   </span>
-                  <span className="text-base sm:text-lg font-sans font-bold text-white mt-1 block">
-                    €340
+                  <span className="text-base sm:text-lg font-sans font-bold text-[#e5c158] mt-1 block">
+                    €{member?.finances?.total !== undefined ? member.finances.total : 0}
                   </span>
                 </div>
               </div>
@@ -856,8 +949,8 @@ export function MemberCrmModal({
                   <span className="text-[10px] font-mono text-[#9e8f82] block">Suscripción activa</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     <Crown className="w-3.5 h-3.5 text-[#c5a059]" />
-                    <span className="text-xs font-brand font-bold text-[#e5c158]">
-                      Oro Mensual
+                    <span className="text-xs font-brand font-bold text-[#e5c158] truncate">
+                      {(member?.subscriptions || []).find(s => s.status === 'ACTIVE')?.group?.name || 'Ninguna'}
                     </span>
                   </div>
                 </div>
@@ -866,9 +959,21 @@ export function MemberCrmModal({
                 <div>
                   <span className="text-[10px] font-mono text-[#9e8f82] block">Estado del perfil</span>
                   <div className="flex items-center gap-1.5 mt-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-                    <span className="text-xs font-mono font-bold text-emerald-300">
-                      Activo
+                    <span className={`w-2 h-2 rounded-full ${
+                      member?.status === 'ACTIVE'
+                        ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
+                        : member?.status === 'PENDING_REVIEW'
+                        ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
+                        : 'bg-crimson-400 shadow-[0_0_8px_rgba(244,63,94,0.8)]'
+                    }`} />
+                    <span className={`text-xs font-mono font-bold ${
+                      member?.status === 'ACTIVE'
+                        ? 'text-emerald-300'
+                        : member?.status === 'PENDING_REVIEW'
+                        ? 'text-amber-300'
+                        : 'text-crimson-300'
+                    }`}>
+                      {member?.status === 'ACTIVE' ? 'Activo' : member?.status === 'PENDING_REVIEW' ? 'En Revisión' : member?.status || 'Inactivo'}
                     </span>
                   </div>
                 </div>
@@ -876,13 +981,13 @@ export function MemberCrmModal({
                 {/* Progreso General */}
                 <div>
                   <div className="flex items-center justify-between text-[10px] font-mono mb-1">
-                    <span className="text-[#9e8f82]">Progreso general</span>
-                    <span className="text-[#c5a059] font-bold">{currentPrefs.overallProgress}%</span>
+                    <span className="text-[#9e8f82]">Progreso</span>
+                    <span className="text-[#c5a059] font-bold">{member?.overallProgress || 0}%</span>
                   </div>
                   <div className="w-full bg-[#1b1016] rounded-full h-1.5 overflow-hidden border border-[#3a1922]">
                     <div 
-                      className="bg-gradient-to-r from-[#9c2b3e] to-[#e8c96a] h-full rounded-full" 
-                      style={{ width: `${currentPrefs.overallProgress}%` }}
+                      className="bg-gradient-to-r from-[#9c2b3e] to-[#e8c96a] h-full rounded-full transition-all duration-500" 
+                      style={{ width: `${Math.min(100, Math.max(0, member?.overallProgress || 0))}%` }}
                     />
                   </div>
                 </div>
@@ -973,20 +1078,17 @@ export function MemberCrmModal({
           {/* --------------------------------------------------------------------- */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             
-            {/* Left: Progreso y méritos (col-span-6) */}
-            <div className="lg:col-span-6 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
+            {/* Left: Progreso y méritos (col-span-7) */}
+            <div className="lg:col-span-7 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-[#2d141b]">
                   <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2">
                     <TrendingUp className="w-4 h-4 text-[#c5a059]" />
                     Progreso y méritos
                   </h4>
-                  <button 
-                    onClick={() => alert('Abriendo diario de evolución...')}
-                    className="text-xs font-mono text-[#c5a059] hover:underline flex items-center gap-1"
-                  >
-                    Ver diario completo →
-                  </button>
+                  <span className="text-xs font-mono text-[#c5a059]">
+                    {member?.position?.name || member?.group?.name || 'Aspirante'}
+                  </span>
                 </div>
 
                 {/* Progress Arc & Goal Info */}
@@ -1009,7 +1111,7 @@ export function MemberCrmModal({
                         stroke="url(#progressGrad)"
                         strokeWidth="6"
                         strokeDasharray={213}
-                        strokeDashoffset={213 - (213 * (currentPrefs.overallProgress || 68)) / 100}
+                        strokeDashoffset={213 - (213 * Math.min(100, Math.max(0, member?.overallProgress || 0))) / 100}
                         strokeLinecap="round"
                         fill="transparent"
                       />
@@ -1021,27 +1123,27 @@ export function MemberCrmModal({
                       </defs>
                     </svg>
                     <span className="absolute font-sans font-bold text-sm text-[#faf3e8]">
-                      {currentPrefs.overallProgress || 68}%
+                      {member?.overallProgress || 0}%
                     </span>
                   </div>
 
                   {/* Goal details */}
                   <div className="flex-1 space-y-1">
                     <h5 className="font-brand font-bold text-base text-white">
-                      Camino a {currentPrefs.targetRank}
+                      Escalafón: {member?.group?.name || 'Plebeyos'}
                     </h5>
                     <p className="text-xs font-serif italic text-[#a39485]">
-                      Disciplina. Constancia. Evolución.
+                      {member?.status === 'ACTIVE' ? 'Devoción, constancia y evolución en la Casa.' : 'Expediente bajo revisión formal.'}
                     </p>
                     <div className="pt-2">
                       <div className="flex justify-between text-[11px] font-mono text-[#8e8073] mb-1">
-                        <span>Progreso hacia ascenso</span>
-                        <span className="text-[#c5a059] font-bold">680 / 1,000 puntos</span>
+                        <span>Puntos de experiencia acumulados</span>
+                        <span className="text-[#c5a059] font-bold">{member?.experiencePoints || 0} XP</span>
                       </div>
                       <div className="w-full bg-[#1c1016] rounded-full h-2 overflow-hidden border border-[#3e1e27]">
                         <div 
-                          className="bg-gradient-to-r from-[#7a1225] via-[#c9a227] to-[#f7e08b] h-full rounded-full" 
-                          style={{ width: '68%' }}
+                          className="bg-gradient-to-r from-[#7a1225] via-[#c9a227] to-[#f7e08b] h-full rounded-full transition-all duration-500" 
+                          style={{ width: `${Math.min(100, Math.max(member?.overallProgress ? 3 : 0, member?.overallProgress || 0))}%` }}
                         />
                       </div>
                     </div>
@@ -1053,110 +1155,87 @@ export function MemberCrmModal({
               <div className="grid grid-cols-4 gap-2 pt-3 border-t border-[#2d141b]">
                 <div className="bg-[#180f14] border border-[#381921] rounded-lg p-2 text-center">
                   <Crown className="w-3.5 h-3.5 text-[#c5a059] mx-auto mb-1" />
-                  <span className="text-[9px] font-mono text-[#8e8073] block truncate">Méritos totales</span>
-                  <span className="text-xs sm:text-sm font-sans font-bold text-white">{currentPrefs.experiencePoints || 680}</span>
+                  <span className="text-[9px] font-mono text-[#8e8073] block truncate">Méritos (XP)</span>
+                  <span className="text-xs sm:text-sm font-sans font-bold text-white">{member?.experiencePoints || 0}</span>
                 </div>
 
                 <div className="bg-[#180f14] border border-[#381921] rounded-lg p-2 text-center">
                   <Star className="w-3.5 h-3.5 text-amber-400 mx-auto mb-1" />
                   <span className="text-[9px] font-mono text-[#8e8073] block truncate">Rituales</span>
-                  <span className="text-xs sm:text-sm font-sans font-bold text-white">12</span>
+                  <span className="text-xs sm:text-sm font-sans font-bold text-white">
+                    {(member?.assignments || []).filter(a => a.type === 'RITUAL' && ['COMPLETED_ON_TIME', 'COMPLETED_LATE'].includes(a.status)).length}
+                    <span className="text-[10px] text-gray-500 font-normal"> / {(member?.assignments || []).filter(a => a.type === 'RITUAL').length}</span>
+                  </span>
                 </div>
 
                 <div className="bg-[#180f14] border border-[#381921] rounded-lg p-2 text-center">
                   <Award className="w-3.5 h-3.5 text-rose-400 mx-auto mb-1" />
                   <span className="text-[9px] font-mono text-[#8e8073] block truncate">Entrenamientos</span>
-                  <span className="text-xs sm:text-sm font-sans font-bold text-white">8</span>
+                  <span className="text-xs sm:text-sm font-sans font-bold text-white">
+                    {(member?.assignments || []).filter(a => a.type === 'TRAINING' && ['COMPLETED_ON_TIME', 'COMPLETED_LATE'].includes(a.status)).length}
+                    <span className="text-[10px] text-gray-500 font-normal"> / {(member?.assignments || []).filter(a => a.type === 'TRAINING').length}</span>
+                  </span>
                 </div>
 
                 <div className="bg-[#180f14] border border-[#381921] rounded-lg p-2 text-center">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 mx-auto mb-1" />
-                  <span className="text-[9px] font-mono text-[#8e8073] block truncate">Ascensos</span>
-                  <span className="text-xs sm:text-sm font-sans font-bold text-white">2</span>
+                  <span className="text-[9px] font-mono text-[#8e8073] block truncate">Completadas</span>
+                  <span className="text-xs sm:text-sm font-sans font-bold text-white">
+                    {(member?.assignments || []).filter(a => ['COMPLETED_ON_TIME', 'COMPLETED_LATE'].includes(a.status)).length}
+                    <span className="text-[10px] text-gray-500 font-normal"> / {(member?.assignments || []).length}</span>
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Right: Última actividad + Cita Decorativa (col-span-6) */}
-            <div className="lg:col-span-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-              
-              {/* Timeline Card */}
-              <div className="bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 shadow-lg flex flex-col justify-between">
+            {/* Right: Última actividad real (col-span-5) */}
+            <div className="lg:col-span-5 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
+              <div>
                 <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2 pb-2.5 border-b border-[#2d141b]">
                   <Clock className="w-4 h-4 text-[#c5a059]" />
-                  Última actividad
+                  Última actividad registrada
                 </h4>
 
-                <div className="space-y-3 pt-2 text-xs font-mono relative before:absolute before:left-2 before:top-3 before:bottom-3 before:w-px before:bg-[#3d1c25]">
-                  {/* Timeline 1 */}
-                  <div className="flex items-start gap-3 pl-1 relative">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#c5a059] border-2 border-[#110b0e] mt-1 flex-shrink-0 z-10" />
-                    <div>
-                      <span className="text-[10px] text-[#8e8073] block">15 Abr 2025</span>
-                      <p className="font-sans font-bold text-white text-[11px]">Ritual completado</p>
-                      <p className="text-[10px] text-[#c2b29f]">Ritual de silencio - Nivel II</p>
-                    </div>
+                {(member?.eventLogs || []).length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 font-mono text-xs space-y-1">
+                    <Clock className="w-6 h-6 text-gray-600 mx-auto opacity-50 mb-1" />
+                    <p className="text-gray-400">Sin eventos de actividad aún</p>
+                    <p className="text-[10px] text-gray-600">Las solicitudes, tareas y ascensos se registrarán aquí.</p>
                   </div>
-
-                  {/* Timeline 2 */}
-                  <div className="flex items-start gap-3 pl-1 relative">
-                    <span className="w-2.5 h-2.5 rounded-full bg-crimson-400 border-2 border-[#110b0e] mt-1 flex-shrink-0 z-10" />
-                    <div>
-                      <span className="text-[10px] text-[#8e8073] block">10 Abr 2025</span>
-                      <p className="font-sans font-bold text-white text-[11px]">Entrenamiento activado</p>
-                      <p className="text-[10px] text-[#c2b29f]">Programa de obediencia mental</p>
-                    </div>
+                ) : (
+                  <div className="space-y-3 pt-3 text-xs font-mono relative before:absolute before:left-2 before:top-3 before:bottom-3 before:w-px before:bg-[#3d1c25] max-h-56 overflow-y-auto custom-scrollbar pr-1">
+                    {(member?.eventLogs || []).slice(0, 6).map((log, idx) => {
+                      const isCompleted = log.eventType === 'TASK_COMPLETED';
+                      const isRequested = log.eventType === 'ACCESS_REQUESTED';
+                      const isSanction = log.eventType === 'SANCTION' || log.eventType === 'FREEZE';
+                      
+                      return (
+                        <div key={log.id || idx} className="flex items-start gap-3 pl-1 relative">
+                          <span className={`w-2.5 h-2.5 rounded-full border-2 border-[#110b0e] mt-1 flex-shrink-0 z-10 ${
+                            isCompleted ? 'bg-emerald-400' : isRequested ? 'bg-[#c5a059]' : isSanction ? 'bg-crimson-400' : 'bg-cyan-400'
+                          }`} />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[10px] text-[#8e8073] block">
+                              {log.createdAt ? new Date(log.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Reciente'}
+                            </span>
+                            <p className="font-sans font-bold text-white text-[11px] truncate">
+                              {log.eventType === 'ACCESS_REQUESTED' ? 'Solicitud de Admisión' :
+                               log.eventType === 'TASK_COMPLETED' ? 'Tarea Realizada' :
+                               log.eventType === 'TASK_ASSIGNED' ? 'Tarea Asignada' :
+                               log.eventType === 'STATUS_CHANGE' ? 'Cambio de Estado' :
+                               log.eventType}
+                            </p>
+                            {log.description && (
+                              <p className="text-[10px] text-[#c2b29f] line-clamp-2 leading-relaxed">
+                                {log.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-
-                  {/* Timeline 3 */}
-                  <div className="flex items-start gap-3 pl-1 relative">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-[#110b0e] mt-1 flex-shrink-0 z-10" />
-                    <div>
-                      <span className="text-[10px] text-[#8e8073] block">02 Abr 2025</span>
-                      <p className="font-sans font-bold text-white text-[11px]">Ascenso a nivel Aprendiz</p>
-                      <p className="text-[10px] text-[#c2b29f]">Por constancia y entrega</p>
-                    </div>
-                  </div>
-
-                  {/* Timeline 4 */}
-                  <div className="flex items-start gap-3 pl-1 relative">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#110b0e] mt-1 flex-shrink-0 z-10" />
-                    <div>
-                      <span className="text-[10px] text-[#8e8073] block">14 Feb 2024</span>
-                      <p className="font-sans font-bold text-white text-[11px]">Tributo inicial completado</p>
-                      <p className="text-[10px] text-[#c2b29f]">Bienvenido al Reino</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Decorative Quote Card with Dark Roses Wallpaper */}
-              <div className="relative rounded-xl overflow-hidden border border-[#5a2735] p-5 flex flex-col justify-between shadow-lg bg-[#140a10]">
-                <img 
-                  src="/dominium_dark_roses.jpg" 
-                  alt="Velvet Roses" 
-                  className="absolute inset-0 w-full h-full object-cover opacity-35 mix-blend-luminosity filter contrast-125"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0e060a] via-[#1a070f]/70 to-[#0e060a]/90" />
-                
-                <div className="relative z-10">
-                  <Crown className="w-5 h-5 text-[#c5a059] mb-2" />
-                </div>
-
-                <div className="relative z-10 my-auto text-center py-4">
-                  <p className="font-serif italic text-base sm:text-lg text-[#faf3e8] leading-relaxed drop-shadow-md">
-                    “Un sumiso disciplinado es un tesoro eterno.”
-                  </p>
-                  <p className="text-[10px] font-mono text-[#c5a059] tracking-[0.3em] uppercase mt-2">
-                    — DOMINIUM
-                  </p>
-                </div>
-
-                <div className="relative z-10 flex justify-end">
-                  <span className="text-[9px] font-mono text-[#8c6a2f] uppercase tracking-widest">
-                    DECRETO SUPREMO
-                  </span>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -1679,65 +1758,60 @@ export function MemberCrmModal({
                 <div className="grid grid-cols-4 gap-2 pt-3 text-center">
                   <div className="bg-[#180f14] p-1.5 rounded-lg border border-[#2e151e]">
                     <span className="text-[9px] font-mono text-[#8e8073] block truncate">Total aportado</span>
-                    <span className="text-xs font-sans font-bold text-[#e5c158]">€5,870</span>
+                    <span className="text-xs font-sans font-bold text-[#e5c158]">
+                      €{member?.finances?.total !== undefined ? member.finances.total : 0}
+                    </span>
                   </div>
                   <div className="bg-[#180f14] p-1.5 rounded-lg border border-[#2e151e]">
                     <span className="text-[9px] font-mono text-[#8e8073] block truncate">Este mes</span>
-                    <span className="text-xs font-sans font-bold text-white">€1,250</span>
+                    <span className="text-xs font-sans font-bold text-white">
+                      €{member?.finances?.thisMonth !== undefined ? member.finances.thisMonth : 0}
+                    </span>
                   </div>
                   <div className="bg-[#180f14] p-1.5 rounded-lg border border-[#2e151e]">
                     <span className="text-[9px] font-mono text-[#8e8073] block truncate">Mes pasado</span>
-                    <span className="text-xs font-sans font-bold text-white">€980</span>
+                    <span className="text-xs font-sans font-bold text-white">
+                      €{member?.finances?.lastMonth !== undefined ? member.finances.lastMonth : 0}
+                    </span>
                   </div>
                   <div className="bg-[#180f14] p-1.5 rounded-lg border border-[#2e151e]">
                     <span className="text-[9px] font-mono text-[#8e8073] block truncate">Regalos</span>
-                    <span className="text-xs font-sans font-bold text-white">€340</span>
+                    <span className="text-xs font-sans font-bold text-white">
+                      €{member?.finances?.gifts !== undefined ? member.finances.gifts : 0}
+                    </span>
                   </div>
                 </div>
 
                 {/* Finance Table */}
-                <div className="overflow-x-auto pt-3">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead>
-                      <tr className="text-[#8e8073] border-b border-[#2d141b] text-[10px]">
-                        <th className="pb-2 font-normal">Fecha</th>
-                        <th className="pb-2 font-normal">Concepto</th>
-                        <th className="pb-2 font-normal">Tipo</th>
-                        <th className="pb-2 font-normal">Importe</th>
-                        <th className="pb-2 font-normal">Notas</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#201118] text-[11px]">
-                      <tr className="hover:bg-[#180f14]/60">
-                        <td className="py-2 text-[#c2b29f]">15 Abr 2025</td>
-                        <td className="py-2 text-white font-medium">Tributo mensual</td>
-                        <td className="py-2 text-[#a39485]">Tributo</td>
-                        <td className="py-2 text-[#e5c158] font-bold">€250</td>
-                        <td className="py-2 text-[#8e8073]">—</td>
-                      </tr>
-                      <tr className="hover:bg-[#180f14]/60">
-                        <td className="py-2 text-[#c2b29f]">10 Abr 2025</td>
-                        <td className="py-2 text-white font-medium">Regalo: Lencería</td>
-                        <td className="py-2 text-[#a39485]">Regalo</td>
-                        <td className="py-2 text-[#e5c158] font-bold">€340</td>
-                        <td className="py-2 text-crimson-400 italic">Desde nuestra wishlist ♡</td>
-                      </tr>
-                      <tr className="hover:bg-[#180f14]/60">
-                        <td className="py-2 text-[#c2b29f]">01 Abr 2025</td>
-                        <td className="py-2 text-white font-medium">Tributo semanal</td>
-                        <td className="py-2 text-[#a39485]">Tributo</td>
-                        <td className="py-2 text-[#e5c158] font-bold">€250</td>
-                        <td className="py-2 text-[#8e8073]">—</td>
-                      </tr>
-                      <tr className="hover:bg-[#180f14]/60">
-                        <td className="py-2 text-[#c2b29f]">14 Mar 2025</td>
-                        <td className="py-2 text-white font-medium">Suscripción</td>
-                        <td className="py-2 text-[#a39485]">Suscripción</td>
-                        <td className="py-2 text-[#e5c158] font-bold">€100</td>
-                        <td className="py-2 text-[#8e8073]">Renovación mensual</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div className="overflow-x-auto pt-3 max-h-56 custom-scrollbar">
+                  {financialTransactions.length > 0 ? (
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead>
+                        <tr className="text-[#8e8073] border-b border-[#2d141b] text-[10px]">
+                          <th className="pb-2 font-normal">Fecha</th>
+                          <th className="pb-2 font-normal">Concepto</th>
+                          <th className="pb-2 font-normal">Tipo</th>
+                          <th className="pb-2 font-normal">Importe</th>
+                          <th className="pb-2 font-normal">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#201118] text-[11px]">
+                        {financialTransactions.map(tx => (
+                          <tr key={tx.id} className="hover:bg-[#180f14]/60">
+                            <td className="py-2 text-[#c2b29f]">{formatDate(tx.date)}</td>
+                            <td className="py-2 text-white font-medium">{tx.concept}</td>
+                            <td className="py-2 text-[#a39485]">{tx.type}</td>
+                            <td className="py-2 text-[#e5c158] font-bold">€{tx.amount}</td>
+                            <td className="py-2 text-[#8e8073]">{tx.notes}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="text-center py-6 text-xs font-mono text-[#8e8073]">
+                      Sin transacciones ni compras registradas en el sistema.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1948,22 +2022,34 @@ export function MemberCrmModal({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[#c5a059] mb-1">Puesto Actual</label>
-                  <input
-                    type="text"
-                    value={profileForm.currentRank}
-                    onChange={e => setProfileForm({ ...profileForm, currentRank: e.target.value })}
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                  />
+                  <label className="block text-[#c5a059] mb-1 font-mono text-xs">Rango / Estamento Actual</label>
+                  <select
+                    value={profileForm.groupId || ''}
+                    onChange={e => setProfileForm({ ...profileForm, groupId: e.target.value })}
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white text-xs font-mono"
+                  >
+                    <option value="">-- Sin Rango Asignado --</option>
+                    {allGroups.map(g => (
+                      <option key={g.id} value={g.id}>
+                        {g.name} {g.badge ? `(${g.badge})` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-[#c5a059] mb-1">Puesto Objetivo</label>
-                  <input
-                    type="text"
-                    value={profileForm.targetRank}
-                    onChange={e => setProfileForm({ ...profileForm, targetRank: e.target.value })}
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                  />
+                  <label className="block text-[#c5a059] mb-1 font-mono text-xs">Rango / Estamento Objetivo</label>
+                  <select
+                    value={profileForm.targetGroupId || ''}
+                    onChange={e => setProfileForm({ ...profileForm, targetGroupId: e.target.value })}
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white text-xs font-mono"
+                  >
+                    <option value="">-- Sin Objetivo --</option>
+                    {allGroups.map(g => (
+                      <option key={g.id} value={g.id}>
+                        {g.name} {g.badge ? `(${g.badge})` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -2221,7 +2307,7 @@ export function MemberCrmModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[#c5a059] mb-1">Estado</label>
                   <select
@@ -2236,6 +2322,15 @@ export function MemberCrmModal({
                   </select>
                 </div>
                 <div>
+                  <label className="block text-[#c5a059] mb-1">Puntos XP</label>
+                  <input
+                    type="number"
+                    value={newActivityForm.pointsAwarded}
+                    onChange={e => setNewActivityForm({ ...newActivityForm, pointsAwarded: e.target.value })}
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  />
+                </div>
+                <div>
                   <label className="block text-[#c5a059] mb-1">Fecha Límite</label>
                   <input
                     type="date"
@@ -2244,6 +2339,17 @@ export function MemberCrmModal({
                     className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[#c5a059] mb-1">Instrucciones / Protocolo Específico</label>
+                <textarea
+                  rows="2"
+                  placeholder="Detalles de la tarea, condiciones de aprobación o protocolo ceremonial..."
+                  value={newActivityForm.customInstructions}
+                  onChange={e => setNewActivityForm({ ...newActivityForm, customInstructions: e.target.value })}
+                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
