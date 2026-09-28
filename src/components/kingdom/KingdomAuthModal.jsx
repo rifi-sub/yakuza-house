@@ -763,9 +763,9 @@ export function KingdomAuthModal({ isOpen, onClose, currentMember, onAuthSuccess
                                       </span>
                                     )}
                                   </div>
-                                  {task.description && (
+                                  {(task.customInstructions || task.description) && (
                                     <p className="text-[11px] text-gray-300 leading-relaxed font-sans">
-                                      {task.description}
+                                      {task.customInstructions || task.description}
                                     </p>
                                   )}
                                   {task.dueDate && (
