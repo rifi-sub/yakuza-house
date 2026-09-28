@@ -8,6 +8,8 @@ export function KingdomAuthModal({ isOpen, onClose, currentMember, onAuthSuccess
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [issuedCredentials, setIssuedCredentials] = useState(null);
+  const [copiedPassword, setCopiedPassword] = useState(false);
 
   // Form states - Solicitud de acceso
   const [reqAlias, setReqAlias] = useState('');
@@ -100,7 +102,12 @@ export function KingdomAuthModal({ isOpen, onClose, currentMember, onAuthSuccess
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al enviar la solicitud');
 
-      setSuccessMsg('Tu solicitud ha sido entregada a la Casa con reverencia. La Administración evaluará tu expediente y recibirás respuesta formal.');
+      if (data.credentials) {
+        setIssuedCredentials(data.credentials);
+        setLoginEmail(data.credentials.email);
+        setLoginPassword(data.credentials.temporaryPassword);
+      }
+      setSuccessMsg('Tu solicitud ha sido entregada a la Casa con reverencia.');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -240,7 +247,83 @@ export function KingdomAuthModal({ isOpen, onClose, currentMember, onAuthSuccess
             </div>
           )}
 
-          {successMsg && (
+          {issuedCredentials ? (
+            <div className="p-5 rounded-2xl bg-gradient-to-b from-[#1a0f16] to-[#0e080b] border border-gold-500/40 text-[#f4ebd9] space-y-4 shadow-2xl animate-in fade-in">
+              <div className="w-12 h-12 rounded-2xl bg-gold-500/10 border border-gold-500/30 flex items-center justify-center mx-auto text-gold-400">
+                <Key className="w-6 h-6 text-gold-400" />
+              </div>
+              <div className="text-center space-y-1">
+                <span className="text-[10px] font-mono tracking-[0.25em] uppercase text-gold-400 font-bold">
+                  ✦ SOLICITUD REGISTRADA & CREDENCIALES GENERADAS ✦
+                </span>
+                <h3 className="font-serif font-bold text-lg text-white">
+                  Bienvenido a la antesala de Yakuza House
+                </h3>
+                <p className="text-xs text-gray-300">
+                  Hemos creado tu expediente oficial en la Casa. Guarda estas credenciales para acceder a tu Portal del Reino:
+                </p>
+              </div>
+
+              {/* Box de Credenciales */}
+              <div className="bg-dark-950/90 border border-gold-500/30 rounded-xl p-4 font-mono text-xs space-y-2.5">
+                {issuedCredentials.memberNumber && (
+                  <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                    <span className="text-gray-400">Nº Expediente:</span>
+                    <span className="font-bold text-gold-400">{issuedCredentials.memberNumber}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                  <span className="text-gray-400">Email / Usuario:</span>
+                  <span className="font-bold text-white selection:bg-gold-500/30">{issuedCredentials.email}</span>
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-gray-400">Contraseña Temporal:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-gold-300 bg-gold-500/10 px-2.5 py-1 rounded border border-gold-500/25 text-sm tracking-wider">
+                      {issuedCredentials.temporaryPassword}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(issuedCredentials.temporaryPassword);
+                        setCopiedPassword(true);
+                        setTimeout(() => setCopiedPassword(false), 2000);
+                      }}
+                      className="p-1 px-2.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-200 text-[10px] font-bold transition-all border border-gray-700"
+                    >
+                      {copiedPassword ? '✓ Copiada' : 'Copiar'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-gray-400 text-center italic">
+                ✉️ También hemos enviado una copia de tus credenciales a <strong>{issuedCredentials.email}</strong>.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTab('login');
+                    setSuccessMsg('');
+                    setIssuedCredentials(null);
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-300 text-dark-950 font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-gold-500/20 transition-all"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Iniciar Sesión Ahora
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="py-2.5 px-4 rounded-xl bg-dark-950 border border-gray-800 hover:bg-gray-800 text-gray-300 text-xs font-mono transition-all"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          ) : successMsg && (
             <div className="p-4 rounded-xl bg-gold-500/10 border border-gold-500/30 text-gold-300 text-center space-y-2">
               <CheckCircle className="w-8 h-8 text-gold-400 mx-auto" />
               <p className="font-serif text-sm font-semibold">{successMsg}</p>

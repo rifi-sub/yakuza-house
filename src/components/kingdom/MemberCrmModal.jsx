@@ -3,7 +3,7 @@ import {
   X, Crown, Search, Bell, Edit3, Calendar, Gift, Target, Award,
   Sparkles, CheckCircle2, Clock, AlertTriangle, ChevronRight,
   TrendingUp, Trash2, Plus, Star, ShieldCheck, Heart, Zap,
-  Flame, Lock, Layers, Settings, Eye, Check, RefreshCw
+  Flame, Lock, Layers, Settings, Eye, Check, RefreshCw, Mail, User
 } from 'lucide-react';
 import { API_BASE } from '../../config';
 
@@ -46,20 +46,24 @@ export function MemberCrmModal({
     alias: '',
     internalName: '',
     memberNumber: '',
+    email: '',
+    telegram: '',
+    ageStatus: '',
+    motivation: '',
     status: 'ACTIVE',
-    overallProgress: 68,
-    experiencePoints: 680,
-    servedSince: '14 Feb 2024',
-    initialTribute: '€500',
-    currentRank: 'Aprendiz',
+    overallProgress: 0,
+    experiencePoints: 0,
+    servedSince: '',
+    initialTribute: '',
+    currentRank: 'Aspirante',
     targetRank: 'Servidor Elite',
-    quote: 'Para servirte, existo.',
-    preferences: 'Sumisión, disciplina, humillación...',
-    fetishes: 'Pies, lencería, control mental...',
-    triggers: 'Desobediencia, tono duro...',
-    limits: 'Sangre, daño permanente...',
-    aftercare: 'Validación, palabras suaves...',
-    personalGoals: 'Alcanzar nivel Elite...'
+    quote: '',
+    preferences: '',
+    fetishes: '',
+    triggers: '',
+    limits: '',
+    aftercare: '',
+    personalGoals: ''
   });
 
   // Add Skill Form
@@ -122,24 +126,34 @@ export function MemberCrmModal({
           }
         }
 
+        const effectiveEmail = data.email || data.user?.email || parsedPrefs.email || '';
+        const effectiveTelegram = data.telegram || parsedPrefs.telegram || '';
+        const effectiveAgeStatus = data.ageStatus || parsedPrefs.ageStatus || '';
+        const effectiveMotivation = data.motivation || parsedPrefs.motivation || '';
+        const effectivePreferences = parsedPrefs.preferences || (typeof data.preferences === 'string' && !data.preferences.startsWith('{') ? data.preferences : '');
+
         setProfileForm({
-          alias: data.alias || 'predevoto',
-          internalName: data.internalName || 'Reino de la Devoción',
-          memberNumber: data.memberNumber || '#017',
+          alias: data.alias || '',
+          internalName: data.internalName || data.alias || '',
+          memberNumber: data.memberNumber || '#001',
+          email: effectiveEmail,
+          telegram: effectiveTelegram,
+          ageStatus: effectiveAgeStatus,
+          motivation: effectiveMotivation,
           status: data.status || 'ACTIVE',
-          overallProgress: data.overallProgress !== undefined ? data.overallProgress : 68,
-          experiencePoints: data.experiencePoints || 680,
-          servedSince: parsedPrefs.servedSince || '14 Feb 2024',
-          initialTribute: parsedPrefs.initialTribute || '€500',
-          currentRank: parsedPrefs.currentRank || data.position?.name || 'Aprendiz',
+          overallProgress: data.overallProgress !== undefined ? data.overallProgress : 0,
+          experiencePoints: data.experiencePoints || 0,
+          servedSince: parsedPrefs.servedSince || (data.joinedAt ? new Date(data.joinedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Reciente'),
+          initialTribute: parsedPrefs.initialTribute || 'Pendiente',
+          currentRank: parsedPrefs.currentRank || data.position?.name || 'Aspirante',
           targetRank: parsedPrefs.targetRank || 'Servidor Elite',
-          quote: parsedPrefs.quote || 'Para servirte, existo.',
-          preferences: parsedPrefs.preferences || 'Sumisión, disciplina, humillación...',
-          fetishes: parsedPrefs.fetishes || 'Pies, lencería, control mental...',
-          triggers: parsedPrefs.triggers || 'Desobediencia, tono duro...',
-          limits: parsedPrefs.limits || 'Sangre, daño permanente...',
-          aftercare: parsedPrefs.aftercare || 'Validación, palabras suaves...',
-          personalGoals: parsedPrefs.personalGoals || data.personalGoals || 'Alcanzar nivel Elite...'
+          quote: parsedPrefs.quote || effectiveMotivation || 'Para servirte, existo.',
+          preferences: effectivePreferences,
+          fetishes: parsedPrefs.fetishes || '',
+          triggers: parsedPrefs.triggers || '',
+          limits: parsedPrefs.limits || '',
+          aftercare: parsedPrefs.aftercare || '',
+          personalGoals: parsedPrefs.personalGoals || data.personalGoals || effectiveMotivation || ''
         });
       }
     } catch (e) {
@@ -411,6 +425,10 @@ export function MemberCrmModal({
     e.preventDefault();
     try {
       const prefsPayload = {
+        email: profileForm.email,
+        telegram: profileForm.telegram,
+        ageStatus: profileForm.ageStatus,
+        motivation: profileForm.motivation,
         servedSince: profileForm.servedSince,
         initialTribute: profileForm.initialTribute,
         currentRank: profileForm.currentRank,
@@ -434,9 +452,13 @@ export function MemberCrmModal({
           alias: profileForm.alias,
           internalName: profileForm.internalName,
           memberNumber: profileForm.memberNumber,
+          email: profileForm.email,
+          telegram: profileForm.telegram,
+          ageStatus: profileForm.ageStatus,
+          motivation: profileForm.motivation,
           status: profileForm.status,
-          overallProgress: parseFloat(profileForm.overallProgress || 68),
-          experiencePoints: parseInt(profileForm.experiencePoints || 680, 10),
+          overallProgress: parseFloat(profileForm.overallProgress || 0),
+          experiencePoints: parseInt(profileForm.experiencePoints || 0, 10),
           personalGoals: profileForm.personalGoals,
           preferences: JSON.stringify(prefsPayload)
         })
@@ -706,15 +728,46 @@ export function MemberCrmModal({
                 <div>
                   <div className="flex items-baseline gap-2">
                     <h3 className="text-lg font-brand font-bold text-[#faf3e8]">
-                      {currentPrefs.memberNumber} / {currentPrefs.internalName}
+                      {currentPrefs.memberNumber} / {currentPrefs.internalName || currentPrefs.alias}
                     </h3>
                   </div>
-                  <p className="text-xs font-mono text-[#c5a059] mt-0.5 flex items-center gap-1">
-                    <span>👤</span> @{currentPrefs.alias}
-                  </p>
-                  <p className="text-xs font-serif italic text-[#c2b29f] mt-1">
-                    "{currentPrefs.quote}"
-                  </p>
+
+                  {/* Badges bar: Alias, Telegram, Email, AgeStatus */}
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <span className="text-xs font-mono text-[#c5a059] flex items-center gap-1">
+                      <span>👤</span> @{currentPrefs.alias}
+                    </span>
+
+                    {(member?.telegram || currentPrefs.telegram) && (
+                      <a
+                        href={`https://t.me/${(member?.telegram || currentPrefs.telegram).replace('@', '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#16222f] border border-[#2b4c6f] text-cyan-300 hover:text-white hover:bg-[#1f354d] text-[11px] font-mono transition-colors"
+                        title="Abrir chat en Telegram"
+                      >
+                        <span>✈️</span> {(member?.telegram || currentPrefs.telegram).startsWith('@') ? (member?.telegram || currentPrefs.telegram) : `@${member?.telegram || currentPrefs.telegram}`}
+                      </a>
+                    )}
+
+                    {(member?.email || member?.user?.email || currentPrefs.email) && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#1b1419] border border-[#44232f] text-[#c2b29f] text-[11px] font-mono">
+                        <Mail className="w-3 h-3 text-[#c5a059]" /> {member?.email || member?.user?.email || currentPrefs.email}
+                      </span>
+                    )}
+
+                    {(member?.ageStatus || currentPrefs.ageStatus) && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#2a1720] border border-[#522938] text-rose-300 text-[11px] font-sans font-medium">
+                        <User className="w-3 h-3 text-rose-400" /> {member?.ageStatus || currentPrefs.ageStatus}
+                      </span>
+                    )}
+                  </div>
+
+                  {(currentPrefs.quote || member?.motivation || currentPrefs.motivation) && (
+                    <p className="text-xs font-serif italic text-[#c2b29f] mt-1.5 border-l-2 border-[#5c2a38] pl-2">
+                      "{currentPrefs.quote || member?.motivation || currentPrefs.motivation}"
+                    </p>
+                  )}
                 </div>
 
                 {/* 2-Column Metadata Grid */}
@@ -843,47 +896,68 @@ export function MemberCrmModal({
           <div className="bg-[#110b0e] border border-[#3c1b24] rounded-xl p-3.5 shadow-md flex items-center justify-between gap-3 overflow-x-auto">
             <div className="flex items-center gap-2 sm:gap-3 text-xs flex-nowrap w-full">
               
-              {/* Pill 1: Preferencias */}
-              <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap">
-                <Heart className="w-3.5 h-3.5 text-crimson-400" />
-                <span className="font-mono font-bold text-[#c5a059]">Preferencias:</span>
-                <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.preferences}</span>
-              </div>
+              {/* Preferencias */}
+              {currentPrefs.preferences && (
+                <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap" title={currentPrefs.preferences}>
+                  <Heart className="w-3.5 h-3.5 text-crimson-400" />
+                  <span className="font-mono font-bold text-[#c5a059]">Preferencias:</span>
+                  <span className="text-[#dcd3c8] truncate max-w-[220px]">{currentPrefs.preferences}</span>
+                </div>
+              )}
 
-              {/* Pill 2: Fetiches */}
-              <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap">
-                <Flame className="w-3.5 h-3.5 text-amber-400" />
-                <span className="font-mono font-bold text-[#c5a059]">Fetiches:</span>
-                <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.fetishes}</span>
-              </div>
+              {/* Motivación */}
+              {(member?.motivation || currentPrefs.motivation) && (
+                <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap" title={member?.motivation || currentPrefs.motivation}>
+                  <Target className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="font-mono font-bold text-[#c5a059]">Motivación:</span>
+                  <span className="text-[#dcd3c8] truncate max-w-[220px]">{member?.motivation || currentPrefs.motivation}</span>
+                </div>
+              )}
 
-              {/* Pill 3: Triggers */}
-              <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap">
-                <Zap className="w-3.5 h-3.5 text-yellow-400" />
-                <span className="font-mono font-bold text-[#c5a059]">Triggers:</span>
-                <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.triggers}</span>
-              </div>
+              {/* Fetiches */}
+              {currentPrefs.fetishes && (
+                <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap" title={currentPrefs.fetishes}>
+                  <Flame className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="font-mono font-bold text-[#c5a059]">Fetiches:</span>
+                  <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.fetishes}</span>
+                </div>
+              )}
 
-              {/* Pill 4: Límites */}
-              <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap">
-                <Lock className="w-3.5 h-3.5 text-rose-400" />
-                <span className="font-mono font-bold text-[#c5a059]">Límites:</span>
-                <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.limits}</span>
-              </div>
+              {/* Triggers */}
+              {currentPrefs.triggers && (
+                <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap" title={currentPrefs.triggers}>
+                  <Zap className="w-3.5 h-3.5 text-yellow-400" />
+                  <span className="font-mono font-bold text-[#c5a059]">Triggers:</span>
+                  <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.triggers}</span>
+                </div>
+              )}
 
-              {/* Pill 5: Aftercare */}
-              <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap">
-                <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
-                <span className="font-mono font-bold text-[#c5a059]">Aftercare:</span>
-                <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.aftercare}</span>
-              </div>
+              {/* Límites */}
+              {currentPrefs.limits && (
+                <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap" title={currentPrefs.limits}>
+                  <Lock className="w-3.5 h-3.5 text-rose-400" />
+                  <span className="font-mono font-bold text-[#c5a059]">Límites:</span>
+                  <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.limits}</span>
+                </div>
+              )}
 
-              {/* Pill 6: Objetivos personales */}
-              <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap">
-                <Target className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="font-mono font-bold text-[#c5a059]">Objetivos personales:</span>
-                <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.personalGoals}</span>
-              </div>
+              {/* Aftercare */}
+              {currentPrefs.aftercare && (
+                <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap" title={currentPrefs.aftercare}>
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
+                  <span className="font-mono font-bold text-[#c5a059]">Aftercare:</span>
+                  <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.aftercare}</span>
+                </div>
+              )}
+
+              {/* Objetivos personales */}
+              {currentPrefs.personalGoals && (
+                <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap" title={currentPrefs.personalGoals}>
+                  <Target className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="font-mono font-bold text-[#c5a059]">Objetivos personales:</span>
+                  <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.personalGoals}</span>
+                </div>
+              )}
             </div>
 
             <button 
@@ -1821,6 +1895,52 @@ export function MemberCrmModal({
                     type="text"
                     value={profileForm.internalName}
                     onChange={e => setProfileForm({ ...profileForm, internalName: e.target.value })}
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[#c5a059] mb-1">Email de contacto</label>
+                  <input
+                    type="email"
+                    value={profileForm.email || ''}
+                    onChange={e => setProfileForm({ ...profileForm, email: e.target.value })}
+                    placeholder="devoto@email.com"
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#c5a059] mb-1">Usuario Telegram (@usuario)</label>
+                  <input
+                    type="text"
+                    value={profileForm.telegram || ''}
+                    onChange={e => setProfileForm({ ...profileForm, telegram: e.target.value })}
+                    placeholder="@usuario"
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[#c5a059] mb-1">Edad / Ocupación / Perfil</label>
+                  <input
+                    type="text"
+                    value={profileForm.ageStatus || ''}
+                    onChange={e => setProfileForm({ ...profileForm, ageStatus: e.target.value })}
+                    placeholder="24 años, Diseñador"
+                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#c5a059] mb-1">Motivación personal</label>
+                  <input
+                    type="text"
+                    value={profileForm.motivation || ''}
+                    onChange={e => setProfileForm({ ...profileForm, motivation: e.target.value })}
+                    placeholder="Motivo de ingreso..."
                     className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
                   />
                 </div>

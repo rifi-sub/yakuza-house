@@ -262,6 +262,16 @@ export function KingdomCrmView({ token }) {
                     <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-gray-400 font-mono">
                       <span className="text-gold-400 font-semibold">{m.group?.name || 'Sin Grupo'}</span>
                       {m.position && <span>· {m.position.name}</span>}
+                      {m.telegram && (
+                        <span className="text-[11px] text-cyan-300">
+                          ✈️ {m.telegram}
+                        </span>
+                      )}
+                      {m.email && (
+                        <span className="text-[11px] text-gray-400">
+                          ✉️ {m.email}
+                        </span>
+                      )}
                       {activeSub && (
                         <span className="text-[10px] bg-dark-950 px-1.5 py-0.5 rounded border border-gray-800 text-gray-300">
                           Suscripción: {activeSub.status} ({activeSub.activationMethod})
