@@ -3,6 +3,8 @@ import {
   ShieldAlert, Crown, Lock, CheckCircle2, XCircle, Send, Sparkles, 
   MessageCircle, AlertTriangle, RefreshCw, Shield, ArrowRight 
 } from 'lucide-react';
+import { resolveMediaUrl } from '../config';
+import princessVisionBanner from '../assets/princess-vision-banner.png';
 
 export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, onOpenKingdomRequest }) {
   const [activeTab, setActiveTab] = useState('normas'); // normas, presentate, reino
@@ -14,6 +16,13 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
   const titleTop = config.titleTop || 'YAKUZA';
   const titleAccent = config.titleAccent || 'PRINCESS';
   const headerQuote = config.headerQuote || '“La sensación es la de entrar en un club privado extremadamente exclusivo. El acceso a mi energía no se compra: se conquista, se honra y se tributa con absoluta devoción.”';
+
+  const visionTitle = config.visionTitle || 'Mi Visión en la Relación D/s';
+  const visionText1 = config.visionText1 || 'Quiero a alguien que pueda ser desarmado completamente, reconstruido por mis manos a mi imagen y para mi placer. Tu vida dejará de ser tuya; existirás solo para orbitarme. Tu único límite será no fallarme. El miedo inicial es natural, pero conmigo se convierte en adicción. Sé lo que deseas, y lo voy a tomar todo. Cada resistencia es solo un paso más hacia tu total entrega. No acepto a sumisos brat o sigma, no me apetece estar peleando constantemente por hacer algo que ambos queremos.';
+  const visionPoint1 = config.visionPoint1 || 'Tu propósito es claro: servirme, enriquecerme y ser moldeado para satisfacerme.';
+  const visionPoint2 = config.visionPoint2 || 'Olvídate de lo demás, solo importo yo. Tu vida será reconfigurada para contribuir en mi visión del BDSM.';
+  const visionQuote = config.visionQuote || 'Quienes han sido lo suficientemente valientes como para entregarse lo saben: el miedo se pasa, pero la adicción a mí es para siempre.';
+  const visionBanner = config.visionBannerUrl ? resolveMediaUrl(config.visionBannerUrl) : princessVisionBanner;
 
   const requirementsTitle = config.requirementsTitle || 'Requisitos para Servirme';
   const requirementsList = config.requirementsList || [
@@ -89,11 +98,11 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
     {
       id: 'elegidos',
       badge: 'NIVEL MÁXIMO',
-      title: 'LOS ELEGIDOS',
+      title: 'ESCLAVOS',
       subtitle: 'Pertenencia Absoluta (D/s)',
-      frontText: 'Pertenece en mente, cuerpo y espíritu a la Princesa de manera presencial y online.',
+      frontText: 'Has demostrado que mereces un lugar estable a mis pies.\nYa no estás intentando entrar: formas parte de mi vida, mi Reino y mi estructura.\nTu función es mantener y superar todo aquello que te hizo merecerme.',
       backTitle: 'Propiedad de la Diosa',
-      backText: 'Tu cuerpo, tu voluntad, tu mente y tu alma son míos. Soy tu propósito, tu guía y Dueña de todo tu ser. Citas presenciales exclusivas y tributo de vida.'
+      backText: `DEBERES\n- Mantener y mejorar todo lo aprendido.\n- Cumplir las funciones de tu puesto.\n- Cuidar la confianza conseguida.\n- Mantener atención, iniciativa y disciplina.\n- Facilitar mi vida y contribuir activamente a mi bienestar.\n- Seguir mereciendo los privilegios obtenidos.\n\nPRIVILEGIOS\n- Reconocimiento oficial dentro del Reino.\n- Nombre y puesto propios.\n- Acceso directo a mí sin reservar audiencia.\n- Máximo nivel de confianza y personalización.\n- Prioridad en dinámicas, sesiones y encuentros.\n- Participación cercana en mi vida y proyectos.\n- El privilegio de haber sido elegido para pertenecerme.`
     }
   ];
 
@@ -122,31 +131,38 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
       };
     }
 
-    const hasDuties = /deberes|obligaciones|compromisos/i.test(rawBack);
-    const hasPrivileges = /privilegios|beneficios|recompensas/i.test(rawBack);
+    const lines = rawBack.split('\n').map(l => l.trim()).filter(Boolean);
+    let currentSection = null;
+    const duties = [];
+    const privileges = [];
+    const otherLines = [];
 
-    if (hasDuties || hasPrivileges) {
-      let dutiesPart = '';
-      let privPart = '';
+    for (const line of lines) {
+      const isDutiesHeader = /^(?:#+\s*)?(?:deberes|obligaciones|compromisos)(?:\s*[:]?\s*)$/i.test(line);
+      const isPrivilegesHeader = /^(?:#+\s*)?(?:privilegios|beneficios|recompensas)(?:\s*[:]?\s*)$/i.test(line);
 
-      if (hasDuties && hasPrivileges) {
-        const parts = rawBack.split(/privilegios|beneficios|recompensas/i);
-        dutiesPart = parts[0] ? parts[0].replace(/deberes|obligaciones|compromisos/i, '').trim() : '';
-        privPart = parts[1] ? parts[1].trim() : '';
-      } else if (hasDuties) {
-        dutiesPart = rawBack.replace(/deberes|obligaciones|compromisos/i, '').trim();
-      } else {
-        privPart = rawBack.replace(/privilegios|beneficios|recompensas/i, '').trim();
+      if (isDutiesHeader) {
+        currentSection = 'duties';
+        continue;
+      }
+      if (isPrivilegesHeader) {
+        currentSection = 'privileges';
+        continue;
       }
 
-      const cleanList = (txt) => txt
-        .split('\n')
-        .map(l => l.replace(/^[-•*–—]\s*/, '').replace(/^\d+[\.\)]\s*/, '').trim())
-        .filter(l => l.length > 0 && !/^(deberes|privilegios|obligaciones|beneficios|compromisos|recompensas)/i.test(l));
+      const clean = line.replace(/^[-•*–—]\s*/, '').replace(/^\d+[\.\)]\s*/, '').trim();
+      if (!clean) continue;
 
-      const duties = cleanList(dutiesPart);
-      const privileges = cleanList(privPart);
+      if (currentSection === 'duties') {
+        duties.push(clean);
+      } else if (currentSection === 'privileges') {
+        privileges.push(clean);
+      } else {
+        otherLines.push(clean);
+      }
+    }
 
+    if (duties.length > 0 || privileges.length > 0) {
       return {
         mode: 'sections',
         duties: duties.length > 0 ? duties : (def.duties || []),
@@ -154,16 +170,10 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
       };
     }
 
-    const lines = rawBack
-      .split('\n')
-      .map(l => l.trim())
-      .filter(Boolean);
-
-    if (lines.length >= 2) {
-      const items = lines.map(l => l.replace(/^[-•*–—]\s*/, '').replace(/^\d+[\.\)]\s*/, '').trim());
+    if (otherLines.length >= 2) {
       return {
         mode: 'bullets',
-        items
+        items: otherLines
       };
     }
 
@@ -234,16 +244,23 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
         badge: 'NIVEL MÁXIMO',
         title: 'ESCLAVOS',
         subtitle: 'Pertenencia Absoluta (D/s)',
-        summary: 'Cúspide del Reino. Pertenencia plena e íntima dentro de la vida, acuerdos y proyectos de la Princesa.',
+        summary: 'Has demostrado que mereces un lugar estable a mis pies. Ya no estás intentando entrar: formas parte de mi vida, mi Reino y mi estructura. Tu función es mantener y superar todo aquello que te hizo merecerme.',
         duties: [
-          'Lealtad absoluta, devoción y excelencia.',
-          'Cuidar la máxima confianza depositada.',
-          'Priorizar siempre el bienestar de la Princesa.'
+          'Mantener y mejorar todo lo aprendido.',
+          'Cumplir las funciones de tu puesto.',
+          'Cuidar la confianza conseguida.',
+          'Mantener atención, iniciativa y disciplina.',
+          'Facilitar mi vida y contribuir activamente a mi bienestar.',
+          'Seguir mereciendo los privilegios obtenidos.'
         ],
         privileges: [
-          'Nombre ceremonial, puesto y reconocimiento oficial.',
-          'Acceso directo sin necesidad de reservar audiencia.',
-          'Prioridad absoluta en dinámicas, citas y vida personal.'
+          'Reconocimiento oficial dentro del Reino.',
+          'Nombre y puesto propios.',
+          'Acceso directo a mí sin reservar audiencia.',
+          'Máximo nivel de confianza y personalización.',
+          'Prioridad en dinámicas, sesiones y encuentros.',
+          'Participación cercana en mi vida y proyectos.',
+          'El privilegio de haber sido elegido para pertenecerme.'
         ],
         ctaText: 'Aplicar a esta posición'
       }
@@ -324,44 +341,102 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
 
       {/* TAB 1: MIS NORMAS D/S */}
       {activeTab === 'normas' && (
-        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+        <div className="max-w-5xl mx-auto space-y-8">
           
-          {/* Requisitos */}
-          <div className="legibility-bordeaux p-8 rounded-2xl border border-gold-500/40 space-y-4 shadow-2xl">
-            <div className="flex items-center gap-3 border-b border-gold-500/30 pb-3">
-              <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-              <h3 className="font-sans font-bold text-xl text-ivory-100">{requirementsTitle}</h3>
+          {/* BANNER VISUAL DE LA PRINCESA YAKUZA */}
+          <div className="relative w-full rounded-2xl overflow-hidden border border-gold-500/40 shadow-2xl group">
+            <div className="aspect-[16/9] sm:aspect-[21/9] w-full max-h-[460px] overflow-hidden relative">
+              <img 
+                src={visionBanner} 
+                alt="La Princesa Yakuza" 
+                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 filter brightness-95 contrast-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-r from-dark-950/70 via-transparent to-dark-950/70" />
+              <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 flex items-center gap-2 px-3.5 py-1.5 rounded-full legibility-shield border border-gold-500/40 text-gold-300 text-xs font-sans tracking-widest uppercase">
+                <Crown className="w-3.5 h-3.5 text-gold-400" />
+                <span>La Princesa Yakuza · Autoridad & Dominio</span>
+              </div>
             </div>
-            
-            <ul className="space-y-3 text-xs text-ivory-300 font-body leading-relaxed">
-              {requirementsList.map((item, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span className="text-gold-400">✦</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
           </div>
 
-          {/* Lo que NO respondo */}
-          <div className="legibility-shield p-8 rounded-2xl border border-bordeaux-500/50 space-y-4 shadow-2xl">
-            <div className="flex items-center gap-3 border-b border-bordeaux-500/30 pb-3">
-              <XCircle className="w-6 h-6 text-bordeaux-400" />
-              <h3 className="font-sans font-bold text-xl text-ivory-100">{noResponseTitle}</h3>
+          {/* BLOQUE: MI VISIÓN EN LA RELACIÓN D/S (ENCIMA DE LOS DOS BLOQUES) */}
+          <div className="legibility-bordeaux p-6 sm:p-8 rounded-2xl border border-gold-500/40 space-y-5 shadow-2xl relative overflow-hidden">
+            <div className="flex items-center gap-3 border-b border-gold-500/30 pb-3">
+              <Sparkles className="w-6 h-6 text-gold-400 shrink-0" />
+              <h2 className="font-sans font-bold text-2xl sm:text-3xl text-ivory-100 tracking-wide">
+                {visionTitle}
+              </h2>
             </div>
 
-            <ul className="space-y-3 text-xs text-ivory-400 font-body leading-relaxed">
-              {noResponseList.map((item, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span className="text-bordeaux-400">✖</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
+            <p className="text-xs sm:text-sm text-ivory-200 font-body leading-relaxed">
+              {visionText1}
+            </p>
 
-            <div className="pt-2 border-t border-bordeaux-500/20 text-[11px] text-gold-300 font-sans italic">
-              {unblockNote}
+            <div className="space-y-3 pt-1">
+              <div className="p-3.5 rounded-xl bg-dark-950/80 border border-gold-500/30 flex items-start gap-3">
+                <span className="text-base leading-none mt-0.5">🔹</span>
+                <p className="text-xs sm:text-sm font-sans text-gold-200 font-semibold leading-relaxed">
+                  {visionPoint1}
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-dark-950/80 border border-gold-500/30 flex items-start gap-3">
+                <span className="text-base leading-none mt-0.5">🔹</span>
+                <p className="text-xs sm:text-sm font-sans text-gold-200 font-semibold leading-relaxed">
+                  {visionPoint2}
+                </p>
+              </div>
             </div>
+
+            <div className="p-4 rounded-xl bg-gradient-to-r from-bordeaux-950/90 via-dark-950 to-bordeaux-950/90 border border-gold-500/30 text-center">
+              <p className="text-xs sm:text-sm text-gold-300 font-sans italic font-medium leading-relaxed">
+                “{visionQuote}”
+              </p>
+            </div>
+          </div>
+
+          {/* DOS BLOQUES EXISTENTES: REQUISITOS Y NO RESPONDO */}
+          <div className="grid md:grid-cols-2 gap-8">
+            
+            {/* Requisitos */}
+            <div className="legibility-bordeaux p-8 rounded-2xl border border-gold-500/40 space-y-4 shadow-2xl">
+              <div className="flex items-center gap-3 border-b border-gold-500/30 pb-3">
+                <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                <h3 className="font-sans font-bold text-xl text-ivory-100">{requirementsTitle}</h3>
+              </div>
+              
+              <ul className="space-y-3 text-xs text-ivory-300 font-body leading-relaxed">
+                {requirementsList.map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-gold-400">✦</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Lo que NO respondo */}
+            <div className="legibility-shield p-8 rounded-2xl border border-bordeaux-500/50 space-y-4 shadow-2xl">
+              <div className="flex items-center gap-3 border-b border-bordeaux-500/30 pb-3">
+                <XCircle className="w-6 h-6 text-bordeaux-400" />
+                <h3 className="font-sans font-bold text-xl text-ivory-100">{noResponseTitle}</h3>
+              </div>
+
+              <ul className="space-y-3 text-xs text-ivory-400 font-body leading-relaxed">
+                {noResponseList.map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-bordeaux-400">✖</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="pt-2 border-t border-bordeaux-500/20 text-[11px] text-gold-300 font-sans italic">
+                {unblockNote}
+              </div>
+            </div>
+
           </div>
 
         </div>
@@ -425,7 +500,7 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
                   {/* Tarjeta Giratoria 3D */}
                   <div
                     onClick={() => toggleCardFlip(tier.id)}
-                    className="cursor-pointer h-[480px] perspective-1000 group relative w-full select-none"
+                    className="cursor-pointer h-[520px] perspective-1000 group relative w-full select-none"
                     title="Haz clic para girar la tarjeta"
                   >
                     <div
@@ -434,7 +509,7 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
                       }`}
                     >
                       {/* Cara Frontal: Nombre, lema y resumen breve */}
-                      <div className={`absolute inset-0 w-full h-full backface-hidden legibility-shield p-6 rounded-2xl border border-gold-500/40 flex flex-col justify-between bg-gradient-to-b ${tier.gradient} shadow-2xl hover:border-gold-400 transition-colors`}>
+                      <div className={`absolute inset-0 w-full h-full backface-hidden legibility-shield bg-dark-950 p-6 rounded-2xl border border-gold-500/40 flex flex-col justify-between bg-gradient-to-b ${tier.gradient} shadow-2xl hover:border-gold-400 transition-all duration-300 ${isFlipped ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                         <div className="space-y-3.5">
                           <div className="flex items-center justify-between border-b border-gold-500/30 pb-2">
                             <span className="text-[10px] font-sans text-gold-400 font-bold uppercase tracking-widest">
@@ -475,8 +550,8 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
                       </div>
 
                       {/* Cara Posterior: Deberes y privilegios principales */}
-                      <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 legibility-bordeaux p-6 rounded-2xl border border-gold-400 flex flex-col justify-between shadow-2xl">
-                        <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+                      <div className={`absolute inset-0 w-full h-full backface-hidden rotate-y-180 bg-[#160609] legibility-bordeaux p-6 rounded-2xl border border-gold-400 flex flex-col justify-between shadow-2xl transition-all duration-300 ${isFlipped ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                        <div className="space-y-2.5 overflow-y-auto pr-1.5 flex-1 custom-scrollbar max-h-[420px]">
                           <div className="flex items-center justify-between border-b border-gold-500/30 pb-2">
                             <span className="text-[10px] font-sans text-gold-300 font-bold uppercase tracking-widest truncate max-w-[55%]">
                               ✦ {tier.title}

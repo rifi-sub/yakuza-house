@@ -58,6 +58,12 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
     titleTop: "YAKUZA",
     titleAccent: "PRINCESS",
     headerQuote: "“La sensación es la de entrar en un club privado extremadamente exclusivo. El acceso a mi energía no se compra: se conquista, se honra y se tributa con absoluta devoción.”",
+    visionBannerUrl: "/princess-vision-banner.png",
+    visionTitle: "Mi Visión en la Relación D/s",
+    visionText1: "Quiero a alguien que pueda ser desarmado completamente, reconstruido por mis manos a mi imagen y para mi placer. Tu vida dejará de ser tuya; existirás solo para orbitarme. Tu único límite será no fallarme. El miedo inicial es natural, pero conmigo se convierte en adicción. Sé lo que deseas, y lo voy a tomar todo. Cada resistencia es solo un paso más hacia tu total entrega. No acepto a sumisos brat o sigma, no me apetece estar peleando constantemente por hacer algo que ambos queremos.",
+    visionPoint1: "Tu propósito es claro: servirme, enriquecerme y ser moldeado para satisfacerme.",
+    visionPoint2: "Olvídate de lo demás, solo importo yo. Tu vida será reconfigurada para contribuir en mi visión del BDSM.",
+    visionQuote: "Quienes han sido lo suficientemente valientes como para entregarse lo saben: el miedo se pasa, pero la adicción a mí es para siempre.",
     requirementsTitle: "Requisitos para Servirme",
     requirementsList: [
       "Debes ser mayor de edad, tener trabajo estable y mentalidad de crecimiento.",
@@ -2014,11 +2020,93 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
             </div>
           </div>
 
-          {/* SECCIÓN 2: REQUISITOS PARA SERVIRME */}
+          {/* SECCIÓN NUEVA: BANNER VISUAL & MI VISIÓN EN LA RELACIÓN D/S */}
+          <div className="glass-panel p-6 rounded-xl border border-gray-800 space-y-4">
+            <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> 2. Banner Visual & Mi Visión en la Relación D/s
+            </h4>
+            <p className="text-xs text-gray-400">
+              Aparece en la pestaña "Mis Normas D/s" como el gran banner cinematográfico y el manifiesto superior sobre los dos bloques.
+            </p>
+
+            <div>
+              <label className="block text-xs font-mono text-gray-300 mb-1">URL o Ruta de la Imagen de Banner</label>
+              <input
+                type="text"
+                value={princessForm.visionBannerUrl || ''}
+                onChange={e => setPrincessForm({ ...princessForm, visionBannerUrl: e.target.value })}
+                placeholder="/princess-vision-banner.png"
+                className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white font-mono"
+              />
+              {princessForm.visionBannerUrl && (
+                <div className="mt-2 rounded-lg overflow-hidden border border-gold-500/30 max-h-48 max-w-md">
+                  <img 
+                    src={resolveMediaUrl(princessForm.visionBannerUrl)} 
+                    alt="Preview Banner" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono text-gray-300 mb-1">Título de la Visión</label>
+              <input
+                type="text"
+                value={princessForm.visionTitle || ''}
+                onChange={e => setPrincessForm({ ...princessForm, visionTitle: e.target.value })}
+                placeholder="Mi Visión en la Relación D/s"
+                className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white font-bold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono text-gray-300 mb-1">Texto del Manifiesto / Visión</label>
+              <textarea
+                rows="4"
+                value={princessForm.visionText1 || ''}
+                onChange={e => setPrincessForm({ ...princessForm, visionText1: e.target.value })}
+                className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-ivory-200 font-body leading-relaxed"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-mono text-gray-300 mb-1">Punto Destacado 1 (🔹)</label>
+                <textarea
+                  rows="2"
+                  value={princessForm.visionPoint1 || ''}
+                  onChange={e => setPrincessForm({ ...princessForm, visionPoint1: e.target.value })}
+                  className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gold-300"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-mono text-gray-300 mb-1">Punto Destacado 2 (🔹)</label>
+                <textarea
+                  rows="2"
+                  value={princessForm.visionPoint2 || ''}
+                  onChange={e => setPrincessForm({ ...princessForm, visionPoint2: e.target.value })}
+                  className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gold-300"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono text-gray-300 mb-1">Cita de Cierre / Sentencia Final</label>
+              <input
+                type="text"
+                value={princessForm.visionQuote || ''}
+                onChange={e => setPrincessForm({ ...princessForm, visionQuote: e.target.value })}
+                className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gold-300 italic font-serif"
+              />
+            </div>
+          </div>
+
+          {/* SECCIÓN 3: REQUISITOS PARA SERVIRME */}
           <div className="glass-panel p-6 rounded-xl border border-gray-800 space-y-4">
             <div className="flex justify-between items-center">
               <h4 className="font-sans font-bold text-sm text-gold-400 uppercase tracking-widest flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" /> 2. Requisitos para Servirme
+                <CheckCircle className="w-4 h-4" /> 3. Requisitos para Servirme
               </h4>
               <button
                 type="button"
