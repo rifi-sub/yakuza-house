@@ -6,7 +6,14 @@ import {
 } from 'lucide-react';
 import { API_BASE, safeFetchJson } from '../../config';
 
-export function KingdomAuthModal({ isOpen, onClose, currentMember, onAuthSuccess, onLogout }) {
+export function KingdomAuthModal({ 
+  isOpen, 
+  onClose, 
+  currentMember, 
+  onAuthSuccess, 
+  onLogout,
+  initialTargetGroupId
+}) {
   const [tab, setTab] = useState('request'); // 'request', 'login', 'profile'
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -32,14 +39,30 @@ export function KingdomAuthModal({ isOpen, onClose, currentMember, onAuthSuccess
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  // Abrir en 'profile' si ya está autenticado
+  // Abrir en 'request' si se especifica initialTargetGroupId, o en 'profile' si ya está autenticado
   useEffect(() => {
-    if (currentMember) {
+    if (initialTargetGroupId) {
+      setTab('request');
+    } else if (currentMember) {
       setTab('profile');
     } else {
       setTab('request');
     }
-  }, [currentMember]);
+  }, [currentMember, initialTargetGroupId, isOpen]);
+
+  // Preseleccionar estamento solicitado cuando los grupos estén listos
+  useEffect(() => {
+    if (initialTargetGroupId && groups.length > 0) {
+      const match = groups.find(g => 
+        g.id === initialTargetGroupId || 
+        g.slug === initialTargetGroupId || 
+        (g.name && g.name.toLowerCase() === initialTargetGroupId.toLowerCase())
+      );
+      if (match) {
+        setReqTargetGroupId(match.id);
+      }
+    }
+  }, [initialTargetGroupId, groups]);
 
   // Refrescar expediente del miembro desde el servidor
   const fetchMe = async () => {

@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { ShieldAlert, Crown, Lock, CheckCircle2, XCircle, Send, Sparkles, MessageCircle, AlertTriangle } from 'lucide-react';
+import { 
+  ShieldAlert, Crown, Lock, CheckCircle2, XCircle, Send, Sparkles, 
+  MessageCircle, AlertTriangle, RefreshCw, Shield, ArrowRight 
+} from 'lucide-react';
 
-export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore }) {
+export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, onOpenKingdomRequest }) {
   const [activeTab, setActiveTab] = useState('normas'); // normas, presentate, reino
   const [flippedCards, setFlippedCards] = useState({});
 
@@ -106,6 +109,124 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore }
       ...prev,
       [cardId]: !prev[cardId]
     }));
+  };
+
+  const getTierDisplay = (tier) => {
+    const defaults = {
+      plebeyos: {
+        id: 'plebeyos',
+        badge: 'NIVEL 1',
+        title: 'PLEBEYOS',
+        subtitle: 'Sumisión Inicial & Utilidad',
+        summary: 'Espacio de entrada para demostrar respeto, disponibilidad y utilidad práctica sin aportación económica obligatoria.',
+        duties: [
+          'Cumplir órdenes y tareas en el canal oficial.',
+          'Mantener respeto estricto al protocolo y tiempos.',
+          'Aportar habilidades técnicas, promoción o logística.'
+        ],
+        privileges: [
+          'Servir a la Princesa de forma gratuita.',
+          'Tareas adaptadas a tus conocimientos.',
+          'Oportunidad de ascenso por méritos y constancia.'
+        ],
+        ctaText: 'Solicitar entrada al Reino'
+      },
+      sirvientes: {
+        id: 'sirvientes',
+        badge: 'NIVEL 2',
+        title: 'SIRVIENTES',
+        subtitle: 'Trato Directo & Contratos',
+        summary: 'Servicio con peso real. Combina constancia, tareas prioritarias y gestos puntuales para facilitar la vida de la Princesa.',
+        duties: [
+          'Mantener lealtad y continuidad demostrada.',
+          'Tributos o soporte en compras de wishlist.',
+          'Iniciativa, discreción y respuesta prioritaria.'
+        ],
+        privileges: [
+          'Trato y comunicación directa con la Princesa.',
+          'Acceso al Club 1k y contratos de servidumbre.',
+          'Opción preferente de evaluación para Caballero.'
+        ],
+        ctaText: 'Aplicar a esta posición'
+      },
+      caballeros: {
+        id: 'caballeros',
+        badge: 'NIVEL 3',
+        title: 'CABALLEROS',
+        subtitle: 'Aspirantes a Propiedad',
+        summary: 'Entrenamiento riguroso para sumisos con la disciplina, compatibilidad y entrega requeridas para pertenecer a la Princesa.',
+        duties: [
+          'Seguir entrenamiento personalizado y rituales.',
+          'Disponibilidad alta y aceptación de corrección.',
+          'Aportación regular y soporte logístico/financiero.'
+        ],
+        privileges: [
+          'Seguimiento cercano y dinámicas D/s continuadas.',
+          'Acceso a experiencias presenciales (cashmeets / entregas).',
+          'Candidatura formal a consagración como sumiso en propiedad.'
+        ],
+        ctaText: 'Aplicar a esta posición'
+      },
+      elegidos: {
+        id: 'elegidos',
+        badge: 'NIVEL MÁXIMO',
+        title: 'ESCLAVOS',
+        subtitle: 'Pertenencia Absoluta (D/s)',
+        summary: 'Cúspide del Reino. Pertenencia plena e íntima dentro de la vida, acuerdos y proyectos de la Princesa.',
+        duties: [
+          'Lealtad absoluta, devoción y excelencia.',
+          'Cuidar la máxima confianza depositada.',
+          'Priorizar siempre el bienestar de la Princesa.'
+        ],
+        privileges: [
+          'Nombre ceremonial, puesto y reconocimiento oficial.',
+          'Acceso directo sin necesidad de reservar audiencia.',
+          'Prioridad absoluta en dinámicas, citas y vida personal.'
+        ],
+        ctaText: 'Aplicar a esta posición'
+      }
+    };
+
+    const def = defaults[tier.id] || defaults.plebeyos;
+
+    let duties = def.duties;
+    let privileges = def.privileges;
+
+    if (tier.backText && (tier.backText.includes('DEBERES') || tier.backText.includes('PRIVILEGIOS'))) {
+      const parts = tier.backText.split(/PRIVILEGIOS/i);
+      const dutiesPart = parts[0] ? parts[0].replace(/DEBERES/i, '').trim() : '';
+      const privPart = parts[1] ? parts[1].trim() : '';
+
+      const cleanLines = (txt) => txt.split('\n')
+        .map(l => l.replace(/^[-•*]\s*/, '').trim())
+        .filter(l => l.length > 0 && !l.toLowerCase().startsWith('deberes') && !l.toLowerCase().startsWith('privilegios'));
+
+      const dParsed = cleanLines(dutiesPart);
+      const pParsed = cleanLines(privPart);
+
+      if (dParsed.length > 0) duties = dParsed.slice(0, 3);
+      if (pParsed.length > 0) privileges = pParsed.slice(0, 3);
+    } else if (tier.backText && tier.backText.trim()) {
+      const lines = tier.backText.split('\n').map(l => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+      if (lines.length >= 2) {
+        duties = lines.slice(0, Math.ceil(lines.length / 2)).slice(0, 3);
+        privileges = lines.slice(Math.ceil(lines.length / 2)).slice(0, 3);
+      }
+    }
+
+    return {
+      id: tier.id,
+      badge: tier.badge || def.badge,
+      title: tier.title || def.title,
+      subtitle: tier.subtitle || def.subtitle,
+      summary: (tier.frontText && tier.frontText.trim()) 
+        ? tier.frontText.split('\n').filter(Boolean).slice(0, 3).join(' ') 
+        : def.summary,
+      duties,
+      privileges,
+      ctaText: tier.id === 'plebeyos' ? 'Solicitar entrada al Reino' : 'Aplicar a esta posición',
+      gradient: tier.gradient || defaultGradients[tier.id] || 'from-dark-950 via-bordeaux-800 to-dark-950'
+    };
   };
 
   return (
@@ -253,53 +374,143 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore }
           <div className="text-center max-w-2xl mx-auto space-y-2">
             <span className="text-xs font-sans text-gold-400 uppercase tracking-widest block">{kingdomHeaderBadge}</span>
             <h3 className="font-sans font-bold text-2xl text-ivory-100">{kingdomHeaderTitle}</h3>
+            <p className="text-xs text-ivory-300 font-sans">
+              Haz clic sobre cualquier tarjeta para girarla y consultar sus deberes y privilegios principales.
+            </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {kingdomTiers.map(tier => {
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+            {kingdomTiers.map(rawTier => {
+              const tier = getTierDisplay(rawTier);
               const isFlipped = flippedCards[tier.id];
               return (
-                <div
-                  key={tier.id}
-                  onClick={() => toggleCardFlip(tier.id)}
-                  className="cursor-pointer h-96 perspective-1000 group"
-                >
+                <div key={tier.id} className="flex flex-col space-y-3">
+                  
+                  {/* Tarjeta Giratoria 3D */}
                   <div
-                    className={`relative w-full h-full duration-700 transition-all transform-style-3d ${
-                      isFlipped ? 'rotate-y-180' : ''
-                    }`}
+                    onClick={() => toggleCardFlip(tier.id)}
+                    className="cursor-pointer h-[460px] perspective-1000 group relative w-full select-none"
+                    title="Haz clic para girar la tarjeta"
                   >
-                    {/* Front Face */}
-                    <div className={`absolute inset-0 w-full h-full backface-hidden legibility-shield p-6 rounded-2xl border border-gold-500/40 flex flex-col justify-between bg-gradient-to-b ${tier.gradient} shadow-2xl`}>
-                      <div>
-                        <span className="text-[10px] font-sans text-gold-400 font-bold uppercase tracking-widest block mb-2 border-b border-gold-500/30 pb-1">
-                          ✦ {tier.badge}
-                        </span>
-                        <h4 className="font-sans font-black text-2xl text-ivory-100 mb-2">{tier.title}</h4>
-                        <p className="text-xs text-gold-300 font-sans font-semibold mb-4">{tier.subtitle}</p>
-                        <p className="text-xs text-ivory-300 font-body leading-relaxed">{tier.frontText}</p>
+                    <div
+                      className={`relative w-full h-full duration-700 transition-transform transform-style-3d ${
+                        isFlipped ? 'rotate-y-180' : ''
+                      }`}
+                    >
+                      {/* Cara Frontal: Nombre, lema y resumen breve */}
+                      <div className={`absolute inset-0 w-full h-full backface-hidden legibility-shield p-6 rounded-2xl border border-gold-500/40 flex flex-col justify-between bg-gradient-to-b ${tier.gradient} shadow-2xl hover:border-gold-400 transition-colors`}>
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between border-b border-gold-500/30 pb-2">
+                            <span className="text-[10px] font-sans text-gold-400 font-bold uppercase tracking-widest">
+                              ✦ {tier.badge}
+                            </span>
+                            <span className="text-[9px] font-mono text-gold-500/70 uppercase">
+                              Estamento
+                            </span>
+                          </div>
+
+                          <div>
+                            <h4 className="font-brand font-black text-2xl text-ivory-100 tracking-wide mb-1">
+                              {tier.title}
+                            </h4>
+                            <p className="text-xs text-gold-300 font-sans font-semibold tracking-wide italic">
+                              “{tier.subtitle}”
+                            </p>
+                          </div>
+
+                          <div className="pt-2 border-t border-gold-500/20">
+                            <span className="text-[10px] font-mono uppercase text-gray-400 block mb-1.5 tracking-wider">
+                              Representa
+                            </span>
+                            <p className="text-xs text-ivory-200 font-sans leading-relaxed">
+                              {tier.summary}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Pie cara frontal: Indicador interactivo para girar */}
+                        <div className="pt-3 border-t border-gold-500/20 flex items-center justify-between text-[11px] font-mono text-gold-400 group-hover:text-gold-300 transition-colors">
+                          <span className="flex items-center gap-1.5 font-bold">
+                            <RefreshCw className="w-3.5 h-3.5 transition-transform group-hover:rotate-180 duration-500" />
+                            Ver deberes & privilegios
+                          </span>
+                          <span className="text-[10px] text-gray-400 font-sans">↻</span>
+                        </div>
                       </div>
 
-                      <div className="text-center pt-4 border-t border-gold-500/20 text-[10px] font-sans text-gold-400 uppercase tracking-widest flex items-center justify-center gap-1">
-                        <span>Haz clic para girar</span> ↻
-                      </div>
-                    </div>
+                      {/* Cara Posterior: Deberes y privilegios principales */}
+                      <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 legibility-bordeaux p-6 rounded-2xl border border-gold-400 flex flex-col justify-between shadow-2xl">
+                        <div className="space-y-3.5 overflow-hidden">
+                          <div className="flex items-center justify-between border-b border-gold-500/30 pb-2">
+                            <span className="text-[10px] font-sans text-gold-300 font-bold uppercase tracking-widest">
+                              ✦ {tier.title}
+                            </span>
+                            <span className="text-[9px] font-mono text-gold-400/80 uppercase">
+                              Normativa
+                            </span>
+                          </div>
 
-                    {/* Back Face */}
-                    <div className={`absolute inset-0 w-full h-full backface-hidden rotate-y-180 legibility-bordeaux p-6 rounded-2xl border border-gold-400 flex flex-col justify-between shadow-2xl`}>
-                      <div>
-                        <span className="text-[10px] font-sans text-gold-300 font-bold uppercase tracking-widest block mb-2 border-b border-gold-500/30 pb-1">
-                          REVERSIÓN DE PRIVILEGIOS
-                        </span>
-                        <h4 className="font-sans font-bold text-lg text-ivory-100 mb-3">{tier.backTitle}</h4>
-                        <p className="text-xs text-ivory-200 font-body leading-relaxed">{tier.backText}</p>
-                      </div>
+                          {/* Bloque Deberes Principales */}
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5 text-gold-300 text-[11px] font-mono font-bold uppercase tracking-wider">
+                              <Shield className="w-3 h-3 text-gold-400" />
+                              <span>Deberes Principales</span>
+                            </div>
+                            <ul className="space-y-1 text-[11px] font-sans text-ivory-200 leading-tight">
+                              {tier.duties.map((duty, idx) => (
+                                <li key={idx} className="flex items-start gap-1.5">
+                                  <span className="text-gold-400 text-xs leading-none mt-0.5">•</span>
+                                  <span>{duty}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
 
-                      <div className="text-center pt-4 border-t border-gold-500/30 text-[10px] font-sans text-ivory-300 uppercase tracking-widest">
-                        Volver a la portada ↻
+                          {/* Bloque Privilegios Principales */}
+                          <div className="space-y-1.5 pt-2 border-t border-gold-500/25">
+                            <div className="flex items-center gap-1.5 text-gold-300 text-[11px] font-mono font-bold uppercase tracking-wider">
+                              <Crown className="w-3 h-3 text-gold-400" />
+                              <span>Privilegios Clave</span>
+                            </div>
+                            <ul className="space-y-1 text-[11px] font-sans text-ivory-200 leading-tight">
+                              {tier.privileges.map((priv, idx) => (
+                                <li key={idx} className="flex items-start gap-1.5">
+                                  <span className="text-gold-300 text-xs leading-none mt-0.5">✦</span>
+                                  <span>{priv}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+
+                        {/* Pie cara posterior: Volver */}
+                        <div className="pt-3 border-t border-gold-500/30 flex items-center justify-between text-[11px] font-mono text-gold-300 hover:text-white transition-colors">
+                          <span className="flex items-center gap-1.5 font-bold">
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            Volver al anverso
+                          </span>
+                          <span className="text-[10px] text-gray-300 font-sans">↻</span>
+                        </div>
                       </div>
                     </div>
                   </div>
+
+                  {/* Botón claro debajo de cada rango: Solicitar entrada / Aplicar a una posición */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onOpenKingdomRequest) {
+                        onOpenKingdomRequest(tier.id);
+                      }
+                    }}
+                    className="w-full py-3 px-3 rounded-xl bg-gradient-to-r from-bordeaux-800 via-dark-900 to-bordeaux-800 hover:from-bordeaux-700 hover:to-bordeaux-600 border border-gold-500/50 hover:border-gold-400 text-gold-300 hover:text-white text-xs font-sans font-bold uppercase tracking-wider transition-all duration-300 shadow-xl flex items-center justify-center gap-2 group/btn hover:scale-[1.02]"
+                  >
+                    <Crown className="w-3.5 h-3.5 text-gold-400 group-hover/btn:scale-110 transition-transform" />
+                    <span>{tier.ctaText}</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-gold-400 group-hover/btn:translate-x-0.5 transition-transform" />
+                  </button>
+
                 </div>
               );
             })}

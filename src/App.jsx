@@ -28,7 +28,13 @@ export default function App() {
 
   // Kingdom Auth & Member Profile state
   const [showKingdomAuth, setShowKingdomAuth] = useState(false);
+  const [initialKingdomTargetGroup, setInitialKingdomTargetGroup] = useState('');
   const [currentMember, setCurrentMember] = useState(null);
+
+  const handleOpenKingdomRequest = (targetGroupId = '') => {
+    setInitialKingdomTargetGroup(targetGroupId);
+    setShowKingdomAuth(true);
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('yakuza_member_token');
@@ -511,7 +517,11 @@ export default function App() {
 
         {/* TAB 2: YAKUZA PRINCESS */}
         {activeTab === 'princess' && (
-          <YakuzaPrincessPage princessConfig={princessConfig} onNavigateToStore={() => setActiveTab('fetish')} />
+          <YakuzaPrincessPage 
+            princessConfig={princessConfig} 
+            onNavigateToStore={() => setActiveTab('fetish')}
+            onOpenKingdomRequest={handleOpenKingdomRequest}
+          />
         )}
 
         {/* TAB 3: GRAND OPENING / SORTEO 2K */}
@@ -616,8 +626,12 @@ export default function App() {
       {/* Kingdom Auth & Admission Modal */}
       <KingdomAuthModal
         isOpen={showKingdomAuth}
-        onClose={() => setShowKingdomAuth(false)}
+        onClose={() => {
+          setShowKingdomAuth(false);
+          setInitialKingdomTargetGroup('');
+        }}
         currentMember={currentMember}
+        initialTargetGroupId={initialKingdomTargetGroup}
         onAuthSuccess={(member) => {
           setCurrentMember(member);
         }}

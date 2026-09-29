@@ -227,3 +227,25 @@
 .glow-gold {
   box-shadow: 0 0 20px rgba(201, 162, 39, 0.35);
 }
+
+/* ==================== 3D FLIP CARD UTILITIES ==================== */
+.perspective-1000 {
+  perspective: 1000px;
+  -webkit-perspective: 1000px;
+}
+
+.transform-style-3d {
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+  -webkit-transform: rotateY(180deg);
+}
+
