@@ -8,7 +8,7 @@ import { KingdomHierarchyView } from './kingdom/KingdomHierarchyView';
 import { KingdomActivitiesView } from './kingdom/KingdomActivitiesView';
 import { KingdomRequestsView } from './kingdom/KingdomRequestsView';
 
-export default function AdminPanel({ onBackToStore }) {
+export default function AdminPanel({ onBackToStore, onRefreshData }) {
 
   const [token, setToken] = useState(localStorage.getItem('yakuza_admin_token') || '');
   const [emailInput, setEmailInput] = useState('');
@@ -699,6 +699,7 @@ export default function AdminPanel({ onBackToStore }) {
       if (!res.ok) throw new Error(data.error || 'Error guardando configuración de Yakuza Princess');
       alert('¡Configuración y textos de Yakuza Princess guardados con éxito!');
       fetchAllData();
+      if (onRefreshData) onRefreshData();
     } catch (err) {
       alert(err.message || 'Error guardando configuración');
     } finally {
@@ -2365,10 +2366,11 @@ export default function AdminPanel({ onBackToStore }) {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-mono text-gray-400 mb-0.5">Descripción Cara Frontal</label>
+                    <label className="block text-[11px] font-mono text-gray-400 mb-0.5">Descripción Cara Frontal (Resumen que representa el nivel)</label>
                     <textarea
-                      rows="2"
+                      rows="3"
                       value={tier.frontText || ''}
+                      placeholder="Resumen breve de lo que representa ese nivel (aparece en el anverso de la tarjeta)..."
                       onChange={e => {
                         const updated = [...princessForm.kingdomTiers];
                         updated[idx] = { ...updated[idx], frontText: e.target.value };
@@ -2384,6 +2386,7 @@ export default function AdminPanel({ onBackToStore }) {
                       <input
                         type="text"
                         value={tier.backTitle || ''}
+                        placeholder="Ej: Órdenes & Grupo Telegram / Deberes & Privilegios"
                         onChange={e => {
                           const updated = [...princessForm.kingdomTiers];
                           updated[idx] = { ...updated[idx], backTitle: e.target.value };
@@ -2394,17 +2397,24 @@ export default function AdminPanel({ onBackToStore }) {
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-mono text-crimson-400 mb-0.5">Texto Cara Trasera (Privilegios / Descripción)</label>
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="block text-[11px] font-mono text-crimson-400">Texto Cara Trasera (Deberes y Privilegios)</label>
+                        <span className="text-[10px] font-mono text-gold-400/80">Estructura DEBERES / PRIVILEGIOS</span>
+                      </div>
                       <textarea
-                        rows="3"
+                        rows="7"
                         value={tier.backText || ''}
+                        placeholder={`DEBERES\n- Deber principal 1\n- Deber principal 2\n\nPRIVILEGIOS\n- Privilegio clave 1\n- Privilegio clave 2`}
                         onChange={e => {
                           const updated = [...princessForm.kingdomTiers];
                           updated[idx] = { ...updated[idx], backText: e.target.value };
                           setPrincessForm({ ...princessForm, kingdomTiers: updated });
                         }}
-                        className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-gray-200"
+                        className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-gray-200 font-mono"
                       />
+                      <span className="text-[10px] text-gray-400 block mt-1">
+                        ✦ Tip: Puedes incluir las cabeceras <strong>DEBERES</strong> y <strong>PRIVILEGIOS</strong> con viñetas (-), o escribir texto libre. Todo se reflejará dinámicamente en la tarjeta pública.
+                      </span>
                     </div>
                   </div>
                 </div>

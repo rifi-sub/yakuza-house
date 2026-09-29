@@ -111,6 +111,68 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
     }));
   };
 
+  const parseBackContent = (tier, def) => {
+    const rawBack = (tier.backText && tier.backText.trim()) ? tier.backText.trim() : '';
+
+    if (!rawBack) {
+      return {
+        mode: 'sections',
+        duties: def.duties || [],
+        privileges: def.privileges || []
+      };
+    }
+
+    const hasDuties = /deberes|obligaciones|compromisos/i.test(rawBack);
+    const hasPrivileges = /privilegios|beneficios|recompensas/i.test(rawBack);
+
+    if (hasDuties || hasPrivileges) {
+      let dutiesPart = '';
+      let privPart = '';
+
+      if (hasDuties && hasPrivileges) {
+        const parts = rawBack.split(/privilegios|beneficios|recompensas/i);
+        dutiesPart = parts[0] ? parts[0].replace(/deberes|obligaciones|compromisos/i, '').trim() : '';
+        privPart = parts[1] ? parts[1].trim() : '';
+      } else if (hasDuties) {
+        dutiesPart = rawBack.replace(/deberes|obligaciones|compromisos/i, '').trim();
+      } else {
+        privPart = rawBack.replace(/privilegios|beneficios|recompensas/i, '').trim();
+      }
+
+      const cleanList = (txt) => txt
+        .split('\n')
+        .map(l => l.replace(/^[-•*–—]\s*/, '').replace(/^\d+[\.\)]\s*/, '').trim())
+        .filter(l => l.length > 0 && !/^(deberes|privilegios|obligaciones|beneficios|compromisos|recompensas)/i.test(l));
+
+      const duties = cleanList(dutiesPart);
+      const privileges = cleanList(privPart);
+
+      return {
+        mode: 'sections',
+        duties: duties.length > 0 ? duties : (def.duties || []),
+        privileges: privileges.length > 0 ? privileges : (def.privileges || [])
+      };
+    }
+
+    const lines = rawBack
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+
+    if (lines.length >= 2) {
+      const items = lines.map(l => l.replace(/^[-•*–—]\s*/, '').replace(/^\d+[\.\)]\s*/, '').trim());
+      return {
+        mode: 'bullets',
+        items
+      };
+    }
+
+    return {
+      mode: 'text',
+      text: rawBack
+    };
+  };
+
   const getTierDisplay = (tier) => {
     const defaults = {
       plebeyos: {
@@ -188,42 +250,16 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
     };
 
     const def = defaults[tier.id] || defaults.plebeyos;
-
-    let duties = def.duties;
-    let privileges = def.privileges;
-
-    if (tier.backText && (tier.backText.includes('DEBERES') || tier.backText.includes('PRIVILEGIOS'))) {
-      const parts = tier.backText.split(/PRIVILEGIOS/i);
-      const dutiesPart = parts[0] ? parts[0].replace(/DEBERES/i, '').trim() : '';
-      const privPart = parts[1] ? parts[1].trim() : '';
-
-      const cleanLines = (txt) => txt.split('\n')
-        .map(l => l.replace(/^[-•*]\s*/, '').trim())
-        .filter(l => l.length > 0 && !l.toLowerCase().startsWith('deberes') && !l.toLowerCase().startsWith('privilegios'));
-
-      const dParsed = cleanLines(dutiesPart);
-      const pParsed = cleanLines(privPart);
-
-      if (dParsed.length > 0) duties = dParsed.slice(0, 3);
-      if (pParsed.length > 0) privileges = pParsed.slice(0, 3);
-    } else if (tier.backText && tier.backText.trim()) {
-      const lines = tier.backText.split('\n').map(l => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
-      if (lines.length >= 2) {
-        duties = lines.slice(0, Math.ceil(lines.length / 2)).slice(0, 3);
-        privileges = lines.slice(Math.ceil(lines.length / 2)).slice(0, 3);
-      }
-    }
+    const backContent = parseBackContent(tier, def);
 
     return {
       id: tier.id,
       badge: tier.badge || def.badge,
       title: tier.title || def.title,
       subtitle: tier.subtitle || def.subtitle,
-      summary: (tier.frontText && tier.frontText.trim()) 
-        ? tier.frontText.split('\n').filter(Boolean).slice(0, 3).join(' ') 
-        : def.summary,
-      duties,
-      privileges,
+      frontText: (tier.frontText && tier.frontText.trim()) ? tier.frontText.trim() : def.summary,
+      backTitle: (tier.backTitle && tier.backTitle.trim()) ? tier.backTitle.trim() : 'Normativa',
+      backContent,
       ctaText: tier.id === 'plebeyos' ? 'Solicitar entrada al Reino' : 'Aplicar a esta posición',
       gradient: tier.gradient || defaultGradients[tier.id] || 'from-dark-950 via-bordeaux-800 to-dark-950'
     };
@@ -389,7 +425,7 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
                   {/* Tarjeta Giratoria 3D */}
                   <div
                     onClick={() => toggleCardFlip(tier.id)}
-                    className="cursor-pointer h-[460px] perspective-1000 group relative w-full select-none"
+                    className="cursor-pointer h-[480px] perspective-1000 group relative w-full select-none"
                     title="Haz clic para girar la tarjeta"
                   >
                     <div
@@ -399,7 +435,7 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
                     >
                       {/* Cara Frontal: Nombre, lema y resumen breve */}
                       <div className={`absolute inset-0 w-full h-full backface-hidden legibility-shield p-6 rounded-2xl border border-gold-500/40 flex flex-col justify-between bg-gradient-to-b ${tier.gradient} shadow-2xl hover:border-gold-400 transition-colors`}>
-                        <div className="space-y-4">
+                        <div className="space-y-3.5">
                           <div className="flex items-center justify-between border-b border-gold-500/30 pb-2">
                             <span className="text-[10px] font-sans text-gold-400 font-bold uppercase tracking-widest">
                               ✦ {tier.badge}
@@ -419,11 +455,11 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
                           </div>
 
                           <div className="pt-2 border-t border-gold-500/20">
-                            <span className="text-[10px] font-mono uppercase text-gray-400 block mb-1.5 tracking-wider">
+                            <span className="text-[10px] font-mono uppercase text-gray-400 block mb-1 tracking-wider">
                               Representa
                             </span>
-                            <p className="text-xs text-ivory-200 font-sans leading-relaxed">
-                              {tier.summary}
+                            <p className="text-xs text-ivory-200 font-sans leading-relaxed whitespace-pre-line">
+                              {tier.frontText}
                             </p>
                           </div>
                         </div>
@@ -440,47 +476,85 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
 
                       {/* Cara Posterior: Deberes y privilegios principales */}
                       <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 legibility-bordeaux p-6 rounded-2xl border border-gold-400 flex flex-col justify-between shadow-2xl">
-                        <div className="space-y-3.5 overflow-hidden">
+                        <div className="space-y-3 overflow-y-auto pr-1 flex-1">
                           <div className="flex items-center justify-between border-b border-gold-500/30 pb-2">
-                            <span className="text-[10px] font-sans text-gold-300 font-bold uppercase tracking-widest">
+                            <span className="text-[10px] font-sans text-gold-300 font-bold uppercase tracking-widest truncate max-w-[55%]">
                               ✦ {tier.title}
                             </span>
-                            <span className="text-[9px] font-mono text-gold-400/80 uppercase">
-                              Normativa
+                            <span className="text-[10px] font-mono text-gold-400 font-bold uppercase tracking-wider truncate max-w-[45%] text-right" title={tier.backTitle}>
+                              {tier.backTitle}
                             </span>
                           </div>
 
-                          {/* Bloque Deberes Principales */}
-                          <div className="space-y-1.5">
-                            <div className="flex items-center gap-1.5 text-gold-300 text-[11px] font-mono font-bold uppercase tracking-wider">
-                              <Shield className="w-3 h-3 text-gold-400" />
-                              <span>Deberes Principales</span>
-                            </div>
-                            <ul className="space-y-1 text-[11px] font-sans text-ivory-200 leading-tight">
-                              {tier.duties.map((duty, idx) => (
-                                <li key={idx} className="flex items-start gap-1.5">
-                                  <span className="text-gold-400 text-xs leading-none mt-0.5">•</span>
-                                  <span>{duty}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
+                          {/* Modo 1: Secciones de Deberes y Privilegios */}
+                          {tier.backContent.mode === 'sections' && (
+                            <div className="space-y-2.5">
+                              {tier.backContent.duties && tier.backContent.duties.length > 0 && (
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-1.5 text-gold-300 text-[11px] font-mono font-bold uppercase tracking-wider">
+                                    <Shield className="w-3 h-3 text-gold-400 shrink-0" />
+                                    <span>Deberes Principales</span>
+                                  </div>
+                                  <ul className="space-y-1 text-[11px] font-sans text-ivory-200 leading-tight">
+                                    {tier.backContent.duties.map((duty, idx) => (
+                                      <li key={idx} className="flex items-start gap-1.5">
+                                        <span className="text-gold-400 text-xs leading-none mt-0.5 shrink-0">•</span>
+                                        <span>{duty}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
 
-                          {/* Bloque Privilegios Principales */}
-                          <div className="space-y-1.5 pt-2 border-t border-gold-500/25">
-                            <div className="flex items-center gap-1.5 text-gold-300 text-[11px] font-mono font-bold uppercase tracking-wider">
-                              <Crown className="w-3 h-3 text-gold-400" />
-                              <span>Privilegios Clave</span>
+                              {tier.backContent.privileges && tier.backContent.privileges.length > 0 && (
+                                <div className="space-y-1 pt-2 border-t border-gold-500/25">
+                                  <div className="flex items-center gap-1.5 text-gold-300 text-[11px] font-mono font-bold uppercase tracking-wider">
+                                    <Crown className="w-3 h-3 text-gold-400 shrink-0" />
+                                    <span>Privilegios Clave</span>
+                                  </div>
+                                  <ul className="space-y-1 text-[11px] font-sans text-ivory-200 leading-tight">
+                                    {tier.backContent.privileges.map((priv, idx) => (
+                                      <li key={idx} className="flex items-start gap-1.5">
+                                        <span className="text-gold-300 text-xs leading-none mt-0.5 shrink-0">✦</span>
+                                        <span>{priv}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
                             </div>
-                            <ul className="space-y-1 text-[11px] font-sans text-ivory-200 leading-tight">
-                              {tier.privileges.map((priv, idx) => (
-                                <li key={idx} className="flex items-start gap-1.5">
-                                  <span className="text-gold-300 text-xs leading-none mt-0.5">✦</span>
-                                  <span>{priv}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
+                          )}
+
+                          {/* Modo 2: Lista con Viñetas */}
+                          {tier.backContent.mode === 'bullets' && (
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-1.5 text-gold-300 text-[11px] font-mono font-bold uppercase tracking-wider">
+                                <Shield className="w-3 h-3 text-gold-400 shrink-0" />
+                                <span>Normativa & Privilegios</span>
+                              </div>
+                              <ul className="space-y-1 text-[11px] font-sans text-ivory-200 leading-tight">
+                                {tier.backContent.items.map((item, idx) => (
+                                  <li key={idx} className="flex items-start gap-1.5">
+                                    <span className="text-gold-400 text-xs leading-none mt-0.5 shrink-0">•</span>
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Modo 3: Texto Libre */}
+                          {tier.backContent.mode === 'text' && (
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-1.5 text-gold-300 text-[11px] font-mono font-bold uppercase tracking-wider">
+                                <Shield className="w-3 h-3 text-gold-400 shrink-0" />
+                                <span>Normativa del Rango</span>
+                              </div>
+                              <p className="text-[11px] font-sans text-ivory-200 leading-relaxed whitespace-pre-line">
+                                {tier.backContent.text}
+                              </p>
+                            </div>
+                          )}
                         </div>
 
                         {/* Pie cara posterior: Volver */}

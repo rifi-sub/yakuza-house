@@ -104,6 +104,20 @@ export default function App() {
     }
   }, [selectedCategory]);
 
+  // Refrescar configuración de Princess automáticamente al entrar a la pestaña
+  useEffect(() => {
+    if (activeTab === 'princess') {
+      fetch(`${API_BASE}/api/store/princess`)
+        .then(r => r.json())
+        .then(data => {
+          if (data && typeof data === 'object' && !data.error) {
+            setPrincessConfig(data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [activeTab]);
+
   const handleAddToCart = (item) => {
     setCartItems(prev => {
       const existing = prev.find(i => i.item.id === item.id);
@@ -159,7 +173,13 @@ export default function App() {
           onOpenKingdomAuth={() => setShowKingdomAuth(true)}
           currentMember={currentMember}
         />
-        <AdminPanel onBackToStore={() => setActiveTab('fetish')} />
+        <AdminPanel 
+          onBackToStore={() => {
+            fetchStoreData();
+            setActiveTab('fetish');
+          }} 
+          onRefreshData={fetchStoreData}
+        />
         <Footer onOpenLegal={(type) => setLegalModalType(type)} />
       </div>
     );
