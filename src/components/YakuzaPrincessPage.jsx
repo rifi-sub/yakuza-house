@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { 
-  ShieldAlert, Crown, Lock, CheckCircle2, XCircle, Send, Sparkles, 
-  MessageCircle, AlertTriangle, RefreshCw, Shield, ArrowRight 
+import {
+  ShieldAlert, Crown, Lock, CheckCircle2, XCircle, Send, Sparkles,
+  MessageCircle, AlertTriangle, RefreshCw, Shield, ArrowRight
 } from 'lucide-react';
 import { resolveMediaUrl } from '../config';
 import princessVisionBanner from '../assets/princess-vision-banner.png';
@@ -59,7 +59,7 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
 
   const kingdomHeaderBadge = config.kingdomHeaderBadge || 'JERARQUÍA DEL REINO';
   const kingdomHeaderTitle = config.kingdomHeaderTitle || 'Haz clic en cada tarjeta para girarla y leer sus privilegios';
-  
+
   const defaultGradients = {
     plebeyos: 'from-dark-950 via-bordeaux-800 to-dark-950',
     sirvientes: 'from-bordeaux-800 via-bordeaux-600 to-dark-950',
@@ -284,7 +284,7 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
-      
+
       {/* Header Banner */}
       <div className="text-center max-w-4xl mx-auto space-y-4">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full legibility-shield border border-gold-500/50 text-gold-300 text-xs font-sans tracking-widest uppercase shadow-lg">
@@ -309,31 +309,28 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
       <div className="flex justify-center gap-2 border-b border-gold-500/30 pb-4 overflow-x-auto">
         <button
           onClick={() => setActiveTab('normas')}
-          className={`py-2.5 px-6 rounded-full font-sans text-xs uppercase tracking-widest transition-all ${
-            activeTab === 'normas'
+          className={`py-2.5 px-6 rounded-full font-sans text-xs uppercase tracking-widest transition-all ${activeTab === 'normas'
               ? 'bg-bordeaux-600/80 text-gold-300 font-bold border border-gold-500/60 shadow-lg shadow-bordeaux-700/50'
               : 'bg-dark-950/80 border border-gold-500/20 text-ivory-400 hover:text-white'
-          }`}
+            }`}
         >
           📜 1. Mis Normas D/s
         </button>
         <button
           onClick={() => setActiveTab('presentate')}
-          className={`py-2.5 px-6 rounded-full font-sans text-xs uppercase tracking-widest transition-all ${
-            activeTab === 'presentate'
+          className={`py-2.5 px-6 rounded-full font-sans text-xs uppercase tracking-widest transition-all ${activeTab === 'presentate'
               ? 'bg-bordeaux-600/80 text-gold-300 font-bold border border-gold-500/60 shadow-lg shadow-bordeaux-700/50'
               : 'bg-dark-950/80 border border-gold-500/20 text-ivory-400 hover:text-white'
-          }`}
+            }`}
         >
           👑 2. Protocolo "Preséntate"
         </button>
         <button
           onClick={() => setActiveTab('reino')}
-          className={`py-2.5 px-6 rounded-full font-sans text-xs uppercase tracking-widest transition-all ${
-            activeTab === 'reino'
+          className={`py-2.5 px-6 rounded-full font-sans text-xs uppercase tracking-widest transition-all ${activeTab === 'reino'
               ? 'bg-bordeaux-600/80 text-gold-300 font-bold border border-gold-500/60 shadow-lg shadow-bordeaux-700/50'
               : 'bg-dark-950/80 border border-gold-500/20 text-ivory-400 hover:text-white'
-          }`}
+            }`}
         >
           🗡️ 3. Mi Reino (Jerarquía)
         </button>
@@ -342,13 +339,13 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
       {/* TAB 1: MIS NORMAS D/S */}
       {activeTab === 'normas' && (
         <div className="max-w-5xl mx-auto space-y-8">
-          
+
           {/* BANNER VISUAL DE LA PRINCESA YAKUZA */}
           <div className="relative w-full rounded-2xl overflow-hidden border border-gold-500/40 shadow-2xl group">
             <div className="aspect-[16/9] sm:aspect-[21/9] w-full max-h-[460px] overflow-hidden relative">
-              <img 
-                src={visionBanner} 
-                alt="La Princesa Yakuza" 
+              <img
+                src="/j.jpeg"
+                alt="La Princesa Yakuza"
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 filter brightness-95 contrast-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/20 to-transparent" />
@@ -398,14 +395,14 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
 
           {/* DOS BLOQUES EXISTENTES: REQUISITOS Y NO RESPONDO */}
           <div className="grid md:grid-cols-2 gap-8">
-            
+
             {/* Requisitos */}
             <div className="legibility-bordeaux p-8 rounded-2xl border border-gold-500/40 space-y-4 shadow-2xl">
               <div className="flex items-center gap-3 border-b border-gold-500/30 pb-3">
                 <CheckCircle2 className="w-6 h-6 text-emerald-400" />
                 <h3 className="font-sans font-bold text-xl text-ivory-100">{requirementsTitle}</h3>
               </div>
-              
+
               <ul className="space-y-3 text-xs text-ivory-300 font-body leading-relaxed">
                 {requirementsList.map((item, idx) => (
                   <li key={idx} className="flex items-start gap-2">
@@ -445,7 +442,7 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
       {/* TAB 2: PROTOCOLO DE PRESENTACIÓN */}
       {activeTab === 'presentate' && (
         <div className="max-w-4xl mx-auto space-y-8">
-          
+
           <div className="legibility-bordeaux p-8 rounded-2xl border border-gold-500/50 space-y-6 shadow-2xl">
             <div className="text-center space-y-2">
               <span className="text-xs font-sans text-gold-400 uppercase tracking-widest block">{protocolBadge}</span>
@@ -496,7 +493,7 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
               const isFlipped = flippedCards[tier.id];
               return (
                 <div key={tier.id} className="flex flex-col space-y-3">
-                  
+
                   {/* Tarjeta Giratoria 3D */}
                   <div
                     onClick={() => toggleCardFlip(tier.id)}
@@ -504,9 +501,8 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
                     title="Haz clic para girar la tarjeta"
                   >
                     <div
-                      className={`relative w-full h-full duration-700 transition-transform transform-style-3d ${
-                        isFlipped ? 'rotate-y-180' : ''
-                      }`}
+                      className={`relative w-full h-full duration-700 transition-transform transform-style-3d ${isFlipped ? 'rotate-y-180' : ''
+                        }`}
                     >
                       {/* Cara Frontal: Nombre, lema y resumen breve */}
                       <div className={`absolute inset-0 w-full h-full backface-hidden legibility-shield bg-dark-950 p-6 rounded-2xl border border-gold-500/40 flex flex-col justify-between bg-gradient-to-b ${tier.gradient} shadow-2xl hover:border-gold-400 transition-all duration-300 ${isFlipped ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
