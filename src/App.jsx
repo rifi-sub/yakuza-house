@@ -115,6 +115,8 @@ export default function App() {
           }
         })
         .catch(() => {});
+    } else if (activeTab === 'findreamland') {
+      setSelectedCategory('findreamland');
     }
   }, [activeTab]);
 
@@ -420,17 +422,19 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 1: FETISH HOUSE (LA TIENDA - Sin banner hero) */}
-        {activeTab === 'fetish' && (
+        {/* TAB 1: FETISH HOUSE & FINDREAMLAND (LA TIENDA) */}
+        {(activeTab === 'fetish' || activeTab === 'findreamland') && (
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-8">
             
-            {/* Action Bar de la Tienda: Botones ¿Cómo pedir? y Consultar Pedido */}
+            {/* Action Bar de la Tienda / FinDreamland */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 md:p-5 rounded-2xl legibility-shield border border-gold-500/30 shadow-2xl">
               <div>
                 <span className="text-[11px] font-sans font-bold text-gold-400 tracking-widest uppercase block">
-                  ✦ BOUTIQUE FETISH EXCLUSIVA
+                  {activeTab === 'findreamland' ? '✦ SECCIÓN EXCLUSIVA FINDREAMLAND' : '✦ BOUTIQUE FETISH EXCLUSIVA'}
                 </span>
-                <h1 className="font-brand font-black text-xl sm:text-2xl text-white">Catálogo & Adquisiciones</h1>
+                <h1 className="font-brand font-black text-xl sm:text-2xl text-white">
+                  {activeTab === 'findreamland' ? 'FinDreamland · Finanzas, Tributos & Lujo' : 'Catálogo & Adquisiciones'}
+                </h1>
               </div>
               <div className="flex items-center gap-3 w-full sm:w-auto">
                 <button
@@ -455,10 +459,12 @@ export default function App() {
             {/* Intro Quote (Legibility Shield & Bordeaux Panel) */}
             <div className="legibility-bordeaux p-8 rounded-2xl border border-gold-500/40 max-w-4xl mx-auto space-y-5 shadow-2xl">
               <span className="text-[11px] font-sans font-semibold text-gold-400 tracking-widest uppercase block">
-                ✦ DECRETO DE LA PRINCESA
+                {activeTab === 'findreamland' ? '✦ DECRETO FINANCIERO DE LA PRINCESA' : '✦ DECRETO DE LA PRINCESA'}
               </span>
               <p className="text-sm sm:text-base text-ivory-200 italic font-serif leading-relaxed">
-                “Mi saliva, las marcas en mis suelas, mis calcetines sudados tras una dura sesión o incluso mi repostería fina es un manjar reservado para alguien inferior como tú. Me encanta complacerme a tu costa y otorgarte el honor de poseer mi esencia.”
+                {activeTab === 'findreamland'
+                  ? '“El dinero es la sumisión más pura, sincera y tangible. En FinDreamland, cada tributo y cada adquisición financiera materializa tu reverencia a la Princesa y cimenta tu pertenencia en su Reino.”'
+                  : '“Mi saliva, las marcas en mis suelas, mis calcetines sudados tras una dura sesión o incluso mi repostería fina es un manjar reservado para alguien inferior como tú. Me encanta complacerme a tu costa y otorgarte el honor de poseer mi esencia.”'}
               </p>
               <div className="flex flex-wrap gap-4 text-xs font-sans text-ivory-300 pt-4 border-t border-gold-500/20">
                 <span className="flex items-center gap-2 text-gold-300 font-medium">

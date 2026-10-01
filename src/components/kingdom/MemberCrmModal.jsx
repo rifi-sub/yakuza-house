@@ -3,9 +3,11 @@ import {
   X, Crown, Search, Bell, Edit3, Calendar, Gift, Target, Award,
   Sparkles, CheckCircle2, Clock, AlertTriangle, ChevronRight,
   TrendingUp, Trash2, Plus, Star, ShieldCheck, Heart, Zap,
-  Flame, Lock, Layers, Settings, Eye, Check, RefreshCw, Mail, User
+  Flame, Lock, Layers, Settings, Eye, Check, RefreshCw, Mail, User,
+  DollarSign, ArrowUp, ArrowDown, Save, CreditCard, Send, Shield,
+  ChevronDown, ChevronUp, ExternalLink, Filter, CheckCircle
 } from 'lucide-react';
-import { API_BASE } from '../../config';
+import { API_BASE, resolveMediaUrl } from '../../config';
 
 export function MemberCrmModal({ 
   memberId, 
@@ -18,331 +20,394 @@ export function MemberCrmModal({
 }) {
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [activitiesLibrary, setActivitiesLibrary] = useState([]);
-  const [notesFilter, setNotesFilter] = useState('internal'); // 'internal' | 'next_steps'
-  const [searchMemberQuery, setSearchMemberQuery] = useState('');
-  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [allGroupsState, setAllGroupsState] = useState(allGroups);
+  const [showEditDrawer, setShowEditDrawer] = useState(false);
+  const [activeTabSection, setActiveTabSection] = useState('dashboard'); // 'dashboard', 'finanzas', 'requisitos', 'habilidades', 'notas'
+  const [selectedActivityCategory, setSelectedActivityCategory] = useState('ALL');
+  const [activitySearchQuery, setActivitySearchQuery] = useState('');
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [showMemberSearchDropdown, setShowMemberSearchDropdown] = useState(false);
 
-  // Modals for editing / actions
-  const [showEditProfile, setShowEditProfile] = useState(false);
-  const [showAddSkill, setShowAddSkill] = useState(false);
-  const [showNewActivityModal, setShowNewActivityModal] = useState(false);
-  const [showAddNoteModal, setShowAddNoteModal] = useState(false);
-
-  // Training designer state (dropdown selections)
-  const [selectedTrainingItems, setSelectedTrainingItems] = useState({
-    task: '',
-    ritual: '',
-    punishment: '',
-    reward: '',
-    privilege: '',
-    goal: '',
-    special: ''
-  });
-  const [assigningTraining, setAssigningTraining] = useState(false);
-
-  // Edit Profile Form
-  const [profileForm, setProfileForm] = useState({
+  // Formulario principal del miembro
+  const [formData, setFormData] = useState({
     alias: '',
     internalName: '',
     memberNumber: '',
     email: '',
     telegram: '',
-    ageStatus: '',
-    motivation: '',
+    age: '',
+    profession: '',
+    quote: '',
+    initialTribute: '',
+    servedSince: '',
     status: 'ACTIVE',
     groupId: '',
     targetGroupId: '',
-    overallProgress: 0,
-    experiencePoints: 0,
-    servedSince: '',
-    initialTribute: '',
-    currentRank: '',
-    targetRank: '',
-    quote: '',
+    overallProgress: 22,
+    experiencePoints: 135,
+    totalRevenue: 0,
+    avatarUrl: '',
+    internalNotes: '',
     preferences: '',
+    motivation: '',
     fetishes: '',
     triggers: '',
     limits: '',
     aftercare: '',
-    personalGoals: ''
+    personalGoals: '',
+    activeSubscription: 'Ninguna'
   });
 
-  // Add Skill Form
-  const [skillForm, setSkillForm] = useState({
+  // Estado para registrar tributo/pago manual
+  const [newTribute, setNewTribute] = useState({
+    amount: '',
+    concept: 'Tributo de devoción',
+    paymentMethod: 'BIZUM',
+    reference: '',
+    notes: '',
+    date: new Date().toISOString().split('T')[0]
+  });
+  const [addingTribute, setAddingTribute] = useState(false);
+
+  // Estado para nuevo objetivo/entrenamiento manual
+  const [newObjective, setNewObjective] = useState({
+    templateId: '',
+    title: '',
+    type: 'TASK',
+    dueDays: 3,
+    pointsAwarded: 20,
+    priority: 'MEDIUM',
+    customInstructions: ''
+  });
+  const [showNewActivityModal, setShowNewActivityModal] = useState(false);
+  const [addingObjective, setAddingObjective] = useState(false);
+
+  // Estado para nueva habilidad
+  const [newSkill, setNewSkill] = useState({
     skillCategory: 'VIDEO_EDITING',
     skillName: '',
     level: 'ADVANCED',
-    notes: ''
+    notes: '3/5 puntos de maestría'
   });
+  const [addingSkill, setAddingSkill] = useState(false);
 
-  // New Activity Form
-  const [newActivityForm, setNewActivityForm] = useState({
-    title: '',
-    type: 'TASK',
-    status: 'ACTIVE',
-    dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-    priority: 'Alta',
-    pointsAwarded: 25,
-    customInstructions: ''
-  });
+  // Nueva nota interna
+  const [newNote, setNewNote] = useState('');
+  const [addingNote, setAddingNote] = useState(false);
 
-  // Add Note Form
-  const [newNoteText, setNewNoteText] = useState('');
-  const [newNoteType, setNewNoteType] = useState('internal');
+  // Cerrar con Escape
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showEditDrawer) setShowEditDrawer(false);
+        else if (showNewActivityModal) setShowNewActivityModal(false);
+        else if (onClose) onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showEditDrawer, showNewActivityModal, onClose]);
 
-  // Checklists states (Requirements)
-  const [specialReqs, setSpecialReqs] = useState({
-    tributo_minimo: true,
-    informe_semanal: true,
-    rituales_asignados: false,
-    comunicacion_activa: true
-  });
+  // Cargar grupos si no vinieron por props
+  useEffect(() => {
+    if (!allGroups || allGroups.length === 0) {
+      fetch(`${API_BASE}/api/kingdom/groups`)
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data)) setAllGroupsState(data);
+        })
+        .catch(() => {});
+    }
+  }, [allGroups]);
 
-  const [generalReqs, setGeneralReqs] = useState({
-    perfil_verificado: true,
-    aceptacion_normas: true,
-    tributo_inicial: true,
-    respeto_absoluto: true,
-    discrecion_confidencialidad: true
-  });
+  // Cargar biblioteca de actividades
+  useEffect(() => {
+    fetch(`${API_BASE}/api/kingdom/admin/activities/library`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) setActivitiesLibrary(data);
+      })
+      .catch(() => {});
+  }, [token]);
 
-  // Fetch Member Details
-  const fetchMemberDetail = async (idToFetch = memberId) => {
-    if (!idToFetch) return;
+  // Cargar detalle completo del miembro
+  const fetchMemberDetail = async () => {
+    if (!memberId) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${idToFetch}`, {
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      if (res.ok) {
-        setMember(data);
-        
-        let parsedPrefs = {};
-        if (data.preferences) {
-          try {
-            parsedPrefs = typeof data.preferences === 'string' ? JSON.parse(data.preferences) : data.preferences;
-          } catch (err) {
-            parsedPrefs = { preferences: data.preferences };
-          }
+      if (!res.ok) throw new Error(data.error || 'Error al obtener sumiso');
+      
+      setMember(data);
+
+      let parsedPrefs = {};
+      if (data.preferences) {
+        try {
+          parsedPrefs = typeof data.preferences === 'string' ? JSON.parse(data.preferences) : data.preferences;
+        } catch {
+          parsedPrefs = { preferences: data.preferences };
         }
-
-        const effectiveEmail = data.email || data.user?.email || parsedPrefs.email || '';
-        const effectiveTelegram = data.telegram || parsedPrefs.telegram || '';
-        const effectiveAgeStatus = data.ageStatus || parsedPrefs.ageStatus || '';
-        const effectiveMotivation = data.motivation || parsedPrefs.motivation || '';
-        const effectivePreferences = parsedPrefs.preferences || (typeof data.preferences === 'string' && !data.preferences.startsWith('{') ? data.preferences : '');
-
-        setProfileForm({
-          alias: data.alias || '',
-          internalName: data.internalName || data.alias || '',
-          memberNumber: data.memberNumber || '#001',
-          email: effectiveEmail,
-          telegram: effectiveTelegram,
-          ageStatus: effectiveAgeStatus,
-          motivation: effectiveMotivation,
-          status: data.status || 'ACTIVE',
-          groupId: data.groupId || '',
-          targetGroupId: data.targetGroupId || '',
-          overallProgress: data.overallProgress !== undefined ? data.overallProgress : 0,
-          experiencePoints: data.experiencePoints || 0,
-          servedSince: parsedPrefs.servedSince || (data.joinedAt ? new Date(data.joinedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Reciente'),
-          initialTribute: parsedPrefs.initialTribute || 'Pendiente',
-          currentRank: data.group?.name || parsedPrefs.currentRank || data.position?.name || 'PLEBEYOS',
-          targetRank: data.targetGroup?.name || parsedPrefs.targetRank || 'SIRVIENTES',
-          quote: parsedPrefs.quote || effectiveMotivation || 'Para servirte, existo.',
-          preferences: effectivePreferences,
-          fetishes: parsedPrefs.fetishes || '',
-          triggers: parsedPrefs.triggers || '',
-          limits: parsedPrefs.limits || '',
-          aftercare: parsedPrefs.aftercare || '',
-          personalGoals: parsedPrefs.personalGoals || data.personalGoals || effectiveMotivation || ''
-        });
       }
-    } catch (e) {
-      console.error('Error fetching member details:', e);
+
+      setFormData({
+        alias: data.alias || '',
+        internalName: data.internalName || data.alias || '',
+        memberNumber: data.memberNumber || '#002',
+        email: data.email || data.user?.email || 'ilirifi@yahoo.com',
+        telegram: parsedPrefs.telegram || data.telegram || '@javi_javi_javi',
+        age: parsedPrefs.age || '23',
+        profession: parsedPrefs.profession || 'Ingeniero Becario',
+        quote: parsedPrefs.quote || data.quote || 'No es como empieza, sino como termina.',
+        initialTribute: parsedPrefs.initialTribute || 'Pendiente',
+        servedSince: parsedPrefs.servedSince || '28 sept 2026',
+        status: data.status || 'ACTIVE',
+        groupId: data.groupId || '',
+        targetGroupId: data.targetGroupId || '',
+        overallProgress: data.overallProgress !== undefined ? data.overallProgress : 22,
+        experiencePoints: data.experiencePoints !== undefined ? data.experiencePoints : 135,
+        totalRevenue: data.totalRevenue !== undefined ? data.totalRevenue : (data.finances?.total || 0),
+        avatarUrl: data.avatarUrl || '',
+        internalNotes: data.internalNotes || '',
+        preferences: parsedPrefs.preferences || 'Humillación Psicológica y Verbal',
+        motivation: parsedPrefs.motivation || 'Mencionar otra motivación al lado de sumisión absoluta',
+        fetishes: parsedPrefs.fetishes || 'Pies, humillación, edging, sumisión psicológica',
+        triggers: parsedPrefs.triggers || 'Los pies y las palabras sin filtros de la Princesa',
+        limits: parsedPrefs.limits || 'Daño físico permanente, contacto no consentido',
+        aftercare: parsedPrefs.aftercare || 'Validación tras cumplir tareas, órdenes claras',
+        personalGoals: data.personalGoals || parsedPrefs.personalGoals || 'Consagrarme como sumiso útil en la estructura de la Princesa',
+        activeSubscription: parsedPrefs.activeSubscription || (data.subscriptions?.[0]?.group?.name ? `Acceso ${data.subscriptions[0].group.name}` : 'Ninguna')
+      });
+      setIsDirty(false);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch Central Activity Library
-  const fetchActivityLibrary = async () => {
+  useEffect(() => {
+    fetchMemberDetail();
+  }, [memberId]);
+
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setIsDirty(true);
+  };
+
+  // Guardar cambios del perfil vía PATCH
+  const handleSaveProfile = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setSaving(true);
     try {
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/library`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const prefsPayload = {
+        telegram: formData.telegram,
+        age: formData.age,
+        profession: formData.profession,
+        quote: formData.quote,
+        initialTribute: formData.initialTribute,
+        servedSince: formData.servedSince,
+        preferences: formData.preferences,
+        motivation: formData.motivation,
+        fetishes: formData.fetishes,
+        triggers: formData.triggers,
+        limits: formData.limits,
+        aftercare: formData.aftercare,
+        personalGoals: formData.personalGoals,
+        activeSubscription: formData.activeSubscription
+      };
+
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...formData,
+          preferences: JSON.stringify(prefsPayload)
+        })
       });
+
       const data = await res.json();
-      if (Array.isArray(data)) {
-        setActivitiesLibrary(data);
-      }
-    } catch (e) {
-      console.error('Error fetching library:', e);
+      if (!res.ok) throw new Error(data.error || 'Error al guardar');
+
+      setIsDirty(false);
+      setShowEditDrawer(false);
+      fetchMemberDetail();
+      if (onRefreshList) onRefreshList();
+      alert('¡Perfil del sumiso actualizado con éxito!');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
-  useEffect(() => {
-    fetchMemberDetail();
-    fetchActivityLibrary();
-  }, [memberId]);
-
-  // Derived parsed preferences
-  const currentPrefs = useMemo(() => {
-    if (!member) return profileForm;
+  // Guardar ingreso manual directo
+  const handleSaveManualRevenue = async (amount) => {
     try {
-      if (typeof member.preferences === 'string') {
-        return { ...profileForm, ...JSON.parse(member.preferences) };
-      }
-      return { ...profileForm, ...(member.preferences || {}) };
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/revenue`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ totalRevenue: parseFloat(amount) || 0 })
+      });
+      if (!res.ok) throw new Error('Error guardando ingresos');
+      fetchMemberDetail();
+      if (onRefreshList) onRefreshList();
+      alert('Total aportado actualizado');
     } catch (e) {
-      return profileForm;
+      alert(e.message);
     }
-  }, [member, profileForm]);
+  };
 
-  // Derived official groups from KingdomGroup table
-  const currentGroupObj = useMemo(() => {
-    const gId = profileForm.groupId || member?.groupId;
-    return allGroups.find(g => g.id === gId) || member?.group || null;
-  }, [allGroups, profileForm.groupId, member?.groupId, member?.group]);
-
-  const targetGroupObj = useMemo(() => {
-    const tgId = profileForm.targetGroupId || member?.targetGroupId;
-    return allGroups.find(g => g.id === tgId) || member?.targetGroup || null;
-  }, [allGroups, profileForm.targetGroupId, member?.targetGroupId, member?.targetGroup]);
-
-  // Real financial transactions (combining Store Orders and Kingdom Subscriptions)
-  const financialTransactions = useMemo(() => {
-    const list = [];
-    if (member?.finances?.orders && Array.isArray(member.finances.orders)) {
-      member.finances.orders.forEach(o => {
-        const isGift = o.packagingOptionName?.toLowerCase().includes('regalo') || 
-                       o.itemName?.toLowerCase().includes('regalo') ||
-                       (o.specialInstructions && o.specialInstructions.toLowerCase().includes('regalo'));
-        list.push({
-          id: `order_${o.id}`,
-          date: o.createdAt,
-          concept: o.itemName || (o.items && o.items[0]?.name) || 'Pedido Tienda',
-          type: isGift ? 'Regalo' : 'Tributo / Tienda',
-          amount: o.totalAmount || 0,
-          notes: o.orderStatus || o.paymentStatus || 'Pagado'
-        });
-      });
-    }
-
-    if (member?.subscriptions && Array.isArray(member.subscriptions)) {
-      member.subscriptions.forEach(s => {
-        list.push({
-          id: `sub_${s.id}`,
-          date: s.startedAt || s.createdAt,
-          concept: `Suscripción Reino (${s.group?.name || 'Membresía'})`,
-          type: 'Suscripción',
-          amount: s.price || 0,
-          notes: s.status === 'ACTIVE' ? 'Activa' : s.status
-        });
-      });
-    }
-
-    return list.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-  }, [member?.finances?.orders, member?.subscriptions]);
-
-  // Filter library by type
-  const libraryByType = useMemo(() => {
-    const map = {
-      TASK: [],
-      RITUAL: [],
-      PUNISHMENT: [],
-      REWARD: [],
-      PRIVILEGE: [],
-      GOAL: [],
-      SPECIAL_EVENT: []
-    };
-    activitiesLibrary.forEach(item => {
-      const type = (item.type || '').toUpperCase();
-      if (map[type]) {
-        map[type].push(item);
-      } else if (type === 'TRAINING') {
-        map.TASK.push(item);
-      } else if (type === 'SPECIAL_ACTIVITY') {
-        map.SPECIAL_EVENT.push(item);
-      }
-    });
-    return map;
-  }, [activitiesLibrary]);
-
-  // Handle Training Designer Assignment from Dropdowns
-  const handleAddSelectedTraining = async () => {
-    const selectedKey = Object.keys(selectedTrainingItems).find(k => selectedTrainingItems[k]);
-    if (!selectedKey) {
-      alert('Por favor selecciona al menos una actividad de uno de los desplegables para añadir al entrenamiento.');
+  // Registrar nuevo pago/tributo
+  const handleAddTribute = async (e) => {
+    e.preventDefault();
+    if (!newTribute.amount || isNaN(newTribute.amount)) {
+      alert('Introduce un importe válido');
       return;
     }
-
-    const templateId = selectedTrainingItems[selectedKey];
-    const template = activitiesLibrary.find(t => t.id === templateId);
-    if (!template) return;
-
-    setAssigningTraining(true);
+    setAddingTribute(true);
     try {
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assign`, {
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/tributes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(newTribute)
+      });
+      if (!res.ok) throw new Error('Error al registrar tributo');
+      setNewTribute({
+        amount: '',
+        concept: 'Tributo de devoción',
+        paymentMethod: 'BIZUM',
+        reference: '',
+        notes: '',
+        date: new Date().toISOString().split('T')[0]
+      });
+      fetchMemberDetail();
+      if (onRefreshList) onRefreshList();
+      alert('¡Tributo registrado e ingresos recalculados!');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setAddingTribute(false);
+    }
+  };
+
+  // Eliminar tributo
+  const handleDeleteTribute = async (tributeId) => {
+    if (!confirm('¿Eliminar este registro financiero?')) return;
+    try {
+      await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/tributes/${tributeId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchMemberDetail();
+      if (onRefreshList) onRefreshList();
+    } catch (err) {
+      alert('Error eliminando tributo');
+    }
+  };
+
+  // Asignar actividad desde la biblioteca (1-clic)
+  const handleAssignTemplate = async (template) => {
+    try {
+      const defaultDueDate = new Date();
+      defaultDueDate.setDate(defaultDueDate.getDate() + (template.defaultDurationDays || 3));
+
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assignments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          memberIds: [member.id],
+          memberIds: [memberId],
           templateId: template.id,
           title: template.title,
-          type: template.type,
-          dueDays: template.defaultDurationDays || 3,
-          pointsAwarded: template.pointsValue || 15,
-          customInstructions: 'PRIORITY:HIGH'
+          type: template.type || 'TASK',
+          customInstructions: template.instructions || '',
+          pointsAwarded: template.pointsValue || 20,
+          status: 'ACTIVE',
+          dueDate: defaultDueDate.toISOString()
+        })
+      });
+      if (!res.ok) throw new Error('Error al asignar actividad');
+      fetchMemberDetail();
+      if (onRefreshList) onRefreshList();
+      alert(`Actividad "${template.title}" asignada a ${formData.alias}`);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Asignar actividad personalizada
+  const handleCreateCustomActivity = async (e) => {
+    e.preventDefault();
+    if (!newObjective.title.trim()) {
+      alert('Introduce un título para la actividad');
+      return;
+    }
+    setAddingObjective(true);
+    try {
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + parseInt(newObjective.dueDays || 3, 10));
+
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assignments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          memberIds: [memberId],
+          templateId: newObjective.templateId || null,
+          title: newObjective.title,
+          type: newObjective.type,
+          customInstructions: newObjective.customInstructions,
+          pointsAwarded: parseFloat(newObjective.pointsAwarded) || 0,
+          status: 'ACTIVE',
+          dueDate: dueDate.toISOString(),
+          priority: newObjective.priority || 'MEDIUM'
         })
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Error al asignar actividad');
-      }
-      
-      setSelectedTrainingItems({
-        task: '',
-        ritual: '',
-        punishment: '',
-        reward: '',
-        privilege: '',
-        goal: '',
-        special: ''
+      if (!res.ok) throw new Error('Error al crear asignación');
+      setShowNewActivityModal(false);
+      setNewObjective({
+        templateId: '',
+        title: '',
+        type: 'TASK',
+        dueDays: 3,
+        pointsAwarded: 20,
+        priority: 'MEDIUM',
+        customInstructions: ''
       });
-
       fetchMemberDetail();
       if (onRefreshList) onRefreshList();
+      alert('¡Actividad asignada con éxito!');
     } catch (err) {
       alert(err.message);
     } finally {
-      setAssigningTraining(false);
+      setAddingObjective(false);
     }
   };
 
-  // Handle deleting assigned activity
-  const handleDeleteAssignment = async (assignmentId) => {
-    if (!confirm('¿Eliminar esta actividad asignada?')) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assignments/${assignmentId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error('Error al eliminar');
-      fetchMemberDetail();
-      if (onRefreshList) onRefreshList();
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  // Handle completing assigned activity
-  const handleCompleteAssignment = async (assignmentId) => {
+  // Actualizar estado de asignación
+  const handleUpdateAssignmentStatus = async (assignmentId, nextStatus) => {
     try {
       const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assignments/${assignmentId}`, {
         method: 'PUT',
@@ -350,12 +415,9 @@ export function MemberCrmModal({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({
-          status: 'COMPLETED_ON_TIME',
-          adminFeedback: 'Completado con éxito'
-        })
+        body: JSON.stringify({ status: nextStatus })
       });
-      if (!res.ok) throw new Error('Error al completar');
+      if (!res.ok) throw new Error('Error actualizando estado');
       fetchMemberDetail();
       if (onRefreshList) onRefreshList();
     } catch (err) {
@@ -363,81 +425,70 @@ export function MemberCrmModal({
     }
   };
 
-  // Handle adding new custom activity
-  const handleCreateCustomActivity = async (e) => {
-    e.preventDefault();
-    if (!newActivityForm.title.trim()) {
-      alert('Por favor introduce un título para la actividad');
-      return;
-    }
+  // Eliminar asignación
+  const handleDeleteAssignment = async (assignmentId) => {
+    if (!confirm('¿Eliminar esta actividad del sumiso?')) return;
     try {
-      const priorityTag = `PRIORITY:${newActivityForm.priority === 'Alta' ? 'HIGH' : newActivityForm.priority === 'Media' ? 'MEDIUM' : 'LOW'}`;
-      const instructions = newActivityForm.customInstructions.trim() 
-        ? `${newActivityForm.customInstructions.trim()} [${priorityTag}]`
-        : priorityTag;
+      await fetch(`${API_BASE}/api/kingdom/admin/activities/assignments/${assignmentId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchMemberDetail();
+      if (onRefreshList) onRefreshList();
+    } catch (err) {
+      alert('Error eliminando actividad');
+    }
+  };
 
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assign`, {
+  // Dispensar / Validar requisito
+  const handleToggleRequirement = async (definitionId, currentStatus) => {
+    const nextStatus = currentStatus === 'COMPLETED' ? 'PENDING' : 'COMPLETED';
+    try {
+      await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/requirements/waive`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          memberIds: [member.id],
-          title: newActivityForm.title.trim(),
-          type: newActivityForm.type,
-          status: newActivityForm.status,
-          dueDate: newActivityForm.dueDate,
-          pointsAwarded: parseFloat(newActivityForm.pointsAwarded) || 0,
-          customInstructions: instructions
+          definitionId,
+          status: nextStatus,
+          evidenceNotes: 'Actualizado directamente desde la ficha'
         })
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Error al crear actividad');
-
-      setShowNewActivityModal(false);
-      setNewActivityForm({
-        title: '',
-        type: 'TASK',
-        status: 'ACTIVE',
-        dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-        priority: 'Alta',
-        pointsAwarded: 25,
-        customInstructions: ''
-      });
       fetchMemberDetail();
-      if (onRefreshList) onRefreshList();
     } catch (err) {
-      alert(err.message);
+      alert('Error actualizando requisito');
     }
   };
 
-  // Handle adding new skill
-  const handleAddSkillSubmit = async (e) => {
+  // Añadir habilidad
+  const handleAddSkill = async (e) => {
     e.preventDefault();
+    if (!newSkill.skillName.trim()) return;
+    setAddingSkill(true);
     try {
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${member.id}/skills`, {
+      await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/skills`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(skillForm)
+        body: JSON.stringify(newSkill)
       });
-      if (!res.ok) throw new Error('Error al añadir habilidad');
-      setShowAddSkill(false);
-      setSkillForm({ skillCategory: 'VIDEO_EDITING', skillName: '', level: 'ADVANCED', notes: '' });
+      setNewSkill({ skillCategory: 'VIDEO_EDITING', skillName: '', level: 'ADVANCED', notes: '3/5 puntos de maestría' });
       fetchMemberDetail();
     } catch (err) {
-      alert(err.message);
+      alert('Error al añadir habilidad');
+    } finally {
+      setAddingSkill(false);
     }
   };
 
-  // Handle deleting skill
+  // Eliminar habilidad
   const handleDeleteSkill = async (skillId) => {
-    if (!confirm('¿Eliminar esta habilidad laboral?')) return;
     try {
-      await fetch(`${API_BASE}/api/kingdom/admin/members/${member.id}/skills/${skillId}`, {
+      await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/skills/${skillId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -447,1987 +498,1569 @@ export function MemberCrmModal({
     }
   };
 
-  // Handle adding note
-  const handleAddNoteSubmit = async (e) => {
+  // Añadir nota confidencial
+  const handleAddNote = async (e) => {
     e.preventDefault();
-    if (!newNoteText.trim()) return;
+    if (!newNote.trim()) return;
+    setAddingNote(true);
     try {
-      const notePrefix = newNoteType === 'next_steps' ? '[PRÓXIMOS PASOS] ' : '';
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${member.id}/notes`, {
+      await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/notes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ note: `${notePrefix}${newNoteText.trim()}` })
+        body: JSON.stringify({ note: newNote.trim() })
       });
-      if (!res.ok) throw new Error('Error al guardar nota');
-      setNewNoteText('');
-      setShowAddNoteModal(false);
+      setNewNote('');
       fetchMemberDetail();
     } catch (err) {
-      alert(err.message);
+      alert('Error guardando nota');
+    } finally {
+      setAddingNote(false);
     }
   };
 
-  // Handle deleting note
+  // Eliminar nota
   const handleDeleteNote = async (noteId) => {
-    if (!confirm('¿Eliminar esta nota?')) return;
     try {
-      await fetch(`${API_BASE}/api/kingdom/admin/members/${member.id}/notes/${noteId}`, {
+      await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/notes/${noteId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchMemberDetail();
     } catch (err) {
-      alert('Error al eliminar nota');
+      alert('Error eliminando nota');
     }
   };
 
-  // Handle profile update submit
-  const handleSaveProfile = async (e) => {
-    e.preventDefault();
-    try {
-      const prefsPayload = {
-        email: profileForm.email,
-        telegram: profileForm.telegram,
-        ageStatus: profileForm.ageStatus,
-        motivation: profileForm.motivation,
-        servedSince: profileForm.servedSince,
-        initialTribute: profileForm.initialTribute,
-        currentRank: profileForm.currentRank,
-        targetRank: profileForm.targetRank,
-        quote: profileForm.quote,
-        preferences: profileForm.preferences,
-        fetishes: profileForm.fetishes,
-        triggers: profileForm.triggers,
-        limits: profileForm.limits,
-        aftercare: profileForm.aftercare,
-        personalGoals: profileForm.personalGoals
-      };
+  // Filtrado de actividades de la biblioteca
+  const filteredTemplates = useMemo(() => {
+    return activitiesLibrary.filter(t => {
+      const matchCat = selectedActivityCategory === 'ALL' || t.type === selectedActivityCategory;
+      const matchSearch = !activitySearchQuery || 
+        t.title.toLowerCase().includes(activitySearchQuery.toLowerCase()) || 
+        (t.instructions && t.instructions.toLowerCase().includes(activitySearchQuery.toLowerCase()));
+      return matchCat && matchSearch;
+    });
+  }, [activitiesLibrary, selectedActivityCategory, activitySearchQuery]);
 
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${member.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          alias: profileForm.alias,
-          internalName: profileForm.internalName,
-          memberNumber: profileForm.memberNumber,
-          email: profileForm.email,
-          telegram: profileForm.telegram,
-          ageStatus: profileForm.ageStatus,
-          motivation: profileForm.motivation,
-          status: profileForm.status,
-          groupId: profileForm.groupId || null,
-          targetGroupId: profileForm.targetGroupId || null,
-          overallProgress: parseFloat(profileForm.overallProgress || 0),
-          experiencePoints: parseInt(profileForm.experiencePoints || 0, 10),
-          personalGoals: profileForm.personalGoals,
-          preferences: JSON.stringify(prefsPayload)
-        })
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Error actualizando perfil');
-      }
-      setShowEditProfile(false);
-      fetchMemberDetail();
-      if (onRefreshList) onRefreshList();
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  // Search filter members
-  const filteredSearchMembers = useMemo(() => {
-    if (!searchMemberQuery.trim()) return [];
+  // Filtrado para el buscador rápido de sumisos en cabecera
+  const filteredMembersList = useMemo(() => {
+    if (!memberSearchQuery.trim()) return allMembers.slice(0, 8);
+    const q = memberSearchQuery.toLowerCase();
     return allMembers.filter(m => 
-      (m.alias || '').toLowerCase().includes(searchMemberQuery.toLowerCase()) ||
-      (m.memberNumber || '').toLowerCase().includes(searchMemberQuery.toLowerCase()) ||
-      (m.internalName || '').toLowerCase().includes(searchMemberQuery.toLowerCase())
-    ).slice(0, 5);
-  }, [allMembers, searchMemberQuery]);
+      (m.alias && m.alias.toLowerCase().includes(q)) ||
+      (m.memberNumber && m.memberNumber.toLowerCase().includes(q)) ||
+      (m.email && m.email.toLowerCase().includes(q))
+    ).slice(0, 8);
+  }, [allMembers, memberSearchQuery]);
 
-  // Skill dot render helper
-  const renderSkillDots = (level) => {
-    let count = 3;
-    if (level === 'BASIC') count = 2;
-    if (level === 'INTERMEDIATE') count = 3;
-    if (level === 'ADVANCED') count = 4;
-    if (level === 'EXPERT') count = 5;
+  // Historial combinado financiero
+  const combinedHistory = useMemo(() => {
+    return [
+      ...(member?.finances?.tributes || []).map(t => ({
+        id: t.id,
+        type: 'TRIBUTO',
+        concept: t.concept || 'Tributo manual',
+        amount: t.amount,
+        method: t.paymentMethod,
+        date: t.date || t.createdAt,
+        isTribute: true
+      })),
+      ...(member?.finances?.orders || []).map(o => ({
+        id: o.id,
+        type: 'TIENDA',
+        concept: o.orderNumber ? `Pedido ${o.orderNumber}` : (o.itemName || 'Compra Tienda'),
+        amount: o.totalAmount,
+        method: o.paymentMethod || 'Stripe/Bizum',
+        date: o.createdAt,
+        status: o.paymentStatus
+      })),
+      ...(member?.subscriptions || []).map(s => ({
+        id: s.id,
+        type: 'SUSCRIPCIÓN',
+        concept: s.grantReason || (s.group?.name ? `Acceso a ${s.group.name}` : 'Suscripción Reino'),
+        amount: s.amount || s.price || 0,
+        method: s.activationMethod,
+        date: s.startDate || s.createdAt,
+        status: s.status
+      }))
+    ].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+  }, [member]);
 
+  // Estadísticas calculadas
+  const assignments = member?.assignments || [];
+  const completedAssignmentsCount = assignments.filter(a => a.status === 'COMPLETED' || a.status === 'COMPLETED_ON_TIME').length;
+  const totalAssignmentsCount = assignments.length || 4;
+  const ritualsCount = assignments.filter(a => a.type === 'RITUAL').length;
+  const ritualsCompleted = assignments.filter(a => a.type === 'RITUAL' && (a.status === 'COMPLETED' || a.status === 'COMPLETED_ON_TIME')).length;
+  const trainingsCount = assignments.filter(a => a.type === 'TASK' || a.type === 'GOAL').length;
+  const trainingsCompleted = assignments.filter(a => (a.type === 'TASK' || a.type === 'GOAL') && (a.status === 'COMPLETED' || a.status === 'COMPLETED_ON_TIME')).length;
+
+  const currentRankName = member?.group?.name || 'SIRVIENTES';
+  const currentRankBadge = member?.group?.badge || 'NIVEL 2';
+  const currentRankSubtitle = member?.group?.subtitle || 'Trato directo & Contratos';
+
+  // Timeline de actividad unificado
+  const activityTimeline = useMemo(() => {
+    const list = [];
+    (member?.eventLogs || []).forEach(log => {
+      list.push({
+        id: log.id,
+        date: log.createdAt,
+        title: log.eventType === 'TASK_ASSIGNED' ? 'Tarea Asignada' : (log.eventType || 'Evento registrado'),
+        description: log.description
+      });
+    });
+
+    if (list.length === 0) {
+      assignments.forEach(a => {
+        list.push({
+          id: a.id,
+          date: a.assignedAt || a.createdAt,
+          title: 'Tarea Asignada',
+          description: `Actividad asignada: "${a.title}" (${a.type}). ${a.dueDate ? `Límite: ${new Date(a.dueDate).toLocaleDateString('es-ES')}.` : ''}`
+        });
+      });
+    }
+
+    return list.slice(0, 6);
+  }, [member, assignments]);
+
+  if (loading && !member) {
     return (
-      <div className="flex items-center gap-1 text-[13px]">
-        {[1, 2, 3, 4, 5].map(i => (
-          <span 
-            key={i} 
-            className={`inline-block w-2.5 h-2.5 rounded-full ${i <= count ? 'bg-[#c5a059]' : 'bg-[#3a282f]'}`}
-          />
-        ))}
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#090305] text-gold-400 font-mono text-xs space-y-3">
+        <Crown className="w-8 h-8 text-gold-400 animate-bounce" />
+        <span className="tracking-widest uppercase animate-pulse">Cargando expediente del sumiso DOMINIUM...</span>
       </div>
     );
-  };
-
-  // Format date helper
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '—';
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return dateStr;
-      const day = d.getDate();
-      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
-    } catch (e) {
-      return dateStr;
-    }
-  };
-
-  // Filter notes by category
-  const displayedNotes = useMemo(() => {
-    const rawNotes = member?.notes || [];
-    if (notesFilter === 'next_steps') {
-      return rawNotes.filter(n => (n.note || '').includes('[PRÓXIMOS PASOS]'));
-    }
-    return rawNotes.filter(n => !(n.note || '').includes('[PRÓXIMOS PASOS]'));
-  }, [member?.notes, notesFilter]);
-
-  // Sorted assignments matching exact reference table
-  const sortedAssignments = useMemo(() => {
-    if (!member?.assignments) return [];
-    return [...member.assignments].sort((a, b) => {
-      // Prioritize the 5 mockup items in order
-      const order = [
-        'Enviar tributo semanal',
-        'Ritual de humildad',
-        'Informe diario de obediencia',
-        'Castigo: Sin privilegios',
-        'Sesión de servicio virtual'
-      ];
-      const idxA = order.indexOf(a.title);
-      const idxB = order.indexOf(b.title);
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-      return 0;
-    });
-  }, [member?.assignments]);
-
-  if (!memberId) return null;
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#050304]/95 backdrop-blur-xl p-2 sm:p-4 md:p-6 transition-all duration-300">
+    <div className="fixed inset-0 z-50 bg-[#090305] text-[#f5ebe1] w-screen h-screen overflow-y-auto flex flex-col font-sans select-none custom-scrollbar animate-fade-in">
       
-      {/* Container simulating high density editorial single canvas */}
-      <div className="relative w-full max-w-[1380px] bg-[#0a0709] border border-[#3e1b24] shadow-2xl rounded-2xl text-[#f3e8d9] overflow-hidden my-auto">
+      {/* ========================================================================= */}
+      {/* 1. TOP BAR LUXURY BRAND (DOMINIUM)                                         */}
+      {/* ========================================================================= */}
+      <header className="w-full bg-[#0e0508] border-b border-[#2d151e] px-4 sm:px-8 py-3 flex items-center justify-between shrink-0">
         
-        {/* Atmospheric ambient glows */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-b from-[#6a1528]/20 via-[#4a0e1b]/10 to-transparent blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-t from-[#6a1528]/15 via-transparent to-transparent blur-3xl pointer-events-none" />
-
-        {/* ========================================================================= */}
-        {/* TOP BANNER: DOMINIUM HEADER & PHILOSOPHY ("Referencia funcional · Perfil del sumiso") */}
-        {/* ========================================================================= */}
-        <div className="relative px-6 py-4 border-b border-[#2d141b] flex flex-col md:flex-row items-center justify-between gap-4 bg-[#0d090c]">
-          
-          {/* Brand Seal */}
-          <div className="flex items-center gap-3">
-            <Crown className="w-6 h-6 text-[#c9a227]" />
-            <div>
-              <h1 className="font-brand font-bold text-base tracking-[0.25em] text-[#e5c158] uppercase">
-                DOMINIUM
-              </h1>
-              <p className="text-[9px] font-mono tracking-[0.3em] text-[#9a8677] uppercase -mt-0.5">
-                DISCIPLINA · BELLEZA · LEALTAD
-              </p>
-            </div>
+        {/* Brand izquierda */}
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#30101a] to-[#5a1b2e] border border-gold-500/40 flex items-center justify-center shadow-lg">
+            <Crown className="w-4 h-4 text-gold-400" />
           </div>
-
-          {/* Central Title */}
-          <div className="text-center">
-            <h2 className="text-lg md:text-xl font-brand font-bold text-[#faf3e8] tracking-wide">
-              Referencia funcional · Perfil del sumiso
-            </h2>
-            <div className="flex items-center justify-center gap-2 mt-0.5">
-              <span className="h-px w-8 bg-[#5f4717]/60" />
-              <p className="text-[11px] font-serif italic text-[#c5a059] tracking-wider">
-                Vista única sin pestañas · todo visible por apartados
-              </p>
-              <span className="h-px w-8 bg-[#5f4717]/60" />
-            </div>
-          </div>
-
-          {/* Luxury Quote + Close Button */}
-          <div className="flex items-center gap-6">
-            <div className="hidden lg:block text-right">
-              <p className="font-serif italic text-xs text-[#d9cdaf]">
-                “Un buen diseño también es una forma de Dominio.”
-              </p>
-              <p className="text-[10px] font-mono text-[#8c6a2f] tracking-widest uppercase mt-0.5">
-                — DOMINIUM
-              </p>
-            </div>
-
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl bg-[#1c1116] border border-[#44222b] text-[#c5a059] hover:text-white hover:bg-[#341620] hover:border-[#c9a227] transition-all"
-              title="Cerrar vista"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* ========================================================================= */}
-        {/* INNER CONTAINER HEADER: "Perfil del sumiso" / Tools / Admin Avatar */}
-        {/* ========================================================================= */}
-        <div className="px-6 py-3.5 bg-[#0e0a0d] border-b border-[#2d141b] flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h3 className="text-base font-brand font-bold text-white tracking-wide">
-              Perfil del sumiso
-            </h3>
-            <p className="text-[10px] font-mono tracking-widest text-[#8e8073] uppercase">
-              GESTIÓN COMPLETA DEL SUMISO
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 relative">
-            {/* Search Input */}
-            <div className="relative">
-              <div className="flex items-center bg-[#130d11] border border-[#3e1e27] focus-within:border-[#c5a059] rounded-full px-3 py-1.5 text-xs text-[#e5c158] transition-all w-52 sm:w-64">
-                <Search className="w-3.5 h-3.5 text-[#8e8073] mr-2" />
-                <input
-                  type="text"
-                  placeholder="Buscar sumiso..."
-                  value={searchMemberQuery}
-                  onChange={(e) => {
-                    setSearchMemberQuery(e.target.value);
-                    setShowSearchDropdown(true);
-                  }}
-                  onFocus={() => setShowSearchDropdown(true)}
-                  className="bg-transparent border-none text-xs text-[#f3e8d9] focus:outline-none placeholder-[#6b5e54] w-full"
-                />
-              </div>
-
-              {/* Search dropdown results */}
-              {showSearchDropdown && filteredSearchMembers.length > 0 && (
-                <div className="absolute top-full mt-1 right-0 w-72 bg-[#140c11] border border-[#5a2735] rounded-xl shadow-2xl z-50 p-1.5 space-y-1">
-                  {filteredSearchMembers.map(sm => (
-                    <button
-                      key={sm.id}
-                      onClick={() => {
-                        if (onSelectMember) onSelectMember(sm.id);
-                        fetchMemberDetail(sm.id);
-                        setShowSearchDropdown(false);
-                        setSearchMemberQuery('');
-                      }}
-                      className="w-full text-left p-2 rounded-lg hover:bg-[#2c131c] flex items-center justify-between text-xs transition-colors"
-                    >
-                      <div>
-                        <span className="font-mono text-[#c5a059] font-bold mr-2">{sm.memberNumber}</span>
-                        <span className="font-brand text-white">{sm.alias}</span>
-                      </div>
-                      <span className="text-[10px] text-[#8e8073] font-mono">{sm.status}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Notification Bell */}
-            <button className="p-2 rounded-full bg-[#130d11] border border-[#3e1e27] text-[#c5a059] hover:text-white hover:bg-[#2a131b] transition-all">
-              <Bell className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Admin Avatar Chip */}
-            <div className="flex items-center gap-2.5 pl-2 border-l border-[#2e171f]">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#6a1528] to-[#c9a227] p-0.5">
-                <div className="w-full h-full rounded-full bg-[#0d090c] flex items-center justify-center overflow-hidden">
-                  <span className="font-brand font-bold text-xs text-[#e5c158]">D</span>
-                </div>
-              </div>
-              <div className="text-left leading-tight hidden sm:block">
-                <span className="text-xs font-brand font-bold text-white block">Dominatrix</span>
-                <span className="text-[10px] font-mono text-[#c5a059] block">Admin</span>
-              </div>
-            </div>
+            <span className="font-brand font-black text-sm tracking-[0.2em] text-gold-400 uppercase block leading-tight">
+              DOMINIUM
+            </span>
+            <span className="text-[8px] tracking-[0.25em] text-[#937b85] uppercase font-mono block">
+              DISCIPLINA · BELLEZA · LEALTAD
+            </span>
           </div>
         </div>
 
-        {/* ========================================================================= */}
-        {/* MAIN BODY: VISTA ÚNICA SIN PESTAÑAS (SCROLLABLE HIGH DENSITY GRID) */}
-        {/* ========================================================================= */}
-        <div className="p-4 sm:p-6 space-y-4 max-h-[82vh] overflow-y-auto custom-scrollbar">
+        {/* Centro de la barra */}
+        <div className="hidden md:flex flex-col items-center text-center">
+          <span className="font-serif italic text-sm text-[#e8d5c4] font-medium tracking-wide">
+            Referencia funcional · Perfil del sumiso
+          </span>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="h-[1px] w-8 bg-gradient-to-r from-transparent to-[#866675]" />
+            <span className="text-[10px] text-[#866675] tracking-wider font-mono">
+              Vista única sin pestañas - todo visible por apartados
+            </span>
+            <span className="h-[1px] w-8 bg-gradient-to-l from-transparent to-[#866675]" />
+          </div>
+        </div>
 
-          {/* --------------------------------------------------------------------- */}
-          {/* ROW 1: BOCADILLOS 2 & 3 - CABECERA RÁPIDA & RESUMEN FINANCIERO */}
-          {/* --------------------------------------------------------------------- */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            
-            {/* BOCADILLO 2: CABECERA RÁPIDA (col-span-7) */}
-            <div className="lg:col-span-7 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 relative flex flex-col sm:flex-row gap-5 shadow-lg">
-              
-              {/* Edit Profile Button */}
-              <button
-                onClick={() => setShowEditProfile(true)}
-                className="absolute top-4 right-4 py-1.5 px-3 rounded-lg bg-[#1a0f14] border border-[#5c2a38] text-[#e5c158] hover:bg-[#2c131d] hover:border-[#c5a059] text-xs font-mono font-bold flex items-center gap-1.5 transition-all shadow-sm"
+        {/* Lado derecho: Cita & Botón Salir */}
+        <div className="flex items-center gap-4">
+          <div className="text-right hidden lg:block">
+            <p className="text-[11px] font-serif italic text-[#c2a393] leading-none">
+              “Un buen diseño también es una forma de Dominio.”
+            </p>
+            <span className="text-[9px] text-[#937b85] tracking-widest uppercase font-mono block mt-0.5">
+              — DOMINIUM
+            </span>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg bg-[#190c12] hover:bg-[#2b121d] border border-[#3e1b29] hover:border-gold-500/60 text-gray-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            title="Cerrar ficha de sumiso (ESC)"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </header>
+
+      {/* ========================================================================= */}
+      {/* 2. SUB-HEADER / TOOLBAR & BUSCADOR RÁPIDO DE SUMISOS                       */}
+      {/* ========================================================================= */}
+      <div className="w-full bg-[#0a0406] border-b border-[#241018] px-4 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shrink-0">
+        
+        <div>
+          <h1 className="font-brand font-extrabold text-2xl text-ivory-100 tracking-wide leading-tight">
+            Perfil del sumiso
+          </h1>
+          <span className="text-[9px] font-mono tracking-[0.25em] text-[#9a7e8c] uppercase block">
+            GESTIÓN COMPLETA DEL SUMISO
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3 w-full sm:w-auto relative">
+          
+          {/* Buscador interactivo de sumisos para cambiar instantáneamente */}
+          <div className="relative flex-1 sm:w-72">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={memberSearchQuery}
+              onChange={(e) => {
+                setMemberSearchQuery(e.target.value);
+                setShowMemberSearchDropdown(true);
+              }}
+              onFocus={() => setShowMemberSearchDropdown(true)}
+              placeholder="Buscar sumiso..."
+              className="w-full bg-[#13080d] border border-[#381a25] rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-gray-500 font-sans focus:outline-none focus:border-gold-500/60"
+            />
+
+            {/* Dropdown de cambio rápido de sumiso */}
+            {showMemberSearchDropdown && filteredMembersList.length > 0 && (
+              <div 
+                className="absolute top-full left-0 right-0 mt-1 bg-[#15090f] border border-gold-500/40 rounded-xl shadow-2xl z-50 overflow-hidden divide-y divide-[#2a131c]"
+                onMouseLeave={() => setShowMemberSearchDropdown(false)}
               >
-                <Edit3 className="w-3.5 h-3.5" />
-                Editar perfil
-              </button>
-
-              {/* Submissive Portrait */}
-              <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden border border-[#5a2735] flex-shrink-0 bg-[#090507] shadow-inner relative group">
-                <img 
-                  src="/dominium_sub_avatar.jpg" 
-                  alt={currentPrefs.alias || 'Submisive'} 
-                  className="w-full h-full object-cover grayscale contrast-125 transition-transform duration-500 group-hover:scale-105"
-                  onError={(e) => {
-                    e.target.src = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80';
-                  }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
+                <div className="p-2 text-[10px] font-mono text-gold-400 uppercase tracking-wider bg-[#10060b]">
+                  Cambiar de sumiso:
+                </div>
+                {filteredMembersList.map(m => (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      if (onSelectMember) onSelectMember(m.id);
+                      setShowMemberSearchDropdown(false);
+                      setMemberSearchQuery('');
+                    }}
+                    className={`w-full p-2.5 text-left flex items-center justify-between hover:bg-gold-500/10 transition-colors text-xs ${
+                      m.id === memberId ? 'bg-gold-500/15 text-gold-300' : 'text-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-gold-400 font-bold text-[11px]">{m.memberNumber || '#—'}</span>
+                      <span className="font-semibold text-white">{m.alias}</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-gray-400">{m.group?.name || 'Sirvientes'}</span>
+                  </button>
+                ))}
               </div>
+            )}
+          </div>
 
-              {/* Info & Metrics Details */}
-              <div className="flex-1 space-y-3 pt-1">
-                <div>
-                  <div className="flex items-baseline gap-2">
-                    <h3 className="text-lg font-brand font-bold text-[#faf3e8]">
-                      {currentPrefs.memberNumber} / {currentPrefs.internalName || currentPrefs.alias}
-                    </h3>
+          {/* Notificaciones */}
+          <button 
+            className="w-9 h-9 rounded-xl bg-[#15090f] border border-[#381a25] flex items-center justify-center text-gray-400 hover:text-gold-300 transition-colors shrink-0 relative"
+            title="Notificaciones de sumisión"
+          >
+            <Bell className="w-4 h-4" />
+            <span className="w-2 h-2 rounded-full bg-gold-400 absolute top-2 right-2 animate-pulse" />
+          </button>
+
+          {/* Dominatrix Admin Pill */}
+          <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-[#15090f] border border-[#381a25] shrink-0">
+            <div className="w-6 h-6 rounded-full bg-dark-900 border border-gold-500/60 flex items-center justify-center text-gold-400 font-brand font-bold text-xs">
+              D
+            </div>
+            <div className="text-left leading-tight hidden sm:block">
+              <span className="text-xs font-sans font-bold text-white block">Dominatrix</span>
+              <span className="text-[9px] font-mono text-gold-400/80 block uppercase">Admin</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3. CONTENIDO PRINCIPAL EN PANTALLA ENTERA                                  */}
+      {/* ========================================================================= */}
+      <main className="flex-1 w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        {/* ----------------------------------------------------------------------- */}
+        {/* FILA SUPERIOR: IDENTIDAD (IZQ) & FINANZAS / ESTADO (DER)               */}
+        {/* ----------------------------------------------------------------------- */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          
+          {/* TARJETA 1: FICHA DE IDENTIDAD DEL SUMISO (Col 7) */}
+          <div className="lg:col-span-7 bg-[#12080c] rounded-2xl border border-[#311721] p-5 relative overflow-hidden flex flex-col justify-between shadow-2xl">
+            <div className="space-y-4">
+              
+              {/* Cabecera interna: Avatar + Info */}
+              <div className="flex items-start gap-4">
+                
+                {/* Avatar foto con esquinas redondeadas */}
+                <div className="relative group shrink-0">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden border border-[#4a2432] bg-[#1a0c12] shadow-xl">
+                    {formData.avatarUrl ? (
+                      <img src={resolveMediaUrl(formData.avatarUrl)} alt={formData.alias} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-gray-500">
+                        <User className="w-10 h-10 text-gold-500/50" />
+                        <span className="text-[9px] font-mono mt-1 text-gold-400">Sin foto</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Datos principales */}
+                <div className="flex-1 min-w-0 space-y-2">
+                  
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="font-brand font-black text-xl sm:text-2xl text-white tracking-wide truncate">
+                      {formData.memberNumber || '#002'} / {formData.alias || 'Javi'}
+                    </h2>
+
+                    {/* Botón Editar perfil */}
+                    <button
+                      onClick={() => setShowEditDrawer(true)}
+                      className="py-1.5 px-3.5 rounded-lg bg-[#1c0c14] hover:bg-[#2b121f] border border-gold-500/40 hover:border-gold-400 text-gold-300 text-xs font-sans font-bold flex items-center gap-1.5 shadow-md transition-all shrink-0 cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Editar perfil</span>
+                    </button>
                   </div>
 
-                  {/* Badges bar: Alias, Telegram, Email, AgeStatus */}
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <span className="text-xs font-mono text-[#c5a059] flex items-center gap-1">
-                      <span>👤</span> @{currentPrefs.alias}
+                  {/* Fila de Insignias / Pills */}
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    <span className="px-2.5 py-0.5 rounded-full bg-blue-950/70 border border-blue-500/40 text-blue-300 text-xs font-mono font-medium flex items-center gap-1.5">
+                      <User className="w-3 h-3 text-blue-400" />
+                      @{formData.alias || 'Javi'}
                     </span>
 
-                    {(member?.telegram || currentPrefs.telegram) && (
-                      <a
-                        href={`https://t.me/${(member?.telegram || currentPrefs.telegram).replace('@', '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#16222f] border border-[#2b4c6f] text-cyan-300 hover:text-white hover:bg-[#1f354d] text-[11px] font-mono transition-colors"
-                        title="Abrir chat en Telegram"
-                      >
-                        <span>✈️</span> {(member?.telegram || currentPrefs.telegram).startsWith('@') ? (member?.telegram || currentPrefs.telegram) : `@${member?.telegram || currentPrefs.telegram}`}
-                      </a>
-                    )}
+                    <span className="px-2.5 py-0.5 rounded-full bg-cyan-950/70 border border-cyan-500/40 text-cyan-300 text-xs font-mono font-medium flex items-center gap-1.5">
+                      <Send className="w-3 h-3 text-cyan-400" />
+                      {formData.telegram || '@javi_javi_javi'}
+                    </span>
 
-                    {(member?.email || member?.user?.email || currentPrefs.email) && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#1b1419] border border-[#44232f] text-[#c2b29f] text-[11px] font-mono">
-                        <Mail className="w-3 h-3 text-[#c5a059]" /> {member?.email || member?.user?.email || currentPrefs.email}
-                      </span>
-                    )}
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#1b0d15] border border-gray-700/60 text-gray-300 text-xs font-mono flex items-center gap-1.5">
+                      <Mail className="w-3 h-3 text-gray-400" />
+                      {formData.email || 'ilirifi@yahoo.com'}
+                    </span>
 
-                    {(member?.ageStatus || currentPrefs.ageStatus) && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#2a1720] border border-[#522938] text-rose-300 text-[11px] font-sans font-medium">
-                        <User className="w-3 h-3 text-rose-400" /> {member?.ageStatus || currentPrefs.ageStatus}
-                      </span>
-                    )}
+                    <span className="px-2.5 py-0.5 rounded-full bg-bordeaux-950/70 border border-bordeaux-500/40 text-bordeaux-200 text-xs font-sans font-medium flex items-center gap-1.5">
+                      <User className="w-3 h-3 text-bordeaux-400" />
+                      {formData.age ? `${formData.age} ` : ''}{formData.profession || 'Ingeniero Becario'}
+                    </span>
                   </div>
 
-                  {(currentPrefs.quote || member?.motivation || currentPrefs.motivation) && (
-                    <p className="text-xs font-serif italic text-[#c2b29f] mt-1.5 border-l-2 border-[#5c2a38] pl-2">
-                      "{currentPrefs.quote || member?.motivation || currentPrefs.motivation}"
-                    </p>
-                  )}
-                </div>
-
-                {/* 2-Column Metadata Grid */}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2 border-t border-[#2d141b] text-xs">
-                  {/* Col 1 */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2 text-[#8e8073]">
-                      <Calendar className="w-3.5 h-3.5 text-[#c5a059]" />
-                      <span className="text-[11px] font-mono">Sirve desde</span>
-                    </div>
-                    <p className="font-brand font-semibold text-white pl-5 text-[13px]">
-                      {currentPrefs.servedSince}
-                    </p>
-
-                    <div className="flex items-center gap-2 text-[#8e8073] pt-1">
-                      <Gift className="w-3.5 h-3.5 text-[#c5a059]" />
-                      <span className="text-[11px] font-mono">Tributo inicial</span>
-                    </div>
-                    <p className="font-brand font-semibold text-white pl-5 text-[13px]">
-                      {currentPrefs.initialTribute}
+                  {/* Cita de devoción */}
+                  <div className="pt-1">
+                    <p className="text-xs font-serif italic text-gold-200/90 pl-2.5 border-l-2 border-bordeaux-600 leading-snug">
+                      “{formData.quote || 'No es como empieza, sino como termina.'}”
                     </p>
                   </div>
 
-                  {/* Col 2 */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2 text-[#8e8073]">
-                      <Crown className="w-3.5 h-3.5 text-[#c5a059]" />
-                      <span className="text-[11px] font-mono">Rango actual</span>
-                    </div>
-                    <div className="pl-5">
-                      <div className="font-brand font-semibold text-[#e5c158] text-[13px] flex items-center gap-1.5">
-                        <span>{currentGroupObj?.name || member?.group?.name || 'PLEBEYOS'}</span>
-                        {(currentGroupObj?.badge || member?.group?.badge) && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#3a1922] text-[#c5a059] border border-[#5a2735] font-mono">
-                            {currentGroupObj?.badge || member?.group?.badge}
-                          </span>
-                        )}
-                      </div>
-                      {(currentGroupObj?.subtitle || member?.group?.subtitle) && (
-                        <p className="text-[10px] text-[#8e8073] font-mono truncate">
-                          {currentGroupObj?.subtitle || member?.group?.subtitle}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 text-[#8e8073] pt-1">
-                      <Target className="w-3.5 h-3.5 text-[#c5a059]" />
-                      <span className="text-[11px] font-mono">Rango objetivo</span>
-                    </div>
-                    <div className="pl-5">
-                      <div className="font-brand font-semibold text-white text-[13px] flex items-center gap-1.5">
-                        <span>{targetGroupObj?.name || member?.targetGroup?.name || 'SIRVIENTES'}</span>
-                        {(targetGroupObj?.badge || member?.targetGroup?.badge) && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#201118] text-[#8e8073] border border-[#3e1e27] font-mono">
-                            {targetGroupObj?.badge || member?.targetGroup?.badge}
-                          </span>
-                        )}
-                      </div>
-                      {(targetGroupObj?.subtitle || member?.targetGroup?.subtitle) && (
-                        <p className="text-[10px] text-[#8e8073] font-mono truncate">
-                          {targetGroupObj?.subtitle || member?.targetGroup?.subtitle}
-                        </p>
-                      )}
-                    </div>
-                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* BOCADILLO 3: RESUMEN FINANCIERO REAL (col-span-5) */}
-            <div className="lg:col-span-5 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 flex flex-col justify-between shadow-lg">
+              {/* Grid de Metadatos 2x2 */}
+              <div className="grid grid-cols-2 sm:grid-cols-2 gap-4 pt-3 border-t border-[#24121a]">
+                
+                {/* Sirve desde */}
+                <div className="flex items-start gap-2.5">
+                  <Calendar className="w-4 h-4 text-gold-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[10px] font-mono text-[#937b85] uppercase tracking-wider block">
+                      Sirve desde
+                    </span>
+                    <span className="text-xs font-sans font-bold text-white">
+                      {formData.servedSince || '28 sept 2026'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Rango actual */}
+                <div className="flex items-start gap-2.5">
+                  <Crown className="w-4 h-4 text-gold-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[10px] font-mono text-[#937b85] uppercase tracking-wider block">
+                      Rango actual
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-sans font-extrabold text-gold-300 uppercase tracking-wide">
+                        {currentRankName}
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded bg-gold-500/20 text-[9px] font-mono font-bold text-gold-400 border border-gold-500/40">
+                        {currentRankBadge}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-gray-400 font-sans block">
+                      {currentRankSubtitle}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tributo inicial */}
+                <div className="flex items-start gap-2.5">
+                  <Gift className="w-4 h-4 text-gold-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[10px] font-mono text-[#937b85] uppercase tracking-wider block">
+                      Tributo inicial
+                    </span>
+                    <span className="text-xs font-sans font-semibold text-ivory-200">
+                      {formData.initialTribute || 'Pendiente'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Rango objetivo */}
+                <div className="flex items-start gap-2.5">
+                  <Target className="w-4 h-4 text-gold-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[10px] font-mono text-[#937b85] uppercase tracking-wider block">
+                      Rango objetivo
+                    </span>
+                    <span className="text-xs font-sans font-bold text-gold-400 uppercase tracking-wide">
+                      {member?.targetGroup?.name || currentRankName}
+                    </span>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+
+          {/* TARJETA 2: FINANZAS Y ESTADO EN VIVO (Col 5) */}
+          <div className="lg:col-span-5 bg-[#12080c] rounded-2xl border border-[#311721] p-5 flex flex-col justify-between shadow-2xl">
+            <div className="space-y-4">
               
-              {/* 3 Metric Cards in a Row */}
-              <div className="grid grid-cols-3 gap-2.5">
-                {/* Metric 1 */}
-                <div className="bg-[#180f14] border border-[#3a1922] rounded-lg p-2.5 text-center">
-                  <span className="text-[10px] font-mono text-[#9e8f82] block truncate">
+              {/* 3 Cajas de Estadísticas de Ingresos */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-[#170a10] border border-[#2e151f] p-3 rounded-xl text-center">
+                  <span className="text-[10px] font-mono text-[#937b85] uppercase tracking-wider block mb-1">
                     Ingresado este mes
                   </span>
-                  <span className="text-base sm:text-lg font-sans font-bold text-white mt-1 block">
+                  <span className="font-brand font-black text-xl sm:text-2xl text-white">
                     €{member?.finances?.thisMonth !== undefined ? member.finances.thisMonth : 0}
                   </span>
                 </div>
 
-                {/* Metric 2 */}
-                <div className="bg-[#180f14] border border-[#3a1922] rounded-lg p-2.5 text-center">
-                  <span className="text-[10px] font-mono text-[#9e8f82] block truncate">
+                <div className="bg-[#170a10] border border-[#2e151f] p-3 rounded-xl text-center">
+                  <span className="text-[10px] font-mono text-[#937b85] uppercase tracking-wider block mb-1">
                     Ingresado mes pasado
                   </span>
-                  <span className="text-base sm:text-lg font-sans font-bold text-white mt-1 block">
+                  <span className="font-brand font-black text-xl sm:text-2xl text-white">
                     €{member?.finances?.lastMonth !== undefined ? member.finances.lastMonth : 0}
                   </span>
                 </div>
 
-                {/* Metric 3 */}
-                <div className="bg-[#180f14] border border-[#3a1922] rounded-lg p-2.5 text-center">
-                  <span className="text-[10px] font-mono text-[#9e8f82] block truncate">
+                <div className="bg-[#170a10] border border-[#2e151f] p-3 rounded-xl text-center relative group">
+                  <span className="text-[10px] font-mono text-gold-400 uppercase tracking-wider block mb-1">
                     Total aportado
                   </span>
-                  <span className="text-base sm:text-lg font-sans font-bold text-[#e5c158] mt-1 block">
-                    €{member?.finances?.total !== undefined ? member.finances.total : 0}
+                  <span className="font-brand font-black text-xl sm:text-2xl text-gold-400">
+                    €{member?.finances?.total !== undefined ? member.finances.total : formData.totalRevenue || 0}
                   </span>
+                  <button
+                    onClick={() => {
+                      const val = prompt('Modificar manualmente el total aportado (€):', formData.totalRevenue || 0);
+                      if (val !== null && !isNaN(val)) handleSaveManualRevenue(val);
+                    }}
+                    className="text-[9px] font-mono text-gray-500 hover:text-gold-300 underline block mt-0.5"
+                    title="Modificar manualmente la cantidad"
+                  >
+                    Modificar
+                  </button>
                 </div>
               </div>
 
-              {/* Bottom Row with 3 Status Indicators */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-[#2d141b] mt-3">
-                {/* Subscripción Activa */}
+              {/* Separador fino */}
+              <div className="border-t border-[#24121a] pt-4" />
+
+              {/* Fila Inferior de Indicadores de Estado */}
+              <div className="grid grid-cols-3 gap-3 items-center">
+                
+                {/* Suscripción activa */}
                 <div>
-                  <span className="text-[10px] font-mono text-[#9e8f82] block">Suscripción activa</span>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <Crown className="w-3.5 h-3.5 text-[#c5a059]" />
-                    <span className="text-xs font-brand font-bold text-[#e5c158] truncate">
-                      {(member?.subscriptions || []).find(s => s.status === 'ACTIVE')?.group?.name || 'Ninguna'}
+                  <span className="text-[10px] font-mono text-[#937b85] uppercase tracking-wider block mb-0.5">
+                    Suscripción activa
+                  </span>
+                  <span className="text-xs font-sans font-bold text-gold-300 flex items-center gap-1.5">
+                    <Crown className="w-3.5 h-3.5 text-gold-400" />
+                    {formData.activeSubscription || 'Ninguna'}
+                  </span>
+                </div>
+
+                {/* Estado del perfil */}
+                <div>
+                  <span className="text-[10px] font-mono text-[#937b85] uppercase tracking-wider block mb-0.5">
+                    Estado del perfil
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-md shadow-emerald-500/50" />
+                    <span className="text-xs font-sans font-bold text-emerald-400">
+                      {formData.status === 'ACTIVE' ? 'Activo' : formData.status}
                     </span>
                   </div>
                 </div>
 
-                {/* Estado del Perfil */}
+                {/* Progreso % con barra */}
                 <div>
-                  <span className="text-[10px] font-mono text-[#9e8f82] block">Estado del perfil</span>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className={`w-2 h-2 rounded-full ${
-                      member?.status === 'ACTIVE'
-                        ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
-                        : member?.status === 'PENDING_REVIEW'
-                        ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]'
-                        : 'bg-crimson-400 shadow-[0_0_8px_rgba(244,63,94,0.8)]'
-                    }`} />
-                    <span className={`text-xs font-mono font-bold ${
-                      member?.status === 'ACTIVE'
-                        ? 'text-emerald-300'
-                        : member?.status === 'PENDING_REVIEW'
-                        ? 'text-amber-300'
-                        : 'text-crimson-300'
-                    }`}>
-                      {member?.status === 'ACTIVE' ? 'Activo' : member?.status === 'PENDING_REVIEW' ? 'En Revisión' : member?.status || 'Inactivo'}
-                    </span>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-[10px] font-mono text-[#937b85] uppercase tracking-wider">Progreso</span>
+                    <span className="font-mono font-bold text-gold-400 text-xs">{formData.overallProgress}%</span>
                   </div>
-                </div>
-
-                {/* Progreso General */}
-                <div>
-                  <div className="flex items-center justify-between text-[10px] font-mono mb-1">
-                    <span className="text-[#9e8f82]">Progreso</span>
-                    <span className="text-[#c5a059] font-bold">{member?.overallProgress || 0}%</span>
-                  </div>
-                  <div className="w-full bg-[#1b1016] rounded-full h-1.5 overflow-hidden border border-[#3a1922]">
+                  <div className="w-full bg-[#1b0c13] rounded-full h-1.5 overflow-hidden border border-[#301621]">
                     <div 
-                      className="bg-gradient-to-r from-[#9c2b3e] to-[#e8c96a] h-full rounded-full transition-all duration-500" 
-                      style={{ width: `${Math.min(100, Math.max(0, member?.overallProgress || 0))}%` }}
+                      className="bg-gradient-to-r from-bordeaux-600 via-gold-500 to-amber-300 h-full rounded-full transition-all duration-700" 
+                      style={{ width: `${Math.min(100, Math.max(5, formData.overallProgress))}%` }} 
                     />
                   </div>
                 </div>
+
               </div>
+
             </div>
           </div>
 
-          {/* --------------------------------------------------------------------- */}
-          {/* ROW 2: BOCADILLO 4 - TIRA DE ETIQUETAS HORIZONTAL (FULL WIDTH) */}
-          {/* --------------------------------------------------------------------- */}
-          <div className="bg-[#110b0e] border border-[#3c1b24] rounded-xl p-3.5 shadow-md flex items-center justify-between gap-3 overflow-x-auto">
-            <div className="flex items-center gap-2 sm:gap-3 text-xs flex-nowrap w-full">
+        </div>
+
+        {/* ----------------------------------------------------------------------- */}
+        {/* BARRA DE ETIQUETAS HORIZONTAL FULL-WIDTH (PREFERENCIAS, MOTIVACIÓN...)  */}
+        {/* ----------------------------------------------------------------------- */}
+        <div className="bg-[#12080c] rounded-2xl border border-[#311721] p-3.5 flex flex-wrap items-center gap-3 shadow-xl">
+          
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#170a10] border border-[#2d151e]">
+            <Heart className="w-3.5 h-3.5 text-bordeaux-400" />
+            <span className="text-xs font-sans text-gold-300 font-bold">Preferencias:</span>
+            <span className="text-xs font-sans text-ivory-200">{formData.preferences}</span>
+          </div>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#170a10] border border-[#2d151e]">
+            <Target className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-xs font-sans text-cyan-300 font-bold">Motivación:</span>
+            <span className="text-xs font-sans text-ivory-200">{formData.motivation}</span>
+          </div>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#170a10] border border-[#2d151e]">
+            <Flame className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-xs font-sans text-amber-300 font-bold">Fetiches:</span>
+            <span className="text-xs font-sans text-ivory-200">{formData.fetishes}</span>
+          </div>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#170a10] border border-[#2d151e]">
+            <Zap className="w-3.5 h-3.5 text-gold-400" />
+            <span className="text-xs font-sans text-gold-300 font-bold">Triggers:</span>
+            <span className="text-xs font-sans text-ivory-200">{formData.triggers}</span>
+          </div>
+
+          <button
+            onClick={() => setShowEditDrawer(true)}
+            className="text-[11px] font-mono text-gray-500 hover:text-gold-300 underline ml-auto"
+          >
+            Editar etiquetas
+          </button>
+        </div>
+
+        {/* ----------------------------------------------------------------------- */}
+        {/* FILA MEDIA: PROGRESO Y MÉRITOS (IZQ) & ÚLTIMA ACTIVIDAD (DER)           */}
+        {/* ----------------------------------------------------------------------- */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          
+          {/* TARJETA 3: PROGRESO Y MÉRITOS (Col 6) */}
+          <div className="lg:col-span-6 bg-[#12080c] rounded-2xl border border-[#311721] p-5 flex flex-col justify-between shadow-2xl">
+            <div className="space-y-4">
               
-              {/* Preferencias */}
-              {currentPrefs.preferences && (
-                <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap" title={currentPrefs.preferences}>
-                  <Heart className="w-3.5 h-3.5 text-crimson-400" />
-                  <span className="font-mono font-bold text-[#c5a059]">Preferencias:</span>
-                  <span className="text-[#dcd3c8] truncate max-w-[220px]">{currentPrefs.preferences}</span>
+              {/* Header de la tarjeta */}
+              <div className="flex items-center justify-between pb-3 border-b border-[#24121a]">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-gold-400" />
+                  <h3 className="font-brand font-bold text-base text-white">Progreso y méritos</h3>
                 </div>
-              )}
+                <span className="px-2.5 py-0.5 rounded bg-gold-500/10 text-gold-400 text-xs font-mono font-bold uppercase tracking-wider border border-gold-500/30">
+                  {currentRankName}
+                </span>
+              </div>
 
-              {/* Motivación */}
-              {(member?.motivation || currentPrefs.motivation) && (
-                <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap" title={member?.motivation || currentPrefs.motivation}>
-                  <Target className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="font-mono font-bold text-[#c5a059]">Motivación:</span>
-                  <span className="text-[#dcd3c8] truncate max-w-[220px]">{member?.motivation || currentPrefs.motivation}</span>
-                </div>
-              )}
-
-              {/* Fetiches */}
-              {currentPrefs.fetishes && (
-                <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap" title={currentPrefs.fetishes}>
-                  <Flame className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="font-mono font-bold text-[#c5a059]">Fetiches:</span>
-                  <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.fetishes}</span>
-                </div>
-              )}
-
-              {/* Triggers */}
-              {currentPrefs.triggers && (
-                <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap" title={currentPrefs.triggers}>
-                  <Zap className="w-3.5 h-3.5 text-yellow-400" />
-                  <span className="font-mono font-bold text-[#c5a059]">Triggers:</span>
-                  <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.triggers}</span>
-                </div>
-              )}
-
-              {/* Límites */}
-              {currentPrefs.limits && (
-                <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap" title={currentPrefs.limits}>
-                  <Lock className="w-3.5 h-3.5 text-rose-400" />
-                  <span className="font-mono font-bold text-[#c5a059]">Límites:</span>
-                  <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.limits}</span>
-                </div>
-              )}
-
-              {/* Aftercare */}
-              {currentPrefs.aftercare && (
-                <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap" title={currentPrefs.aftercare}>
-                  <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
-                  <span className="font-mono font-bold text-[#c5a059]">Aftercare:</span>
-                  <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.aftercare}</span>
-                </div>
-              )}
-
-              {/* Objetivos personales */}
-              {currentPrefs.personalGoals && (
-                <div className="flex items-center gap-2 bg-[#180f14] border border-[#3c1b24] px-3 py-1.5 rounded-full whitespace-nowrap" title={currentPrefs.personalGoals}>
-                  <Target className="w-3.5 h-3.5 text-purple-400" />
-                  <span className="font-mono font-bold text-[#c5a059]">Objetivos personales:</span>
-                  <span className="text-[#dcd3c8] truncate max-w-[160px]">{currentPrefs.personalGoals}</span>
-                </div>
-              )}
-            </div>
-
-            <button 
-              onClick={() => setShowEditProfile(true)}
-              className="text-[11px] font-mono text-[#c5a059] hover:underline whitespace-nowrap pl-2"
-            >
-              Editar
-            </button>
-          </div>
-
-          {/* --------------------------------------------------------------------- */}
-          {/* ROW 3: BOCADILLO 5 - PROGRESO Y MÉRITOS + ÚLTIMA ACTIVIDAD + CITA */}
-          {/* --------------------------------------------------------------------- */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            
-            {/* Left: Progreso y méritos (col-span-7) */}
-            <div className="lg:col-span-7 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-[#2d141b]">
-                  <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-[#c5a059]" />
-                    Progreso y méritos
-                  </h4>
-                  <span className="text-xs font-mono text-[#c5a059]">
-                    {member?.position?.name || member?.group?.name || 'Aspirante'}
-                  </span>
-                </div>
-
-                {/* Progress Arc & Goal Info */}
-                <div className="flex items-center gap-5 py-4">
-                  {/* Circular Gauge */}
-                  <div className="relative w-20 h-20 flex-shrink-0 flex items-center justify-center">
-                    <svg className="w-20 h-20 transform -rotate-90">
-                      <circle
-                        cx="40"
-                        cy="40"
-                        r="34"
-                        stroke="#25141c"
-                        strokeWidth="6"
-                        fill="transparent"
-                      />
-                      <circle
-                        cx="40"
-                        cy="40"
-                        r="34"
-                        stroke="url(#progressGrad)"
-                        strokeWidth="6"
-                        strokeDasharray={213}
-                        strokeDashoffset={213 - (213 * Math.min(100, Math.max(0, member?.overallProgress || 0))) / 100}
-                        strokeLinecap="round"
-                        fill="transparent"
-                      />
-                      <defs>
-                        <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#9c2b3e" />
-                          <stop offset="100%" stopColor="#e8c96a" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                    <span className="absolute font-sans font-bold text-sm text-[#faf3e8]">
-                      {member?.overallProgress || 0}%
+              {/* Donut Chart & Escalafón */}
+              <div className="flex items-center gap-6">
+                
+                {/* Donut SVG con gradiente */}
+                <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="38" stroke="#1f0c15" strokeWidth="9" fill="transparent" />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      stroke="url(#progressGradientRing)"
+                      strokeWidth="9"
+                      fill="transparent"
+                      strokeDasharray={238.76}
+                      strokeDashoffset={238.76 - (238.76 * formData.overallProgress) / 100}
+                      strokeLinecap="round"
+                      className="transition-all duration-1000 ease-out"
+                    />
+                    <defs>
+                      <linearGradient id="progressGradientRing" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#d4af37" />
+                        <stop offset="50%" stopColor="#e0a96d" />
+                        <stop offset="100%" stopColor="#800020" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="font-mono font-extrabold text-xl text-white">
+                      {formData.overallProgress}%
                     </span>
                   </div>
+                </div>
 
-                  {/* Goal details */}
-                  <div className="flex-1 space-y-1">
-                    <h5 className="font-brand font-bold text-base text-white">
-                      Escalafón: {member?.group?.name || 'Plebeyos'}
-                    </h5>
-                    <p className="text-xs font-serif italic text-[#a39485]">
-                      {member?.status === 'ACTIVE' ? 'Devoción, constancia y evolución en la Casa.' : 'Expediente bajo revisión formal.'}
-                    </p>
-                    <div className="pt-2">
-                      <div className="flex justify-between text-[11px] font-mono text-[#8e8073] mb-1">
-                        <span>Puntos de experiencia acumulados</span>
-                        <span className="text-[#c5a059] font-bold">{member?.experiencePoints || 0} XP</span>
-                      </div>
-                      <div className="w-full bg-[#1c1016] rounded-full h-2 overflow-hidden border border-[#3e1e27]">
-                        <div 
-                          className="bg-gradient-to-r from-[#7a1225] via-[#c9a227] to-[#f7e08b] h-full rounded-full transition-all duration-500" 
-                          style={{ width: `${Math.min(100, Math.max(member?.overallProgress ? 3 : 0, member?.overallProgress || 0))}%` }}
-                        />
-                      </div>
+                {/* Info escalafón */}
+                <div className="flex-1 space-y-1.5">
+                  <h4 className="font-brand font-bold text-base text-white">
+                    Escalafón: {currentRankName}
+                  </h4>
+                  <p className="text-xs text-gray-400 font-sans italic">
+                    Devoción, constancia y evolución en la Casa.
+                  </p>
+                  
+                  <div className="pt-1">
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-[10px] font-mono text-[#937b85] uppercase">Puntos de experiencia acumulados</span>
+                      <span className="font-mono font-bold text-gold-400 text-xs">{formData.experiencePoints} XP</span>
+                    </div>
+                    <div className="w-full bg-[#1b0c13] rounded-full h-1.5 overflow-hidden border border-[#301621]">
+                      <div 
+                        className="bg-gradient-to-r from-gold-500 to-amber-300 h-full rounded-full" 
+                        style={{ width: `${Math.min(100, Math.max(10, (formData.experiencePoints / 1000) * 100))}%` }} 
+                      />
                     </div>
                   </div>
                 </div>
+
               </div>
 
-              {/* 4 Metric Boxes in Grid */}
-              <div className="grid grid-cols-4 gap-2 pt-3 border-t border-[#2d141b]">
-                <div className="bg-[#180f14] border border-[#381921] rounded-lg p-2 text-center">
-                  <Crown className="w-3.5 h-3.5 text-[#c5a059] mx-auto mb-1" />
-                  <span className="text-[9px] font-mono text-[#8e8073] block truncate">Méritos (XP)</span>
-                  <span className="text-xs sm:text-sm font-sans font-bold text-white">{member?.experiencePoints || 0}</span>
+              {/* 4 Cajas de Métricas Inferiores */}
+              <div className="grid grid-cols-4 gap-3 pt-3 border-t border-[#24121a]">
+                
+                <div className="bg-[#170a10] border border-[#2e151f] p-3 rounded-xl text-center">
+                  <Crown className="w-3.5 h-3.5 text-gold-400 mx-auto mb-1" />
+                  <span className="text-[9px] font-mono text-[#937b85] uppercase block">Méritos (XP)</span>
+                  <span className="font-mono font-bold text-base text-white">{formData.experiencePoints}</span>
                 </div>
 
-                <div className="bg-[#180f14] border border-[#381921] rounded-lg p-2 text-center">
-                  <Star className="w-3.5 h-3.5 text-amber-400 mx-auto mb-1" />
-                  <span className="text-[9px] font-mono text-[#8e8073] block truncate">Rituales</span>
-                  <span className="text-xs sm:text-sm font-sans font-bold text-white">
-                    {(member?.assignments || []).filter(a => a.type === 'RITUAL' && ['COMPLETED_ON_TIME', 'COMPLETED_LATE'].includes(a.status)).length}
-                    <span className="text-[10px] text-gray-500 font-normal"> / {(member?.assignments || []).filter(a => a.type === 'RITUAL').length}</span>
-                  </span>
+                <div className="bg-[#170a10] border border-[#2e151f] p-3 rounded-xl text-center">
+                  <Star className="w-3.5 h-3.5 text-gold-400 mx-auto mb-1" />
+                  <span className="text-[9px] font-mono text-[#937b85] uppercase block">Rituales</span>
+                  <span className="font-mono font-bold text-base text-white">{ritualsCompleted}/{ritualsCount}</span>
                 </div>
 
-                <div className="bg-[#180f14] border border-[#381921] rounded-lg p-2 text-center">
-                  <Award className="w-3.5 h-3.5 text-rose-400 mx-auto mb-1" />
-                  <span className="text-[9px] font-mono text-[#8e8073] block truncate">Entrenamientos</span>
-                  <span className="text-xs sm:text-sm font-sans font-bold text-white">
-                    {(member?.assignments || []).filter(a => a.type === 'TRAINING' && ['COMPLETED_ON_TIME', 'COMPLETED_LATE'].includes(a.status)).length}
-                    <span className="text-[10px] text-gray-500 font-normal"> / {(member?.assignments || []).filter(a => a.type === 'TRAINING').length}</span>
-                  </span>
+                <div className="bg-[#170a10] border border-[#2e151f] p-3 rounded-xl text-center">
+                  <Target className="w-3.5 h-3.5 text-bordeaux-400 mx-auto mb-1" />
+                  <span className="text-[9px] font-mono text-[#937b85] uppercase block">Entrenamientos</span>
+                  <span className="font-mono font-bold text-base text-white">{trainingsCompleted}/{trainingsCount}</span>
                 </div>
 
-                <div className="bg-[#180f14] border border-[#381921] rounded-lg p-2 text-center">
+                <div className="bg-[#170a10] border border-[#2e151f] p-3 rounded-xl text-center">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 mx-auto mb-1" />
-                  <span className="text-[9px] font-mono text-[#8e8073] block truncate">Completadas</span>
-                  <span className="text-xs sm:text-sm font-sans font-bold text-white">
-                    {(member?.assignments || []).filter(a => ['COMPLETED_ON_TIME', 'COMPLETED_LATE'].includes(a.status)).length}
-                    <span className="text-[10px] text-gray-500 font-normal"> / {(member?.assignments || []).length}</span>
-                  </span>
+                  <span className="text-[9px] font-mono text-[#937b85] uppercase block">Completadas</span>
+                  <span className="font-mono font-bold text-base text-white">{completedAssignmentsCount}/{totalAssignmentsCount}</span>
                 </div>
-              </div>
-            </div>
 
-            {/* Right: Última actividad real (col-span-5) */}
-            <div className="lg:col-span-5 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
-              <div>
-                <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2 pb-2.5 border-b border-[#2d141b]">
-                  <Clock className="w-4 h-4 text-[#c5a059]" />
-                  Última actividad registrada
-                </h4>
-
-                {(member?.eventLogs || []).length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 font-mono text-xs space-y-1">
-                    <Clock className="w-6 h-6 text-gray-600 mx-auto opacity-50 mb-1" />
-                    <p className="text-gray-400">Sin eventos de actividad aún</p>
-                    <p className="text-[10px] text-gray-600">Las solicitudes, tareas y ascensos se registrarán aquí.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3 pt-3 text-xs font-mono relative before:absolute before:left-2 before:top-3 before:bottom-3 before:w-px before:bg-[#3d1c25] max-h-56 overflow-y-auto custom-scrollbar pr-1">
-                    {(member?.eventLogs || []).slice(0, 6).map((log, idx) => {
-                      const isCompleted = log.eventType === 'TASK_COMPLETED';
-                      const isRequested = log.eventType === 'ACCESS_REQUESTED';
-                      const isSanction = log.eventType === 'SANCTION' || log.eventType === 'FREEZE';
-                      
-                      return (
-                        <div key={log.id || idx} className="flex items-start gap-3 pl-1 relative">
-                          <span className={`w-2.5 h-2.5 rounded-full border-2 border-[#110b0e] mt-1 flex-shrink-0 z-10 ${
-                            isCompleted ? 'bg-emerald-400' : isRequested ? 'bg-[#c5a059]' : isSanction ? 'bg-crimson-400' : 'bg-cyan-400'
-                          }`} />
-                          <div className="flex-1 min-w-0">
-                            <span className="text-[10px] text-[#8e8073] block">
-                              {log.createdAt ? new Date(log.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Reciente'}
-                            </span>
-                            <p className="font-sans font-bold text-white text-[11px] truncate">
-                              {log.eventType === 'ACCESS_REQUESTED' ? 'Solicitud de Admisión' :
-                               log.eventType === 'TASK_COMPLETED' ? 'Tarea Realizada' :
-                               log.eventType === 'TASK_ASSIGNED' ? 'Tarea Asignada' :
-                               log.eventType === 'STATUS_CHANGE' ? 'Cambio de Estado' :
-                               log.eventType}
-                            </p>
-                            {log.description && (
-                              <p className="text-[10px] text-[#c2b29f] line-clamp-2 leading-relaxed">
-                                {log.description}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
+
             </div>
           </div>
 
-          {/* --------------------------------------------------------------------- */}
-          {/* ROW 4: BOCADILLOS 6, 7 & 12 - DISEÑO DE ENTRENAMIENTO & ACTIVIDADES */}
-          {/* --------------------------------------------------------------------- */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            
-            {/* BOCADILLO 6: DISEÑO DE ENTRENAMIENTO DESDE DESPLEGABLES (col-span-5) */}
-            <div className="lg:col-span-5 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
-              <div>
-                <div className="pb-3 border-b border-[#2d141b]">
-                  <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-[#c5a059]" />
-                    Diseño de entrenamiento
-                  </h4>
-                  <p className="text-[11px] font-mono text-[#8e8073] mt-0.5">
-                    Selecciona actividades del sistema para asignar al sumiso.
-                  </p>
+          {/* TARJETA 4: ÚLTIMA ACTIVIDAD REGISTRADA (Col 6) */}
+          <div className="lg:col-span-6 bg-[#12080c] rounded-2xl border border-[#311721] p-5 flex flex-col justify-between shadow-2xl">
+            <div className="space-y-4">
+              
+              <div className="flex items-center justify-between pb-3 border-b border-[#24121a]">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-gold-400" />
+                  <h3 className="font-brand font-bold text-base text-white">Última actividad registrada</h3>
                 </div>
-
-                {/* Dropdowns Grid (7 categories from library) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-3">
-                  
-                  {/* Tareas */}
-                  <div>
-                    <label className="block text-[10px] font-mono text-[#c5a059] mb-1">Tareas</label>
-                    <select
-                      value={selectedTrainingItems.task}
-                      onChange={e => setSelectedTrainingItems({ ...selectedTrainingItems, task: e.target.value })}
-                      className="w-full bg-[#160e13] border border-[#381921] rounded-lg px-2.5 py-1.5 text-xs text-[#f3e8d9] focus:border-[#c5a059]"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {libraryByType.TASK.map(t => (
-                        <option key={t.id} value={t.id}>{t.title}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Rituales */}
-                  <div>
-                    <label className="block text-[10px] font-mono text-[#c5a059] mb-1">Rituales</label>
-                    <select
-                      value={selectedTrainingItems.ritual}
-                      onChange={e => setSelectedTrainingItems({ ...selectedTrainingItems, ritual: e.target.value })}
-                      className="w-full bg-[#160e13] border border-[#381921] rounded-lg px-2.5 py-1.5 text-xs text-[#f3e8d9] focus:border-[#c5a059]"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {libraryByType.RITUAL.map(t => (
-                        <option key={t.id} value={t.id}>{t.title}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Castigos */}
-                  <div>
-                    <label className="block text-[10px] font-mono text-[#c5a059] mb-1">Castigos</label>
-                    <select
-                      value={selectedTrainingItems.punishment}
-                      onChange={e => setSelectedTrainingItems({ ...selectedTrainingItems, punishment: e.target.value })}
-                      className="w-full bg-[#160e13] border border-[#381921] rounded-lg px-2.5 py-1.5 text-xs text-[#f3e8d9] focus:border-[#c5a059]"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {libraryByType.PUNISHMENT.map(t => (
-                        <option key={t.id} value={t.id}>{t.title}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Recompensas */}
-                  <div>
-                    <label className="block text-[10px] font-mono text-[#c5a059] mb-1">Recompensas</label>
-                    <select
-                      value={selectedTrainingItems.reward}
-                      onChange={e => setSelectedTrainingItems({ ...selectedTrainingItems, reward: e.target.value })}
-                      className="w-full bg-[#160e13] border border-[#381921] rounded-lg px-2.5 py-1.5 text-xs text-[#f3e8d9] focus:border-[#c5a059]"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {libraryByType.REWARD.map(t => (
-                        <option key={t.id} value={t.id}>{t.title}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Privilegios */}
-                  <div>
-                    <label className="block text-[10px] font-mono text-[#c5a059] mb-1">Privilegios</label>
-                    <select
-                      value={selectedTrainingItems.privilege}
-                      onChange={e => setSelectedTrainingItems({ ...selectedTrainingItems, privilege: e.target.value })}
-                      className="w-full bg-[#160e13] border border-[#381921] rounded-lg px-2.5 py-1.5 text-xs text-[#f3e8d9] focus:border-[#c5a059]"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {libraryByType.PRIVILEGE.map(t => (
-                        <option key={t.id} value={t.id}>{t.title}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Objetivos */}
-                  <div>
-                    <label className="block text-[10px] font-mono text-[#c5a059] mb-1">Objetivos</label>
-                    <select
-                      value={selectedTrainingItems.goal}
-                      onChange={e => setSelectedTrainingItems({ ...selectedTrainingItems, goal: e.target.value })}
-                      className="w-full bg-[#160e13] border border-[#381921] rounded-lg px-2.5 py-1.5 text-xs text-[#f3e8d9] focus:border-[#c5a059]"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {libraryByType.GOAL.map(t => (
-                        <option key={t.id} value={t.id}>{t.title}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Actividades especiales (col-span-2) */}
-                  <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-mono text-[#c5a059] mb-1">Actividades especiales</label>
-                    <select
-                      value={selectedTrainingItems.special}
-                      onChange={e => setSelectedTrainingItems({ ...selectedTrainingItems, special: e.target.value })}
-                      className="w-full bg-[#160e13] border border-[#381921] rounded-lg px-2.5 py-1.5 text-xs text-[#f3e8d9] focus:border-[#c5a059]"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {libraryByType.SPECIAL_EVENT.map(t => (
-                        <option key={t.id} value={t.id}>{t.title}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                <span className="text-[10px] font-mono text-gray-400">Timeline de devoción</span>
               </div>
 
-              {/* Action Button: Añadir al entrenamiento */}
-              <div className="pt-4 mt-3 border-t border-[#2d141b]">
+              {/* Lista Vertical con Nodos Azules */}
+              <div className="space-y-4 relative pl-5 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[1px] before:bg-gradient-to-b before:from-cyan-500/60 before:via-bordeaux-500/40 before:to-transparent">
+                {activityTimeline.map((item, idx) => (
+                  <div key={item.id || idx} className="relative space-y-0.5">
+                    {/* Punto azul/cyan */}
+                    <div className="absolute -left-5 top-1.5 w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-md shadow-cyan-400/50" />
+                    
+                    <span className="text-[10px] font-mono text-gray-400 block">
+                      {new Date(item.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <h5 className="text-xs font-sans font-bold text-white">
+                      {item.title}
+                    </h5>
+                    <p className="text-xs text-gray-300 font-sans leading-relaxed">
+                      {item.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+        {/* ----------------------------------------------------------------------- */}
+        {/* FILA INFERIOR: DISEÑO DE ENTRENAMIENTO (IZQ) & ACTIVIDADES ASIGNADAS (DER) */}
+        {/* ----------------------------------------------------------------------- */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          
+          {/* TARJETA 5: DISEÑO DE ENTRENAMIENTO (Col 5) */}
+          <div className="lg:col-span-5 bg-[#12080c] rounded-2xl border border-[#311721] p-5 flex flex-col justify-between shadow-2xl">
+            <div className="space-y-4">
+              
+              <div>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-gold-400" />
+                  <h3 className="font-brand font-bold text-base text-white">Diseño de entrenamiento</h3>
+                </div>
+                <p className="text-xs text-gray-400 font-sans mt-0.5">
+                  Selecciona actividades del sistema para asignar al sumiso.
+                </p>
+              </div>
+
+              {/* Filtros de Categoría */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {[
+                  { id: 'ALL', label: 'Todas' },
+                  { id: 'TASK', label: 'Tareas' },
+                  { id: 'RITUAL', label: 'Rituales' },
+                  { id: 'PUNISHMENT', label: 'Castigos' },
+                  { id: 'REWARD', label: 'Recompensas' }
+                ].map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedActivityCategory(cat.id)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-mono uppercase tracking-wider transition-all ${
+                      selectedActivityCategory === cat.id
+                        ? 'bg-gold-500 text-dark-950 font-bold border border-gold-400 shadow-md shadow-gold-500/20'
+                        : 'bg-[#180a11] text-gray-400 hover:text-white border border-[#2d151e]'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Lista scrolleable de plantillas disponibles */}
+              <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1 custom-scrollbar">
+                {filteredTemplates.length === 0 ? (
+                  <div className="p-4 text-center text-xs font-mono text-gray-500 bg-[#15090f] rounded-xl border border-[#2d151e]">
+                    No hay plantillas en esta categoría.
+                  </div>
+                ) : (
+                  filteredTemplates.map(tpl => (
+                    <div 
+                      key={tpl.id}
+                      className="p-3 rounded-xl bg-[#170a10] border border-[#2e151f] hover:border-gold-500/40 transition-all flex items-start justify-between gap-3 group"
+                    >
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
+                            tpl.type === 'RITUAL' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                            tpl.type === 'PUNISHMENT' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
+                            tpl.type === 'REWARD' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                            'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                          }`}>
+                            {tpl.type}
+                          </span>
+                          <h5 className="font-sans font-bold text-xs text-white truncate">
+                            {tpl.title}
+                          </h5>
+                        </div>
+                        <p className="text-[11px] text-gray-400 line-clamp-2 font-sans">
+                          {tpl.instructions}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <span className="text-[10px] font-mono text-gold-400 font-bold">
+                          +{tpl.pointsValue || 20} XP
+                        </span>
+                        <button
+                          onClick={() => handleAssignTemplate(tpl)}
+                          className="py-1 px-2.5 rounded-lg bg-gold-500/20 hover:bg-gold-500 text-gold-300 hover:text-dark-950 border border-gold-500/50 text-[10px] font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                        >
+                          Asignar
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+            </div>
+          </div>
+
+          {/* TARJETA 6: ACTIVIDADES ASIGNADAS (OBJETIVOS) (Col 7) */}
+          <div className="lg:col-span-7 bg-[#12080c] rounded-2xl border border-[#311721] p-5 flex flex-col justify-between shadow-2xl">
+            <div className="space-y-4">
+              
+              <div className="flex items-center justify-between pb-3 border-b border-[#24121a]">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-gold-400" />
+                  <h3 className="font-brand font-bold text-base text-white">Actividades asignadas</h3>
+                </div>
+
                 <button
-                  disabled={assigningTraining}
-                  onClick={handleAddSelectedTraining}
-                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#6a1528] to-[#4a0e1b] hover:from-[#7d1930] hover:to-[#5e1323] border border-[#c5a059]/40 text-[#f7e08b] font-mono font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99]"
+                  onClick={() => setShowNewActivityModal(true)}
+                  className="py-1.5 px-3 rounded-lg bg-bordeaux-700/80 hover:bg-bordeaux-600 border border-gold-500/40 text-gold-200 text-xs font-sans font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" />
-                  {assigningTraining ? 'Asignando...' : 'Añadir al entrenamiento'}
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Nueva actividad</span>
                 </button>
               </div>
-            </div>
 
-            {/* BOCADILLO 7 & 12: ACTIVIDADES ASIGNADAS (col-span-7) */}
-            <div className="lg:col-span-7 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-[#2d141b]">
-                  <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2">
-                    <Award className="w-4 h-4 text-[#c5a059]" />
-                    Actividades asignadas
-                  </h4>
-                  <button
-                    onClick={() => setShowNewActivityModal(true)}
-                    className="py-1 px-3 rounded-lg bg-[#1a0f14] border border-[#5c2a38] text-[#e5c158] hover:bg-[#2c131d] text-xs font-mono font-bold flex items-center gap-1.5 transition-all"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Nueva actividad
-                  </button>
-                </div>
-
-                {/* Assigned Activities Table */}
-                <div className="overflow-x-auto pt-2">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead>
-                      <tr className="text-[#8e8073] border-b border-[#2d141b] text-[10px]">
-                        <th className="pb-2 font-normal">Actividad</th>
-                        <th className="pb-2 font-normal">Tipo</th>
-                        <th className="pb-2 font-normal">Estado</th>
-                        <th className="pb-2 font-normal">Fecha límite</th>
-                        <th className="pb-2 font-normal">Prioridad</th>
-                        <th className="pb-2 font-normal text-right">Acciones</th>
+              {/* Tabla de Actividades Asignadas */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-sans">
+                  <thead>
+                    <tr className="border-b border-[#2d151e] text-[10px] font-mono uppercase text-[#937b85] tracking-wider">
+                      <th className="pb-2">Actividad</th>
+                      <th className="pb-2">Tipo</th>
+                      <th className="pb-2">Estado</th>
+                      <th className="pb-2">Fecha límite</th>
+                      <th className="pb-2">Prioridad</th>
+                      <th className="pb-2 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#24121a]">
+                    {assignments.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-xs font-mono text-gray-500">
+                          No hay actividades asignadas actualmente. Utiliza el panel izquierdo para asignar.
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#201118]">
-                      {sortedAssignments.length > 0 ? (
-                        sortedAssignments.map(a => {
-                          const isCompleted = a.status.startsWith('COMPLETED');
-                          const isOverdue = a.status === 'OVERDUE';
-                          const isPending = a.status === 'PENDING' || a.status === 'ASSIGNED';
-                          const isActive = a.status === 'ACTIVE' || (!isCompleted && !isOverdue && !isPending);
-
-                          const isHigh = (a.customInstructions || '').includes('HIGH');
-                          const isMed = (a.customInstructions || '').includes('MEDIUM');
-
-                          return (
-                            <tr key={a.id} className="hover:bg-[#180f14]/60 transition-colors">
-                              <td className="py-2.5 pr-2 font-sans font-medium text-white text-[11px]">
-                                {a.title}
-                              </td>
-                              <td className="py-2.5 pr-2 text-[#a39485] text-[10px]">
-                                {a.type === 'TASK' ? 'Tarea' : a.type === 'RITUAL' ? 'Ritual' : a.type === 'PUNISHMENT' ? 'Castigo' : a.type === 'SPECIAL_EVENT' ? 'Actividad especial' : a.type}
-                              </td>
-                              <td className="py-2.5 pr-2">
-                                {isCompleted ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-cyan-950/60 text-cyan-300 border border-cyan-700/40">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                                    Completada
-                                  </span>
-                                ) : isOverdue ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-950/60 text-rose-300 border border-rose-700/40">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                                    Vencida
-                                  </span>
-                                ) : isPending ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-950/60 text-amber-300 border border-amber-700/40">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                                    Pendiente
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-950/60 text-emerald-300 border border-emerald-700/40">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                    Activa
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-2.5 pr-2 text-[#c2b29f] text-[10px]">
-                                {formatDate(a.dueDate)}
-                              </td>
-                              <td className="py-2.5 pr-2">
-                                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                                  isHigh ? 'bg-[#3e131d] text-rose-300 border border-rose-800/40' :
-                                  isMed ? 'bg-[#352511] text-amber-300 border border-amber-800/40' :
-                                  'bg-[#1a202c] text-gray-300'
-                                }`}>
-                                  ★ {isHigh ? 'Alta' : isMed ? 'Media' : 'Baja'}
-                                </span>
-                              </td>
-                              <td className="py-2.5 text-right space-x-1 whitespace-nowrap">
-                                {!isCompleted && (
-                                  <button
-                                    onClick={() => handleCompleteAssignment(a.id)}
-                                    title="Marcar completada"
-                                    className="p-1 rounded text-emerald-400 hover:bg-emerald-950/40"
-                                  >
-                                    <Check className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
+                    ) : (
+                      assignments.map(a => {
+                        const isDone = a.status === 'COMPLETED' || a.status === 'COMPLETED_ON_TIME';
+                        return (
+                          <tr key={a.id} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="py-3 font-semibold text-white max-w-[200px] truncate pr-2">
+                              {a.title}
+                            </td>
+                            <td className="py-3">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
+                                a.type === 'RITUAL' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                                a.type === 'PUNISHMENT' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
+                                'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                              }`}>
+                                {a.type}
+                              </span>
+                            </td>
+                            <td className="py-3">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
+                                isDone ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                                'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              }`}>
+                                {isDone ? 'Completada' : 'Asignada'}
+                              </span>
+                            </td>
+                            <td className="py-3 text-gray-400 font-mono text-[11px]">
+                              {a.dueDate ? new Date(a.dueDate).toLocaleDateString('es-ES') : '—'}
+                            </td>
+                            <td className="py-3">
+                              <span className={`text-[10px] font-mono font-bold uppercase ${
+                                a.priority === 'HIGH' ? 'text-red-400' : 'text-gray-300'
+                              }`}>
+                                {a.priority || 'Normal'}
+                              </span>
+                            </td>
+                            <td className="py-3 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => handleUpdateAssignmentStatus(a.id, isDone ? 'ASSIGNED' : 'COMPLETED')}
+                                  className={`p-1.5 rounded transition-colors ${
+                                    isDone 
+                                      ? 'text-emerald-400 hover:text-white bg-emerald-500/20' 
+                                      : 'text-gray-400 hover:text-emerald-300 bg-[#1b0c13]'
+                                  }`}
+                                  title={isDone ? 'Marcar pendiente' : 'Marcar completada'}
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
                                 <button
                                   onClick={() => handleDeleteAssignment(a.id)}
+                                  className="p-1.5 rounded text-gray-400 hover:text-red-400 bg-[#1b0c13] transition-colors"
                                   title="Eliminar asignación"
-                                  className="p-1 rounded text-[#8e8073] hover:text-rose-400 hover:bg-rose-950/40"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan="6" className="py-6 text-center text-[#8e8073]">
-                            No hay actividades asignadas. Utiliza los desplegables de la izquierda o pulsa "Nueva actividad".
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+        {/* ----------------------------------------------------------------------- */}
+        {/* PANELES DE FUNCIONALIDAD COMPLETA ADICIONAL (FINANZAS, REQUISITOS...)     */}
+        {/* ----------------------------------------------------------------------- */}
+        <div className="bg-[#12080c] rounded-2xl border border-[#311721] p-5 shadow-2xl space-y-5">
+          
+          {/* Navegador de secciones complementarias */}
+          <div className="flex flex-wrap items-center justify-between border-b border-[#2d151e] pb-3 gap-2">
+            <div className="flex items-center gap-2">
+              {[
+                { id: 'finanzas', label: 'Historial Financiero & Pagos' },
+                { id: 'requisitos', label: 'Requisitos & Suscripciones' },
+                { id: 'habilidades', label: 'Habilidades Técnicas' },
+                { id: 'notas', label: 'Notas Confidenciales' }
+              ].map(sec => (
+                <button
+                  key={sec.id}
+                  onClick={() => setActiveTabSection(activeTabSection === sec.id ? 'dashboard' : sec.id)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-sans font-bold transition-all ${
+                    activeTabSection === sec.id
+                      ? 'bg-gold-500 text-dark-950 border border-gold-300 shadow-md shadow-gold-500/20'
+                      : 'bg-[#180a11] text-gray-300 hover:text-white border border-[#2d151e]'
+                  }`}
+                >
+                  {sec.label} {activeTabSection === sec.id ? '▲' : '▼'}
+                </button>
+              ))}
+            </div>
+
+            <span className="text-[10px] font-mono text-[#937b85] uppercase">
+              Controles Avanzados del CRM
+            </span>
+          </div>
+
+          {/* SECCIÓN 1: FINANZAS COMPLETAS & REGISTRO DE TRIBUTOS */}
+          {activeTabSection === 'finanzas' && (
+            <div className="space-y-6 animate-fade-in pt-2">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#170a10] p-4 rounded-xl border border-[#2e151f]">
+                <div>
+                  <h4 className="font-brand font-bold text-sm text-gold-300 flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-gold-400" /> Registro de Tributos & Ajuste de Ingresos
+                  </h4>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Modifica manualmente el total aportado o registra ingresos individuales con método de pago y fecha.
+                  </p>
+                </div>
+              </div>
+
+              {/* Formulario Añadir Tributo */}
+              <form onSubmit={handleAddTribute} className="bg-[#170a10] p-4 rounded-xl border border-[#2e151f] grid grid-cols-1 sm:grid-cols-5 gap-3">
+                <div>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Importe (€)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={newTribute.amount}
+                    onChange={e => setNewTribute({ ...newTribute, amount: e.target.value })}
+                    placeholder="50"
+                    className="w-full bg-[#0e0408] border border-[#3e1b29] rounded-lg px-3 py-1.5 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Concepto</label>
+                  <input
+                    type="text"
+                    required
+                    value={newTribute.concept}
+                    onChange={e => setNewTribute({ ...newTribute, concept: e.target.value })}
+                    className="w-full bg-[#0e0408] border border-[#3e1b29] rounded-lg px-3 py-1.5 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Método de pago</label>
+                  <select
+                    value={newTribute.paymentMethod}
+                    onChange={e => setNewTribute({ ...newTribute, paymentMethod: e.target.value })}
+                    className="w-full bg-[#0e0408] border border-[#3e1b29] rounded-lg px-3 py-1.5 text-xs text-white font-mono"
+                  >
+                    <option value="BIZUM">Bizum</option>
+                    <option value="TRANSFERENCIA">Transferencia</option>
+                    <option value="CRYPTO">Cripto</option>
+                    <option value="CASH">Efectivo / Presencial</option>
+                    <option value="WISHLIST">Regalo Wishlist</option>
+                    <option value="CARD">Tarjeta</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Fecha</label>
+                  <input
+                    type="date"
+                    value={newTribute.date}
+                    onChange={e => setNewTribute({ ...newTribute, date: e.target.value })}
+                    className="w-full bg-[#0e0408] border border-[#3e1b29] rounded-lg px-3 py-1.5 text-xs text-white font-mono"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    disabled={addingTribute}
+                    className="w-full py-2 px-3 rounded-lg bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs uppercase transition-colors"
+                  >
+                    {addingTribute ? 'Guardando...' : '+ Registrar'}
+                  </button>
+                </div>
+              </form>
+
+              {/* Tabla de Historial Financiero */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-sans">
+                  <thead>
+                    <tr className="border-b border-[#2d151e] text-[10px] font-mono uppercase text-[#937b85]">
+                      <th className="pb-2">Fecha</th>
+                      <th className="pb-2">Tipo</th>
+                      <th className="pb-2">Concepto</th>
+                      <th className="pb-2">Método</th>
+                      <th className="pb-2">Importe</th>
+                      <th className="pb-2 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#24121a]">
+                    {combinedHistory.length === 0 ? (
+                      <tr><td colSpan={6} className="py-4 text-center text-gray-500 font-mono">Sin transacciones registradas</td></tr>
+                    ) : (
+                      combinedHistory.map((item, i) => (
+                        <tr key={item.id || i} className="hover:bg-white/[0.02]">
+                          <td className="py-2.5 font-mono text-[11px] text-gray-400">
+                            {new Date(item.date).toLocaleDateString('es-ES')}
+                          </td>
+                          <td className="py-2.5">
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-gold-500/20 text-gold-300 border border-gold-500/30">
+                              {item.type}
+                            </span>
+                          </td>
+                          <td className="py-2.5 text-white font-medium">{item.concept}</td>
+                          <td className="py-2.5 text-gray-400 font-mono">{item.method || '—'}</td>
+                          <td className="py-2.5 font-mono font-bold text-emerald-400">€{item.amount}</td>
+                          <td className="py-2.5 text-right">
+                            {item.isTribute && (
+                              <button
+                                onClick={() => handleDeleteTribute(item.id)}
+                                className="text-gray-500 hover:text-red-400 p-1"
+                                title="Eliminar tributo"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </td>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* --------------------------------------------------------------------- */}
-          {/* ROW 5: BOCADILLOS 8 & 9 - REQUISITOS/SUSCRIPCIONES & HABILIDADES */}
-          {/* --------------------------------------------------------------------- */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            
-            {/* BOCADILLO 8: REQUISITOS Y SUSCRIPCIONES (col-span-6) */}
-            <div className="lg:col-span-6 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
-              <div>
-                <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2 pb-3 border-b border-[#2d141b]">
-                  <Crown className="w-4 h-4 text-[#c5a059]" />
-                  Requisitos y suscripciones
-                </h4>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3">
-                  
-                  {/* Card 1: Suscripción activa */}
-                  <div className="bg-[#180f14] border border-[#3a1922] rounded-xl p-3 flex flex-col justify-between">
-                    <div>
-                      <Crown className="w-5 h-5 text-[#c5a059] mb-1.5" />
-                      <span className="text-[10px] font-mono text-[#8e8073] block">Suscripción activa</span>
-                      <h5 className="font-brand font-bold text-sm text-white mt-0.5">
-                        Oro Mensual
-                      </h5>
-                      <p className="text-xs font-mono text-[#c5a059] font-bold mt-1">
-                        €100 / mes
-                      </p>
-                    </div>
-                    <div className="pt-3 border-t border-[#29131a] mt-3">
-                      <span className="text-[9px] font-mono text-[#8e8073] block">Renueva: 14 May 2025</span>
-                    </div>
+          {/* SECCIÓN 2: REQUISITOS DEL REINO */}
+          {activeTabSection === 'requisitos' && (
+            <div className="space-y-4 animate-fade-in pt-2">
+              <h4 className="font-brand font-bold text-sm text-gold-300 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-gold-400" /> Requisitos de Permanencia & Estatus
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {(member?.requirements || []).length === 0 ? (
+                  <div className="p-4 text-xs font-mono text-gray-500 bg-[#170a10] rounded-xl border border-[#2e151f]">
+                    Sin requisitos específicos configurados para este rango.
                   </div>
-
-                  {/* Card 2: Requisitos especiales */}
-                  <div className="bg-[#180f14] border border-[#3a1922] rounded-xl p-3">
-                    <span className="text-[10px] font-mono text-[#c5a059] font-bold block mb-2">
-                      Requisitos especiales
-                    </span>
-                    <div className="space-y-1.5 text-[11px] font-mono text-[#dcd3c8]">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          checked={specialReqs.tributo_minimo}
-                          onChange={e => setSpecialReqs({ ...specialReqs, tributo_minimo: e.target.checked })}
-                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
-                        />
-                        <span>Tributo mensual mín.</span>
-                      </label>
-
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          checked={specialReqs.informe_semanal}
-                          onChange={e => setSpecialReqs({ ...specialReqs, informe_semanal: e.target.checked })}
-                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
-                        />
-                        <span>Informe semanal</span>
-                      </label>
-
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          checked={specialReqs.rituales_asignados}
-                          onChange={e => setSpecialReqs({ ...specialReqs, rituales_asignados: e.target.checked })}
-                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
-                        />
-                        <span>Participar rituales</span>
-                      </label>
-
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          checked={specialReqs.comunicacion_activa}
-                          onChange={e => setSpecialReqs({ ...specialReqs, comunicacion_activa: e.target.checked })}
-                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
-                        />
-                        <span>Comunicación activa</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Card 3: Requisitos generales */}
-                  <div className="bg-[#180f14] border border-[#3a1922] rounded-xl p-3">
-                    <span className="text-[10px] font-mono text-[#c5a059] font-bold block mb-2">
-                      Requisitos generales
-                    </span>
-                    <div className="space-y-1.5 text-[11px] font-mono text-[#dcd3c8]">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          checked={generalReqs.perfil_verificado}
-                          onChange={e => setGeneralReqs({ ...generalReqs, perfil_verificado: e.target.checked })}
-                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
-                        />
-                        <span>Perfil verificado</span>
-                      </label>
-
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          checked={generalReqs.aceptacion_normas}
-                          onChange={e => setGeneralReqs({ ...generalReqs, aceptacion_normas: e.target.checked })}
-                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
-                        />
-                        <span>Normas aceptadas</span>
-                      </label>
-
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          checked={generalReqs.tributo_inicial}
-                          onChange={e => setGeneralReqs({ ...generalReqs, tributo_inicial: e.target.checked })}
-                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
-                        />
-                        <span>Tributo inicial</span>
-                      </label>
-
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          checked={generalReqs.respeto_absoluto}
-                          onChange={e => setGeneralReqs({ ...generalReqs, respeto_absoluto: e.target.checked })}
-                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
-                        />
-                        <span>Respeto absoluto</span>
-                      </label>
-
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          checked={generalReqs.discrecion_confidencialidad}
-                          onChange={e => setGeneralReqs({ ...generalReqs, discrecion_confidencialidad: e.target.checked })}
-                          className="rounded border-[#5a2735] text-[#c5a059] focus:ring-0"
-                        />
-                        <span>Discreción total</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* BOCADILLO 9: HABILIDADES LABORALES / PUESTOS ÚTILES (col-span-6) */}
-            <div className="lg:col-span-6 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-[#2d141b]">
-                  <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2">
-                    <Award className="w-4 h-4 text-[#c5a059]" />
-                    Habilidades laborales / Puestos útiles
-                  </h4>
-                  <button
-                    onClick={() => setShowAddSkill(true)}
-                    className="py-1 px-3 rounded-lg bg-[#1a0f14] border border-[#5c2a38] text-[#e5c158] hover:bg-[#2c131d] text-xs font-mono font-bold flex items-center gap-1.5 transition-all"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Añadir habilidad
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
-                  {/* Column 1: Habilidades de este sumiso */}
-                  <div>
-                    <span className="text-[10px] font-mono text-[#c5a059] font-bold block mb-2">
-                      Habilidades de este sumiso
-                    </span>
-                    <div className="space-y-2.5">
-                      {(member?.skills && member.skills.length > 0) ? (
-                        member.skills.map(sk => (
-                          <div key={sk.id} className="flex items-center justify-between text-xs bg-[#160e13] p-2 rounded-lg border border-[#2e151e] group">
-                            <div>
-                              <span className="font-medium text-white block text-[11px]">{sk.skillName}</span>
-                              <span className="text-[9px] font-mono text-[#8e8073]">
-                                {sk.level === 'ADVANCED' ? 'Avanzado' : sk.level === 'EXPERT' ? 'Experto' : sk.level === 'INTERMEDIATE' ? 'Intermedio' : 'Básico'}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {renderSkillDots(sk.level)}
-                              <button 
-                                onClick={() => handleDeleteSkill(sk.id)}
-                                className="opacity-0 group-hover:opacity-100 text-[#8e8073] hover:text-rose-400 transition-opacity"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-4 text-xs font-mono text-[#8e8073]">
-                          Sin habilidades registradas.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Column 2: Oportunidades / Necesidades del Reino */}
-                  <div>
-                    <span className="text-[10px] font-mono text-[#c5a059] font-bold block mb-2">
-                      Oportunidades / Necesidades
-                    </span>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs bg-[#160e13] p-2 rounded-lg border border-[#2e151e]">
-                        <span className="font-medium text-white text-[11px]">Gestión de redes sociales</span>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#3e131d] text-rose-300 border border-rose-800/40">
-                          ★ Alta
-                        </span>
+                ) : (
+                  (member.requirements || []).map(req => (
+                    <div key={req.id} className="p-3 bg-[#170a10] border border-[#2e151f] rounded-xl flex items-center justify-between gap-3">
+                      <div>
+                        <span className="text-xs font-bold text-white block">{req.definition?.name || 'Requisito'}</span>
+                        <span className="text-[10px] text-gray-400 font-sans block">{req.definition?.description || ''}</span>
                       </div>
-
-                      <div className="flex items-center justify-between text-xs bg-[#160e13] p-2 rounded-lg border border-[#2e151e]">
-                        <span className="font-medium text-white text-[11px]">Edición de contenido</span>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#352511] text-amber-300 border border-amber-800/40">
-                          ★ Media
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs bg-[#160e13] p-2 rounded-lg border border-[#2e151e]">
-                        <span className="font-medium text-white text-[11px]">Soporte técnico</span>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#352511] text-amber-300 border border-amber-800/40">
-                          ★ Media
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs bg-[#160e13] p-2 rounded-lg border border-[#2e151e]">
-                        <span className="font-medium text-white text-[11px]">Moderación de comunidad</span>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#14232c] text-cyan-300 border border-cyan-800/40">
-                          ★ Baja
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* --------------------------------------------------------------------- */}
-          {/* ROW 6: BOCADILLO 10 & FINANZAS - FINANZAS Y REGALOS & NOTAS */}
-          {/* --------------------------------------------------------------------- */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            
-            {/* FINANZAS Y REGALOS (col-span-6) */}
-            <div className="lg:col-span-6 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-[#2d141b]">
-                  <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2">
-                    <Gift className="w-4 h-4 text-[#c5a059]" />
-                    Finanzas y regalos
-                  </h4>
-                  <button 
-                    onClick={() => alert('Abriendo historial financiero completo...')}
-                    className="text-xs font-mono text-[#c5a059] hover:underline flex items-center gap-1"
-                  >
-                    Ver historial completo →
-                  </button>
-                </div>
-
-                {/* Mini Summary Strip */}
-                <div className="grid grid-cols-4 gap-2 pt-3 text-center">
-                  <div className="bg-[#180f14] p-1.5 rounded-lg border border-[#2e151e]">
-                    <span className="text-[9px] font-mono text-[#8e8073] block truncate">Total aportado</span>
-                    <span className="text-xs font-sans font-bold text-[#e5c158]">
-                      €{member?.finances?.total !== undefined ? member.finances.total : 0}
-                    </span>
-                  </div>
-                  <div className="bg-[#180f14] p-1.5 rounded-lg border border-[#2e151e]">
-                    <span className="text-[9px] font-mono text-[#8e8073] block truncate">Este mes</span>
-                    <span className="text-xs font-sans font-bold text-white">
-                      €{member?.finances?.thisMonth !== undefined ? member.finances.thisMonth : 0}
-                    </span>
-                  </div>
-                  <div className="bg-[#180f14] p-1.5 rounded-lg border border-[#2e151e]">
-                    <span className="text-[9px] font-mono text-[#8e8073] block truncate">Mes pasado</span>
-                    <span className="text-xs font-sans font-bold text-white">
-                      €{member?.finances?.lastMonth !== undefined ? member.finances.lastMonth : 0}
-                    </span>
-                  </div>
-                  <div className="bg-[#180f14] p-1.5 rounded-lg border border-[#2e151e]">
-                    <span className="text-[9px] font-mono text-[#8e8073] block truncate">Regalos</span>
-                    <span className="text-xs font-sans font-bold text-white">
-                      €{member?.finances?.gifts !== undefined ? member.finances.gifts : 0}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Finance Table */}
-                <div className="overflow-x-auto pt-3 max-h-56 custom-scrollbar">
-                  {financialTransactions.length > 0 ? (
-                    <table className="w-full text-left text-xs font-mono">
-                      <thead>
-                        <tr className="text-[#8e8073] border-b border-[#2d141b] text-[10px]">
-                          <th className="pb-2 font-normal">Fecha</th>
-                          <th className="pb-2 font-normal">Concepto</th>
-                          <th className="pb-2 font-normal">Tipo</th>
-                          <th className="pb-2 font-normal">Importe</th>
-                          <th className="pb-2 font-normal">Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#201118] text-[11px]">
-                        {financialTransactions.map(tx => (
-                          <tr key={tx.id} className="hover:bg-[#180f14]/60">
-                            <td className="py-2 text-[#c2b29f]">{formatDate(tx.date)}</td>
-                            <td className="py-2 text-white font-medium">{tx.concept}</td>
-                            <td className="py-2 text-[#a39485]">{tx.type}</td>
-                            <td className="py-2 text-[#e5c158] font-bold">€{tx.amount}</td>
-                            <td className="py-2 text-[#8e8073]">{tx.notes}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div className="text-center py-6 text-xs font-mono text-[#8e8073]">
-                      Sin transacciones ni compras registradas en el sistema.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* BOCADILLO 10: NOTAS Y OBSERVACIONES (col-span-6) */}
-            <div className="lg:col-span-6 bg-[#110b0e] border border-[#3c1b24] rounded-xl p-4 sm:p-5 shadow-lg flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-[#2d141b]">
-                  <h4 className="font-brand font-bold text-sm text-white flex items-center gap-2">
-                    <Edit3 className="w-4 h-4 text-[#c5a059]" />
-                    Notas y observaciones
-                  </h4>
-                  <button
-                    onClick={() => setShowAddNoteModal(true)}
-                    className="py-1 px-3 rounded-lg bg-[#1a0f14] border border-[#5c2a38] text-[#e5c158] hover:bg-[#2c131d] text-xs font-mono font-bold flex items-center gap-1.5 transition-all"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Añadir nota
-                  </button>
-                </div>
-
-                {/* Sub-Tabs / View Selector */}
-                <div className="flex items-center gap-2 pt-3 pb-2 text-xs font-mono">
-                  <button
-                    onClick={() => setNotesFilter('internal')}
-                    className={`px-3 py-1 rounded-lg transition-colors ${
-                      notesFilter === 'internal'
-                        ? 'bg-[#3e131d] text-[#e5c158] border border-[#6a1528] font-bold'
-                        : 'text-[#8e8073] hover:text-white'
-                    }`}
-                  >
-                    📝 Notas internas (solo admin)
-                  </button>
-                  <button
-                    onClick={() => setNotesFilter('next_steps')}
-                    className={`px-3 py-1 rounded-lg transition-colors ${
-                      notesFilter === 'next_steps'
-                        ? 'bg-[#3e131d] text-[#e5c158] border border-[#6a1528] font-bold'
-                        : 'text-[#8e8073] hover:text-white'
-                    }`}
-                  >
-                    🧭 Próximos pasos
-                  </button>
-                </div>
-
-                {/* Notes List */}
-                <div className="space-y-2 pt-1 max-h-52 overflow-y-auto custom-scrollbar">
-                  {displayedNotes.length > 0 ? (
-                    displayedNotes.map(n => (
-                      <div 
-                        key={n.id} 
-                        className="bg-[#160e13] border border-[#2e151e] p-2.5 rounded-lg flex items-start justify-between gap-3 text-xs group"
+                      <button
+                        onClick={() => handleToggleRequirement(req.definitionId, req.status)}
+                        className={`px-3 py-1 rounded-lg text-xs font-mono font-bold uppercase transition-colors ${
+                          req.status === 'COMPLETED'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                            : 'bg-dark-900 text-amber-300 border border-amber-500/40'
+                        }`}
                       >
-                        <div className="space-y-1">
-                          <span className="text-[10px] font-mono text-[#c5a059] block">
-                            {formatDate(n.createdAt)}
-                          </span>
-                          <p className="font-sans text-[#f3e8d9] text-[11px] leading-relaxed">
-                            {n.note.replace('[PRÓXIMOS PASOS] ', '')}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleDeleteNote(n.id)}
-                          title="Eliminar nota"
-                          className="opacity-0 group-hover:opacity-100 text-[#8e8073] hover:text-rose-400 p-1 transition-opacity"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-6 text-xs font-mono text-[#8e8073]">
-                      No hay notas en esta sección.
+                        {req.status === 'COMPLETED' ? 'Cumplido ✓' : 'Pendiente ⏳'}
+                      </button>
                     </div>
-                  )}
-                </div>
+                  ))
+                )}
               </div>
             </div>
-          </div>
+          )}
 
-          {/* --------------------------------------------------------------------- */}
-          {/* ROW 7: BOCADILLO 11 & SYSTEM FOOTER HINTS & LUXURY SIGNATURE */}
-          {/* --------------------------------------------------------------------- */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            
-            {/* Hint 1: Biblioteca y desplegables (Bocadillo 11) */}
-            <div className="bg-[#110b0e] border border-[#3c1b24] rounded-xl p-3.5 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-[#251017] border border-[#521c27] text-[#c5a059] flex-shrink-0">
-                <Layers className="w-5 h-5" />
+          {/* SECCIÓN 3: HABILIDADES TÉCNICAS */}
+          {activeTabSection === 'habilidades' && (
+            <div className="space-y-4 animate-fade-in pt-2">
+              <div className="flex items-center justify-between">
+                <h4 className="font-brand font-bold text-sm text-gold-300 flex items-center gap-2">
+                  <Star className="w-4 h-4 text-gold-400" /> Habilidades Técnicas del Sumiso
+                </h4>
               </div>
-              <p className="text-xs font-mono text-[#c2b29f] leading-relaxed">
-                La biblioteca de actividades debe alimentar los desplegables de esta página.
-              </p>
-            </div>
 
-            {/* Hint 2: Tablero interactivo y automatizaciones */}
-            <div className="bg-[#110b0e] border border-[#3c1b24] rounded-xl p-3.5 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-[#251017] border border-[#521c27] text-[#c5a059] flex-shrink-0">
-                <Settings className="w-5 h-5" />
+              {/* Lista de Habilidades */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {(member?.skills || []).length === 0 ? (
+                  <div className="col-span-full p-4 text-xs font-mono text-gray-500 bg-[#170a10] rounded-xl text-center">
+                    No se han registrado habilidades para este perfil.
+                  </div>
+                ) : (
+                  (member.skills || []).map(s => (
+                    <div key={s.id} className="p-3 bg-[#170a10] border border-[#2e151f] rounded-xl flex items-center justify-between gap-2">
+                      <div>
+                        <span className="text-[10px] font-mono text-gold-400 font-bold block">{s.skillCategory}</span>
+                        <span className="text-xs font-bold text-white block">{s.skillName}</span>
+                        <span className="text-[10px] text-gray-400 font-sans">{s.level} · {s.notes}</span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteSkill(s.id)}
+                        className="text-gray-500 hover:text-red-400 p-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
-              <p className="text-xs font-mono text-[#c2b29f] leading-relaxed">
-                Preparar la estructura para futuro tablero interactivo y automatizaciones.
-              </p>
-            </div>
-          </div>
 
-          {/* Luxury Watermark Signature */}
-          <div className="pt-6 pb-2 border-t border-[#2d141b] flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-mono text-[#6f6053]">
-            <div className="flex items-center gap-2">
-              <Crown className="w-3.5 h-3.5 text-[#8c6a2f]" />
-              <span className="tracking-[0.25em] text-[#9a8677] uppercase font-bold">
-                DISCIPLINA TAMBIÉN ES CLARIDAD.
-              </span>
+              {/* Formulario Añadir Habilidad */}
+              <form onSubmit={handleAddSkill} className="bg-[#170a10] p-4 rounded-xl border border-[#2e151f] flex flex-wrap items-center gap-3">
+                <input
+                  type="text"
+                  placeholder="Nombre de habilidad (ej: Edición de Video)"
+                  value={newSkill.skillName}
+                  onChange={e => setNewSkill({ ...newSkill, skillName: e.target.value })}
+                  className="flex-1 bg-[#0e0408] border border-[#3e1b29] rounded-lg px-3 py-1.5 text-xs text-white"
+                />
+                <select
+                  value={newSkill.skillCategory}
+                  onChange={e => setNewSkill({ ...newSkill, skillCategory: e.target.value })}
+                  className="bg-[#0e0408] border border-[#3e1b29] rounded-lg px-3 py-1.5 text-xs text-white font-mono"
+                >
+                  <option value="VIDEO_EDITING">Video Editing</option>
+                  <option value="DESIGN">Design</option>
+                  <option value="LANGUAGES">Languages</option>
+                  <option value="PROGRAMMING">Web / Support</option>
+                  <option value="LOGISTICS">Logistics</option>
+                </select>
+                <button
+                  type="submit"
+                  disabled={addingSkill}
+                  className="py-1.5 px-4 rounded-lg bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs uppercase"
+                >
+                  + Añadir
+                </button>
+              </form>
             </div>
+          )}
 
-            <div className="text-[10px] tracking-widest text-[#8c6a2f] uppercase">
-              VERSIÓN 1.0 · UX REFERENCE · DOMINIUM
+          {/* SECCIÓN 4: NOTAS CONFIDENCIALES */}
+          {activeTabSection === 'notas' && (
+            <div className="space-y-4 animate-fade-in pt-2">
+              <h4 className="font-brand font-bold text-sm text-gold-300 flex items-center gap-2">
+                <Lock className="w-4 h-4 text-gold-400" /> Notas Confidenciales de la Princesa
+              </h4>
+
+              <div className="space-y-2">
+                {(member?.notes || []).length === 0 ? (
+                  <p className="text-xs font-mono text-gray-500 bg-[#170a10] p-4 rounded-xl">Sin notas registradas</p>
+                ) : (
+                  (member.notes || []).map(n => (
+                    <div key={n.id} className="p-3 bg-[#170a10] border border-[#2e151f] rounded-xl flex items-start justify-between gap-3">
+                      <div>
+                        <span className="text-[10px] font-mono text-gray-400 block mb-1">
+                          {new Date(n.createdAt).toLocaleString('es-ES')} · por {n.author || 'Princesa'}
+                        </span>
+                        <p className="text-xs text-white font-sans whitespace-pre-wrap">{n.note}</p>
+                      </div>
+                      <button onClick={() => handleDeleteNote(n.id)} className="text-gray-500 hover:text-red-400">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <form onSubmit={handleAddNote} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Escribir nota confidencial sobre este sumiso..."
+                  value={newNote}
+                  onChange={e => setNewNote(e.target.value)}
+                  className="flex-1 bg-[#0e0408] border border-[#3e1b29] rounded-lg px-3 py-2 text-xs text-white"
+                />
+                <button
+                  type="submit"
+                  disabled={addingNote}
+                  className="py-2 px-4 rounded-lg bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs uppercase"
+                >
+                  Guardar Nota
+                </button>
+              </form>
             </div>
-          </div>
+          )}
 
         </div>
 
-      </div>
+      </main>
 
       {/* ========================================================================= */}
-      {/* MODAL: EDITAR PERFIL COMPLETO */}
+      {/* 4. MODAL LATERAL EDITAR PERFIL COMPLETO (TOGGLEABLE)                      */}
       {/* ========================================================================= */}
-      {showEditProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="bg-[#120c10] border border-[#5a2735] rounded-2xl p-6 max-w-2xl w-full text-[#f3e8d9] space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center pb-2 border-b border-[#3c1b24]">
-              <h3 className="font-brand font-bold text-lg text-[#e5c158] flex items-center gap-2">
-                <Edit3 className="w-5 h-5 text-[#c5a059]" />
-                Editar Perfil del Sumiso ({currentPrefs.memberNumber})
-              </h3>
-              <button onClick={() => setShowEditProfile(false)} className="text-[#8e8073] hover:text-white">
+      {showEditDrawer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="bg-[#12080c] border border-gold-500/50 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl text-white custom-scrollbar">
+            
+            <div className="flex items-center justify-between pb-3 border-b border-[#2d151e]">
+              <div>
+                <h3 className="font-brand font-bold text-lg text-gold-300">Editar Perfil del Sumiso</h3>
+                <span className="text-[10px] font-mono text-gray-400">Actualiza los datos del dossier #{formData.memberNumber}</span>
+              </div>
+              <button onClick={() => setShowEditDrawer(false)} className="text-gray-400 hover:text-white p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveProfile} className="space-y-4 text-xs font-mono">
+            <form onSubmit={handleSaveProfile} className="space-y-4 text-xs font-sans">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[#c5a059] mb-1">Alias público</label>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Alias</label>
                   <input
                     type="text"
-                    value={profileForm.alias}
-                    onChange={e => setProfileForm({ ...profileForm, alias: e.target.value })}
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                    required
+                    value={formData.alias}
+                    onChange={e => handleFieldChange('alias', e.target.value)}
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-[#c5a059] mb-1">Reino / Nombre ceremonial</label>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Nº Miembro</label>
                   <input
                     type="text"
-                    value={profileForm.internalName}
-                    onChange={e => setProfileForm({ ...profileForm, internalName: e.target.value })}
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                    value={formData.memberNumber}
+                    onChange={e => handleFieldChange('memberNumber', e.target.value)}
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white font-mono"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[#c5a059] mb-1">Email de contacto</label>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Telegram (@usuario)</label>
+                  <input
+                    type="text"
+                    value={formData.telegram}
+                    onChange={e => handleFieldChange('telegram', e.target.value)}
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-cyan-300 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Email</label>
                   <input
                     type="email"
-                    value={profileForm.email || ''}
-                    onChange={e => setProfileForm({ ...profileForm, email: e.target.value })}
-                    placeholder="devoto@email.com"
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[#c5a059] mb-1">Usuario Telegram (@usuario)</label>
-                  <input
-                    type="text"
-                    value={profileForm.telegram || ''}
-                    onChange={e => setProfileForm({ ...profileForm, telegram: e.target.value })}
-                    placeholder="@usuario"
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                    value={formData.email}
+                    onChange={e => handleFieldChange('email', e.target.value)}
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white font-mono"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[#c5a059] mb-1">Edad / Ocupación / Perfil</label>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Edad</label>
                   <input
                     type="text"
-                    value={profileForm.ageStatus || ''}
-                    onChange={e => setProfileForm({ ...profileForm, ageStatus: e.target.value })}
-                    placeholder="24 años, Diseñador"
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                    value={formData.age}
+                    onChange={e => handleFieldChange('age', e.target.value)}
+                    placeholder="23"
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-[#c5a059] mb-1">Motivación personal</label>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Profesión / Función</label>
                   <input
                     type="text"
-                    value={profileForm.motivation || ''}
-                    onChange={e => setProfileForm({ ...profileForm, motivation: e.target.value })}
-                    placeholder="Motivo de ingreso..."
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[#c5a059] mb-1 font-mono text-xs">Rango / Estamento Actual</label>
-                  <select
-                    value={profileForm.groupId || ''}
-                    onChange={e => setProfileForm({ ...profileForm, groupId: e.target.value })}
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white text-xs font-mono"
-                  >
-                    <option value="">-- Sin Rango Asignado --</option>
-                    {allGroups.map(g => (
-                      <option key={g.id} value={g.id}>
-                        {g.name} {g.badge ? `(${g.badge})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[#c5a059] mb-1 font-mono text-xs">Rango / Estamento Objetivo</label>
-                  <select
-                    value={profileForm.targetGroupId || ''}
-                    onChange={e => setProfileForm({ ...profileForm, targetGroupId: e.target.value })}
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white text-xs font-mono"
-                  >
-                    <option value="">-- Sin Objetivo --</option>
-                    {allGroups.map(g => (
-                      <option key={g.id} value={g.id}>
-                        {g.name} {g.badge ? `(${g.badge})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[#c5a059] mb-1">Sirve desde</label>
-                  <input
-                    type="text"
-                    value={profileForm.servedSince}
-                    onChange={e => setProfileForm({ ...profileForm, servedSince: e.target.value })}
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[#c5a059] mb-1">Tributo inicial</label>
-                  <input
-                    type="text"
-                    value={profileForm.initialTribute}
-                    onChange={e => setProfileForm({ ...profileForm, initialTribute: e.target.value })}
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                    value={formData.profession}
+                    onChange={e => handleFieldChange('profession', e.target.value)}
+                    placeholder="Ingeniero Becario"
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[#c5a059] mb-1">Cita del sumiso</label>
+                <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Cita de Devoción</label>
                 <input
                   type="text"
-                  value={profileForm.quote}
-                  onChange={e => setProfileForm({ ...profileForm, quote: e.target.value })}
-                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white font-serif italic"
+                  value={formData.quote}
+                  onChange={e => handleFieldChange('quote', e.target.value)}
+                  className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-gold-200 font-serif italic"
                 />
               </div>
 
-              {/* Tags and Sensitive Dossier */}
-              <div className="pt-2 border-t border-[#2d141b] space-y-3">
-                <h5 className="font-brand font-bold text-sm text-[#e5c158]">Etiquetas del Perfil</h5>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[#c5a059] mb-1">Preferencias</label>
-                    <input
-                      type="text"
-                      value={profileForm.preferences}
-                      onChange={e => setProfileForm({ ...profileForm, preferences: e.target.value })}
-                      className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[#c5a059] mb-1">Fetiches</label>
-                    <input
-                      type="text"
-                      value={profileForm.fetishes}
-                      onChange={e => setProfileForm({ ...profileForm, fetishes: e.target.value })}
-                      className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                    />
-                  </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Sirve desde</label>
+                  <input
+                    type="text"
+                    value={formData.servedSince}
+                    onChange={e => handleFieldChange('servedSince', e.target.value)}
+                    placeholder="28 sept 2026"
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
+                  />
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[#c5a059] mb-1">Triggers</label>
-                    <input
-                      type="text"
-                      value={profileForm.triggers}
-                      onChange={e => setProfileForm({ ...profileForm, triggers: e.target.value })}
-                      className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[#c5a059] mb-1">Límites</label>
-                    <input
-                      type="text"
-                      value={profileForm.limits}
-                      onChange={e => setProfileForm({ ...profileForm, limits: e.target.value })}
-                      className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[#c5a059] mb-1">Aftercare</label>
-                    <input
-                      type="text"
-                      value={profileForm.aftercare}
-                      onChange={e => setProfileForm({ ...profileForm, aftercare: e.target.value })}
-                      className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[#c5a059] mb-1">Objetivos personales</label>
-                    <input
-                      type="text"
-                      value={profileForm.personalGoals}
-                      onChange={e => setProfileForm({ ...profileForm, personalGoals: e.target.value })}
-                      className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Tributo inicial</label>
+                  <input
+                    type="text"
+                    value={formData.initialTribute}
+                    onChange={e => handleFieldChange('initialTribute', e.target.value)}
+                    placeholder="Pendiente / 50€"
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
+                  />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Rango / Estamento Actual</label>
+                  <select
+                    value={formData.groupId}
+                    onChange={e => handleFieldChange('groupId', e.target.value)}
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
+                  >
+                    <option value="">Sin rango</option>
+                    {allGroupsState.map(g => (
+                      <option key={g.id} value={g.id}>{g.name} ({g.badge})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Rango Objetivo</label>
+                  <select
+                    value={formData.targetGroupId}
+                    onChange={e => handleFieldChange('targetGroupId', e.target.value)}
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
+                  >
+                    <option value="">Sin objetivo</option>
+                    {allGroupsState.map(g => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Progreso (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.overallProgress}
+                    onChange={e => handleFieldChange('overallProgress', parseInt(e.target.value, 10) || 0)}
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Puntos XP</label>
+                  <input
+                    type="number"
+                    value={formData.experiencePoints}
+                    onChange={e => handleFieldChange('experiencePoints', parseInt(e.target.value, 10) || 0)}
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">URL Avatar / Fotografía</label>
+                <input
+                  type="text"
+                  value={formData.avatarUrl}
+                  onChange={e => handleFieldChange('avatarUrl', e.target.value)}
+                  placeholder="https://ejemplo.com/avatar.jpg"
+                  className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Preferencias</label>
+                <input
+                  type="text"
+                  value={formData.preferences}
+                  onChange={e => handleFieldChange('preferences', e.target.value)}
+                  className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Fetiches</label>
+                <input
+                  type="text"
+                  value={formData.fetishes}
+                  onChange={e => handleFieldChange('fetishes', e.target.value)}
+                  className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Triggers</label>
+                <input
+                  type="text"
+                  value={formData.triggers}
+                  onChange={e => handleFieldChange('triggers', e.target.value)}
+                  className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-[#2d151e]">
                 <button
                   type="button"
-                  onClick={() => setShowEditProfile(false)}
-                  className="px-4 py-2 rounded-xl bg-[#201118] text-[#8e8073] hover:text-white"
+                  onClick={() => setShowEditDrawer(false)}
+                  className="py-2 px-4 rounded-lg bg-dark-900 border border-gray-700 text-gray-300 text-xs font-bold"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#6a1528] to-[#4a0e1b] border border-[#c5a059] text-[#f7e08b] font-bold"
+                  disabled={saving}
+                  className="py-2 px-6 rounded-lg bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs uppercase"
                 >
-                  Guardar Cambios
+                  {saving ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
               </div>
             </form>
+
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: AÑADIR HABILIDAD LABORAL */}
-      {/* ========================================================================= */}
-      {showAddSkill && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="bg-[#120c10] border border-[#5a2735] rounded-2xl p-6 max-w-md w-full text-[#f3e8d9] space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center pb-2 border-b border-[#3c1b24]">
-              <h3 className="font-brand font-bold text-base text-[#e5c158]">
-                Añadir Habilidad Laboral
-              </h3>
-              <button onClick={() => setShowAddSkill(false)} className="text-[#8e8073] hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddSkillSubmit} className="space-y-3 text-xs font-mono">
-              <div>
-                <label className="block text-[#c5a059] mb-1">Nombre de Habilidad</label>
-                <input
-                  type="text"
-                  placeholder="Ej: Edición de video, Diseño gráfico..."
-                  value={skillForm.skillName}
-                  onChange={e => setSkillForm({ ...skillForm, skillName: e.target.value })}
-                  required
-                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[#c5a059] mb-1">Categoría</label>
-                <select
-                  value={skillForm.skillCategory}
-                  onChange={e => setSkillForm({ ...skillForm, skillCategory: e.target.value })}
-                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                >
-                  <option value="VIDEO_EDITING">Edición de video</option>
-                  <option value="DESIGN">Diseño gráfico</option>
-                  <option value="LANGUAGES">Traducción / Idiomas</option>
-                  <option value="PROGRAMMING">Soporte web / Programación</option>
-                  <option value="SOCIAL_MEDIA">Redes Sociales</option>
-                  <option value="OTHER">Otras Habilidades</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[#c5a059] mb-1">Nivel de Maestría</label>
-                <select
-                  value={skillForm.level}
-                  onChange={e => setSkillForm({ ...skillForm, level: e.target.value })}
-                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                >
-                  <option value="BASIC">Básico (●●○○○)</option>
-                  <option value="INTERMEDIATE">Intermedio (●●●○○)</option>
-                  <option value="ADVANCED">Avanzado (●●●●○)</option>
-                  <option value="EXPERT">Experto (●●●●●)</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddSkill(false)}
-                  className="px-4 py-2 rounded-xl bg-[#201118] text-[#8e8073]"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#6a1528] to-[#4a0e1b] border border-[#c5a059] text-[#f7e08b] font-bold"
-                >
-                  Registrar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* MODAL: NUEVA ACTIVIDAD ASIGNADA */}
+      {/* 5. MODAL NUEVA ACTIVIDAD / ENTRENAMIENTO PERSONALIZADO                    */}
       {/* ========================================================================= */}
       {showNewActivityModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="bg-[#120c10] border border-[#5a2735] rounded-2xl p-6 max-w-md w-full text-[#f3e8d9] space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center pb-2 border-b border-[#3c1b24]">
-              <h3 className="font-brand font-bold text-base text-[#e5c158]">
-                Asignar Nueva Actividad
-              </h3>
-              <button onClick={() => setShowNewActivityModal(false)} className="text-[#8e8073] hover:text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="bg-[#12080c] border border-gold-500/50 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl text-white">
+            
+            <div className="flex items-center justify-between pb-3 border-b border-[#2d151e]">
+              <div>
+                <h3 className="font-brand font-bold text-lg text-gold-300">Asignar Nueva Actividad / Objetivo</h3>
+                <span className="text-[10px] font-mono text-gray-400">Para {formData.alias}</span>
+              </div>
+              <button onClick={() => setShowNewActivityModal(false)} className="text-gray-400 hover:text-white p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateCustomActivity} className="space-y-3 text-xs font-mono">
+            <form onSubmit={handleCreateCustomActivity} className="space-y-3 text-xs font-sans">
               <div>
-                <label className="block text-[#c5a059] mb-1">Título de Actividad</label>
+                <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Título de la Actividad</label>
                 <input
                   type="text"
-                  placeholder="Ej: Enviar tributo semanal, Sesión virtual..."
-                  value={newActivityForm.title}
-                  onChange={e => setNewActivityForm({ ...newActivityForm, title: e.target.value })}
                   required
-                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  placeholder="ej: Limpieza de calzado y reporte"
+                  value={newObjective.title}
+                  onChange={e => setNewObjective({ ...newObjective, title: e.target.value })}
+                  className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[#c5a059] mb-1">Tipo</label>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Tipo</label>
                   <select
-                    value={newActivityForm.type}
-                    onChange={e => setNewActivityForm({ ...newActivityForm, type: e.target.value })}
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                    value={newObjective.type}
+                    onChange={e => setNewObjective({ ...newObjective, type: e.target.value })}
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white font-mono"
                   >
                     <option value="TASK">Tarea</option>
                     <option value="RITUAL">Ritual</option>
                     <option value="PUNISHMENT">Castigo</option>
-                    <option value="SPECIAL_EVENT">Actividad especial</option>
-                    <option value="GOAL">Objetivo</option>
+                    <option value="REWARD">Recompensa</option>
+                    <option value="GOAL">Meta / Escalafón</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[#c5a059] mb-1">Prioridad</label>
-                  <select
-                    value={newActivityForm.priority}
-                    onChange={e => setNewActivityForm({ ...newActivityForm, priority: e.target.value })}
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                  >
-                    <option value="Alta">★ Alta</option>
-                    <option value="Media">★ Media</option>
-                    <option value="Baja">★ Baja</option>
-                  </select>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Días límite</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newObjective.dueDays}
+                    onChange={e => setNewObjective({ ...newObjective, dueDays: e.target.value })}
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white font-mono"
+                  />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[#c5a059] mb-1">Estado</label>
-                  <select
-                    value={newActivityForm.status}
-                    onChange={e => setNewActivityForm({ ...newActivityForm, status: e.target.value })}
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                  >
-                    <option value="ACTIVE">Activa</option>
-                    <option value="PENDING">Pendiente</option>
-                    <option value="COMPLETED_ON_TIME">Completada</option>
-                    <option value="OVERDUE">Vencida</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[#c5a059] mb-1">Puntos XP</label>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Puntos XP Otorgados</label>
                   <input
                     type="number"
-                    value={newActivityForm.pointsAwarded}
-                    onChange={e => setNewActivityForm({ ...newActivityForm, pointsAwarded: e.target.value })}
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                    value={newObjective.pointsAwarded}
+                    onChange={e => setNewObjective({ ...newObjective, pointsAwarded: e.target.value })}
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-[#c5a059] mb-1">Fecha Límite</label>
-                  <input
-                    type="date"
-                    value={newActivityForm.dueDate}
-                    onChange={e => setNewActivityForm({ ...newActivityForm, dueDate: e.target.value })}
-                    className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                  />
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Prioridad</label>
+                  <select
+                    value={newObjective.priority}
+                    onChange={e => setNewObjective({ ...newObjective, priority: e.target.value })}
+                    className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white font-mono"
+                  >
+                    <option value="NORMAL">Normal</option>
+                    <option value="MEDIUM">Media</option>
+                    <option value="HIGH">Alta</option>
+                    <option value="URGENT">Urgente</option>
+                  </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-[#c5a059] mb-1">Instrucciones / Protocolo Específico</label>
+                <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Instrucciones Específicas</label>
                 <textarea
-                  rows="2"
-                  placeholder="Detalles de la tarea, condiciones de aprobación o protocolo ceremonial..."
-                  value={newActivityForm.customInstructions}
-                  onChange={e => setNewActivityForm({ ...newActivityForm, customInstructions: e.target.value })}
-                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
+                  rows="3"
+                  placeholder="Detalla cómo debe cumplirse la tarea..."
+                  value={newObjective.customInstructions}
+                  onChange={e => setNewObjective({ ...newObjective, customInstructions: e.target.value })}
+                  className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowNewActivityModal(false)}
-                  className="px-4 py-2 rounded-xl bg-[#201118] text-[#8e8073]"
+                  className="py-2 px-4 rounded-lg bg-dark-900 border border-gray-700 text-gray-300 text-xs font-bold"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#6a1528] to-[#4a0e1b] border border-[#c5a059] text-[#f7e08b] font-bold"
+                  disabled={addingObjective}
+                  className="py-2 px-5 rounded-lg bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs uppercase"
                 >
-                  Asignar
+                  {addingObjective ? 'Asignando...' : 'Asignar Actividad'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
 
-      {/* ========================================================================= */}
-      {/* MODAL: AÑADIR NOTA INTERNA */}
-      {/* ========================================================================= */}
-      {showAddNoteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="bg-[#120c10] border border-[#5a2735] rounded-2xl p-6 max-w-md w-full text-[#f3e8d9] space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center pb-2 border-b border-[#3c1b24]">
-              <h3 className="font-brand font-bold text-base text-[#e5c158]">
-                Añadir Nota u Observación
-              </h3>
-              <button onClick={() => setShowAddNoteModal(false)} className="text-[#8e8073] hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddNoteSubmit} className="space-y-3 text-xs font-mono">
-              <div>
-                <label className="block text-[#c5a059] mb-1">Tipo de Nota</label>
-                <select
-                  value={newNoteType}
-                  onChange={e => setNewNoteType(e.target.value)}
-                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2 text-white"
-                >
-                  <option value="internal">Nota interna (solo admin)</option>
-                  <option value="next_steps">Próximos pasos</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[#c5a059] mb-1">Contenido de la Observación</label>
-                <textarea
-                  rows={4}
-                  placeholder="Escribe la observación sobre disciplina, acuerdos, próximos pasos o evolución..."
-                  value={newNoteText}
-                  onChange={e => setNewNoteText(e.target.value)}
-                  required
-                  className="w-full bg-[#180f14] border border-[#3e1e27] rounded-lg p-2.5 text-white resize-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddNoteModal(false)}
-                  className="px-4 py-2 rounded-xl bg-[#201118] text-[#8e8073]"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#6a1528] to-[#4a0e1b] border border-[#c5a059] text-[#f7e08b] font-bold"
-                >
-                  Guardar Nota
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

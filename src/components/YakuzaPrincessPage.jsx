@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { resolveMediaUrl } from '../config';
 import princessVisionBanner from '../assets/princess-vision-banner.png';
+import { KingdomHallOfFame } from './kingdom/KingdomHallOfFame';
 
 export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, onOpenKingdomRequest }) {
   const [activeTab, setActiveTab] = useState('normas'); // normas, presentate, reino
@@ -73,27 +74,27 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
       badge: 'NIVEL 1',
       title: 'PLEBEYOS',
       subtitle: 'Sumisos humildes de primer nivel',
-      frontText: 'Sumisos que desean servir y ser útiles de alguna forma desde el respeto y la devoción.',
+      frontText: 'Sirve con tiempo, habilidades y constancia.\nTu valor está en ser útil, resolutivo y profesional aunque no puedas aportar económicamente.\nAquí empiezas a demostrar si mereces avanzar.',
       backTitle: 'Órdenes & Grupo Telegram',
-      backText: 'Recibes órdenes y tareas gratuitas en el grupo oficial de Telegram. El único requisito es la disponibilidad, eficacia y la satisfacción de haberme complacido.'
+      backText: `DEBERES\n- Cumplir órdenes y tareas en el canal oficial.\n- Mantener respeto estricto al protocolo y tiempos.\n- Aportar habilidades técnicas, promoción o logística.\n\nPRIVILEGIOS\n- Servir a la Princesa de forma gratuita.\n- Tareas adaptadas a tus conocimientos.\n- Oportunidad de ascenso por méritos y constancia.`
     },
     {
       id: 'sirvientes',
       badge: 'NIVEL 2',
       title: 'SIRVIENTES',
       subtitle: 'Trato directo & Contratos',
-      frontText: 'Sumisos entregados que se encargan de hacer la vida de la Princesa más fácil.',
+      frontText: 'Tu servicio empieza a tener peso real.\nCombinas utilidad, constancia y pequeñas aportaciones para facilitarme la vida.\nAquí demuestras que no solo quieres estar: quieres avanzar.',
       backTitle: 'Contacto Directo & Club 1k',
-      backText: 'Contacto directo con la Princesa, tareas personalizadas y recompensas directas al entrar en el club 1k. Contratos desbloqueados y opción de ascenso a Caballeros.'
+      backText: `DEBERES\n- Mantener lealtad y continuidad demostrada.\n- Tributos o soporte en compras de wishlist.\n- Iniciativa, discreción y respuesta prioritaria.\n\nPRIVILEGIOS\n- Trato y comunicación directa con la Princesa.\n- Acceso al Club 1k y contratos de servidumbre.\n- Opción preferente de evaluación para Caballero.`
     },
     {
       id: 'caballeros',
       badge: 'NIVEL 3',
       title: 'CABALLEROS',
       subtitle: 'Aspirantes a Propiedad',
-      frontText: 'Sumisos que aspiran a ser propiedad exclusiva de la Princesa. ¿Conseguirás ser uno de ellos?',
+      frontText: 'Has entrado en entrenamiento.\nYa no solo demuestras utilidad: demuestras si tienes disciplina, compatibilidad y entrega suficientes para pertenecerme.\nAquí se construye la confianza de verdad.',
       backTitle: 'Cashmeets & Citas Presenciales',
-      backText: 'Exploraremos la dinámica juntos. Evaluaciones de sumisión, aftercare exclusivo, cashmeets, cashdrops y entregas de productos en mano.'
+      backText: `DEBERES\n- Seguir entrenamiento personalizado y rituales.\n- Disponibilidad alta y aceptación de corrección.\n- Aportación regular y soporte logístico/financiero.\n\nPRIVILEGIOS\n- Seguimiento cercano y dinámicas D/s continuadas.\n- Acceso a experiencias presenciales (cashmeets / entregas).\n- Candidatura formal a consagración como sumiso en propiedad.`
     },
     {
       id: 'elegidos',
@@ -138,8 +139,9 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
     const otherLines = [];
 
     for (const line of lines) {
-      const isDutiesHeader = /^(?:#+\s*)?(?:deberes|obligaciones|compromisos)(?:\s*[:]?\s*)$/i.test(line);
-      const isPrivilegesHeader = /^(?:#+\s*)?(?:privilegios|beneficios|recompensas)(?:\s*[:]?\s*)$/i.test(line);
+      const cleanHeader = line.replace(/[\*\_#:\-]/g, '').trim().toLowerCase();
+      const isDutiesHeader = ['deberes', 'obligaciones', 'compromisos', 'deberes principales', 'deberes del rango'].includes(cleanHeader);
+      const isPrivilegesHeader = ['privilegios', 'beneficios', 'recompensas', 'privilegios clave', 'privilegios del rango'].includes(cleanHeader);
 
       if (isDutiesHeader) {
         currentSection = 'duties';
@@ -150,7 +152,7 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
         continue;
       }
 
-      const clean = line.replace(/^[-•*–—]\s*/, '').replace(/^\d+[\.\)]\s*/, '').trim();
+      const clean = line.replace(/^[\s\*•–—\-\d\.\)]+/, '').trim();
       if (!clean) continue;
 
       if (currentSection === 'duties') {
@@ -340,57 +342,70 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
       {activeTab === 'normas' && (
         <div className="max-w-5xl mx-auto space-y-8">
 
-          {/* BANNER VISUAL DE LA PRINCESA YAKUZA */}
-          <div className="relative w-full rounded-2xl overflow-hidden border border-gold-500/40 shadow-2xl group">
-            <div className="aspect-[16/9] sm:aspect-[21/9] w-full max-h-[460px] overflow-hidden relative">
-              <img
-                src="/j.jpeg"
-                alt="La Princesa Yakuza"
-                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 filter brightness-95 contrast-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/20 to-transparent" />
-              <div className="absolute inset-0 bg-gradient-to-r from-dark-950/70 via-transparent to-dark-950/70" />
-              <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 flex items-center gap-2 px-3.5 py-1.5 rounded-full legibility-shield border border-gold-500/40 text-gold-300 text-xs font-sans tracking-widest uppercase">
-                <Crown className="w-3.5 h-3.5 text-gold-400" />
-                <span>La Princesa Yakuza · Autoridad & Dominio</span>
+          {/* APARTADO EDITORIAL: RETRATO VERTICAL DESTACADO & VISIÓN D/S */}
+          <div className="grid lg:grid-cols-12 gap-8 items-stretch">
+            
+            {/* Imagen Destacada de la Princesa: Formato Vertical Editorial Amplio */}
+            <div className="lg:col-span-5 flex flex-col">
+              <div className="relative w-full h-full min-h-[460px] sm:min-h-[540px] rounded-2xl overflow-hidden border border-gold-500/50 shadow-2xl group flex flex-col justify-end p-6 bg-dark-950">
+                <img
+                  src={visionBanner || '/j.jpeg'}
+                  alt="La Princesa Yakuza - Retrato Editorial"
+                  className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 filter brightness-95 contrast-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/25 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-r from-dark-950/50 via-transparent to-dark-950/30" />
+                
+                <div className="relative z-10 space-y-2">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full legibility-shield border border-gold-500/50 text-gold-300 text-xs font-sans tracking-widest uppercase shadow-xl">
+                    <Crown className="w-3.5 h-3.5 text-gold-400" />
+                    <span>La Princesa Yakuza · Autoridad & Dominio</span>
+                  </div>
+                  <p className="text-[11px] font-mono text-ivory-300 italic">
+                    Retrato oficial · Estética editorial vertical
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* BLOQUE: MI VISIÓN EN LA RELACIÓN D/S (ENCIMA DE LOS DOS BLOQUES) */}
-          <div className="legibility-bordeaux p-6 sm:p-8 rounded-2xl border border-gold-500/40 space-y-5 shadow-2xl relative overflow-hidden">
-            <div className="flex items-center gap-3 border-b border-gold-500/30 pb-3">
-              <Sparkles className="w-6 h-6 text-gold-400 shrink-0" />
-              <h2 className="font-sans font-bold text-2xl sm:text-3xl text-ivory-100 tracking-wide">
-                {visionTitle}
-              </h2>
-            </div>
+            {/* Bloque: Mi Visión en la Relación D/s */}
+            <div className="lg:col-span-7 legibility-bordeaux p-6 sm:p-8 rounded-2xl border border-gold-500/40 space-y-5 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-3 border-b border-gold-500/30 pb-3 mb-4">
+                  <Sparkles className="w-6 h-6 text-gold-400 shrink-0" />
+                  <h2 className="font-sans font-bold text-2xl sm:text-3xl text-ivory-100 tracking-wide">
+                    {visionTitle}
+                  </h2>
+                </div>
 
-            <p className="text-xs sm:text-sm text-ivory-200 font-body leading-relaxed">
-              {visionText1}
-            </p>
+                <p className="text-xs sm:text-sm text-ivory-200 font-body leading-relaxed mb-4">
+                  {visionText1}
+                </p>
 
-            <div className="space-y-3 pt-1">
-              <div className="p-3.5 rounded-xl bg-dark-950/80 border border-gold-500/30 flex items-start gap-3">
-                <span className="text-base leading-none mt-0.5">🔹</span>
-                <p className="text-xs sm:text-sm font-sans text-gold-200 font-semibold leading-relaxed">
-                  {visionPoint1}
+                <div className="space-y-3">
+                  <div className="p-3.5 rounded-xl bg-dark-950/80 border border-gold-500/30 flex items-start gap-3">
+                    <span className="text-base leading-none mt-0.5">🔹</span>
+                    <p className="text-xs sm:text-sm font-sans text-gold-200 font-semibold leading-relaxed">
+                      {visionPoint1}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-dark-950/80 border border-gold-500/30 flex items-start gap-3">
+                    <span className="text-base leading-none mt-0.5">🔹</span>
+                    <p className="text-xs sm:text-sm font-sans text-gold-200 font-semibold leading-relaxed">
+                      {visionPoint2}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-bordeaux-950/90 via-dark-950 to-bordeaux-950/90 border border-gold-500/30 text-center">
+                <p className="text-xs sm:text-sm text-gold-300 font-sans italic font-medium leading-relaxed">
+                  “{visionQuote}”
                 </p>
               </div>
-
-              <div className="p-3.5 rounded-xl bg-dark-950/80 border border-gold-500/30 flex items-start gap-3">
-                <span className="text-base leading-none mt-0.5">🔹</span>
-                <p className="text-xs sm:text-sm font-sans text-gold-200 font-semibold leading-relaxed">
-                  {visionPoint2}
-                </p>
-              </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-gradient-to-r from-bordeaux-950/90 via-dark-950 to-bordeaux-950/90 border border-gold-500/30 text-center">
-              <p className="text-xs sm:text-sm text-gold-300 font-sans italic font-medium leading-relaxed">
-                “{visionQuote}”
-              </p>
-            </div>
           </div>
 
           {/* DOS BLOQUES EXISTENTES: REQUISITOS Y NO RESPONDO */}
@@ -663,15 +678,20 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
         </div>
       )}
 
-      {/* Bottom CTA to Store */}
-      <div className="text-center pt-8 border-t border-gold-500/20">
-        <button
-          onClick={onNavigateToStore}
-          className="btn-royal-bordeaux"
-        >
-          <Sparkles className="w-4 h-4 text-gold-400" />
-          <span>{buttonStoreText}</span>
-        </button>
+      {/* Muro del Reino / Muro de la Fama al pie de la sección */}
+      <div className="pt-10 border-t border-gold-500/25 space-y-6">
+        <KingdomHallOfFame onApplyClick={(rank) => onOpenKingdomRequest?.(rank)} />
+
+        {/* Enlace secundario hacia la Boutique Fetish */}
+        <div className="text-center pt-2">
+          <button
+            onClick={onNavigateToStore}
+            className="text-xs font-sans text-gold-400 hover:text-white uppercase tracking-widest transition-colors inline-flex items-center gap-2 hover:underline"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-gold-400" />
+            <span>O visita la {buttonStoreText} de la Princesa →</span>
+          </button>
+        </div>
       </div>
 
     </div>

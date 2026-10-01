@@ -13,6 +13,7 @@ export default function Header({
 
   const navLinks = [
     { id: 'fetish', label: 'Tienda' },
+    { id: 'findreamland', label: 'FinDreamland' },
     { id: 'princess', label: 'Yakuza Princess' },
     { id: 'giveaway', label: 'Grand Opening' }
   ];

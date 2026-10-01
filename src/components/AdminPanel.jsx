@@ -7,6 +7,7 @@ import { KingdomCrmView } from './kingdom/KingdomCrmView';
 import { KingdomHierarchyView } from './kingdom/KingdomHierarchyView';
 import { KingdomActivitiesView } from './kingdom/KingdomActivitiesView';
 import { KingdomRequestsView } from './kingdom/KingdomRequestsView';
+import { KingdomHallOfFameAdmin } from './kingdom/KingdomHallOfFameAdmin';
 
 export default function AdminPanel({ onBackToStore, onRefreshData }) {
 
@@ -336,19 +337,36 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/store/admin/media/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al subir imagen');
+      if (editingItem?.id) {
+        const res = await fetch(`${API_BASE}/api/store/admin/items/${editingItem.id}/media`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData
+        });
+        const createdMedia = await res.json();
+        if (!res.ok) throw new Error(createdMedia.error || 'Error al subir archivos multimedia');
 
-      if (data.urls && Array.isArray(data.urls)) {
-        setItemForm(prev => ({
+        const newMediaList = Array.isArray(createdMedia) ? createdMedia : [createdMedia];
+        setEditingItem(prev => ({
           ...prev,
-          images: [...prev.images, ...data.urls]
+          media: [...(prev.media || []), ...newMediaList]
         }));
+        fetchAllData();
+      } else {
+        const res = await fetch(`${API_BASE}/api/store/admin/media/upload`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al subir imagen o vídeo');
+
+        if (data.urls && Array.isArray(data.urls)) {
+          setItemForm(prev => ({
+            ...prev,
+            images: [...prev.images, ...data.urls]
+          }));
+        }
       }
     } catch (err) {
       alert(err.message);
@@ -842,8 +860,9 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
       subTabs: [
         { id: 'kingdom_crm', label: 'CRM Miembros', icon: Users },
         { id: 'kingdom_hierarchy', label: 'Jerarquía Reino', icon: Castle },
-        { id: 'kingdom_activities', label: 'Biblioteca Actividades', icon: BookOpen },
-        { id: 'kingdom_requests', label: 'Solicitudes', icon: Inbox }
+        { id: 'kingdom_activities', label: 'Biblioteca Objetivos', icon: BookOpen },
+        { id: 'kingdom_requests', label: 'Candidatos (Comparativa)', icon: Inbox },
+        { id: 'kingdom_hall_of_fame', label: 'Muro de la Fama', icon: Crown }
       ]
     },
     {
@@ -2620,13 +2639,16 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
                 </label>
               </div>
 
-              {/* SECCIÓN DE FOTOGRAFÍAS */}
+              {/* SECCIÓN DE FOTOGRAFÍAS Y VÍDEOS */}
               <div className="bg-dark-950 p-4 rounded-xl border border-gray-800 space-y-3">
-                <label className="block text-xs font-mono text-gold-400 font-bold">
-                  Fotografías del Artículo ({itemForm.images.length})
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-mono text-gold-400 font-bold">
+                    Fotografías y Vídeos del Artículo (Total: {(editingItem?.media?.length || 0) + itemForm.images.length})
+                  </label>
+                  <span className="text-[10px] font-mono text-gray-400">Soporta múltiples imágenes y vídeos (.mp4, .webm, .mov)</span>
+                </div>
 
-                {/* Opciones de Selección / Subida de fotos */}
+                {/* Opciones de Selección / Subida de fotos y vídeos */}
                 <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
@@ -2640,9 +2662,9 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
                     Elegir de Biblioteca o Subir Nuevo
                   </button>
 
-                  <label className="py-2 px-3 rounded-lg bg-dark-900 border border-gray-700 hover:text-white text-gray-300 font-mono text-xs font-bold cursor-pointer flex items-center gap-1.5">
-                    <Upload className="w-3.5 h-3.5" />
-                    {uploadingImage ? 'Subiendo...' : 'Subida rápida desde PC'}
+                  <label className="py-2 px-3 rounded-lg bg-dark-900 border border-gold-500/40 hover:border-gold-400 text-gold-300 hover:text-white font-mono text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-colors">
+                    <Upload className="w-3.5 h-3.5 text-gold-400" />
+                    {uploadingImage ? 'Subiendo archivos...' : 'Subir Fotos / Vídeos (PC)'}
                     <input type="file" multiple accept="image/*,video/*" onChange={handleFileUpload} className="hidden" />
                   </label>
                 </div>
@@ -2653,7 +2675,7 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
                     type="text"
                     value={newImageUrl}
                     onChange={e => setNewImageUrl(e.target.value)}
-                    placeholder="https://ejemplo.com/imagen.jpg"
+                    placeholder="https://ejemplo.com/archivo.mp4 o .jpg"
                     className="flex-1 bg-dark-900 border border-gray-700 rounded px-3 py-1.5 text-xs text-white placeholder-gray-500 font-mono"
                   />
                   <button
@@ -2668,25 +2690,31 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
                 {/* Galería guardada en BD (media real) */}
                 {editingItem?.id && editingItem?.media?.length > 0 && (
                   <div>
-                    <p className="text-[10px] font-mono text-emerald-400 mb-1.5">✓ Fotos guardadas — haz hover y pulsa ✕ para borrarla definitivamente</p>
+                    <p className="text-[10px] font-mono text-emerald-400 mb-1.5">✓ Galería guardada ({editingItem.media.length}) — haz hover y pulsa ✕ para borrar definitivamente</p>
                     <div className="flex gap-2 overflow-x-auto pb-1">
-                      {editingItem.media.map((m) => (
-                        <div key={m.id} className="relative w-20 h-20 rounded border border-emerald-700/40 overflow-hidden flex-shrink-0 group">
-                          {m.type === 'VIDEO' ? (
-                            <video src={resolveMediaUrl(m.url)} muted className="w-full h-full object-cover" />
-                          ) : (
-                            <img src={resolveMediaUrl(m.url)} alt="" className="w-full h-full object-cover" />
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteItemMedia(editingItem.id, m.id)}
-                            className="absolute inset-0 bg-red-700/90 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-0.5"
-                          >
-                            <X className="w-5 h-5" />
-                            <span className="text-[9px] font-mono font-bold">BORRAR</span>
-                          </button>
-                        </div>
-                      ))}
+                      {editingItem.media.map((m) => {
+                        const isVid = m.type === 'VIDEO' || /\.(mp4|webm|mov|mkv|m4v)(\?.*)?$/i.test(m.url);
+                        return (
+                          <div key={m.id} className="relative w-20 h-20 rounded border border-emerald-700/40 overflow-hidden flex-shrink-0 group bg-dark-900">
+                            {isVid ? (
+                              <video src={resolveMediaUrl(m.url)} muted className="w-full h-full object-cover" />
+                            ) : (
+                              <img src={resolveMediaUrl(m.url)} alt="" className="w-full h-full object-cover" />
+                            )}
+                            {isVid && (
+                              <span className="absolute top-1 left-1 bg-black/80 text-[8px] font-mono font-bold text-gold-400 px-1 rounded border border-gold-500/40">VÍDEO</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteItemMedia(editingItem.id, m.id)}
+                              className="absolute inset-0 bg-red-700/90 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-0.5"
+                            >
+                              <X className="w-5 h-5" />
+                              <span className="text-[9px] font-mono font-bold">BORRAR</span>
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -2694,21 +2722,31 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
                 {/* URLs pendientes (aún no guardadas como media en BD) */}
                 {itemForm.images.length > 0 && (
                   <div>
-                    <p className="text-[10px] font-mono text-amber-400 mb-1.5">⏳ URLs pendientes (se guardarán al pulsar "Guardar Artículo")</p>
+                    <p className="text-[10px] font-mono text-amber-400 mb-1.5">⏳ Archivos pendientes ({itemForm.images.length}) — se guardarán al pulsar "Guardar Artículo"</p>
                     <div className="flex gap-2 overflow-x-auto pb-1">
-                      {itemForm.images.map((img, i) => (
-                        <div key={i} className="relative w-20 h-20 rounded border border-amber-700/40 overflow-hidden flex-shrink-0 group">
-                          <img src={resolveMediaUrl(img)} alt="" className="w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveImage(i)}
-                            className="absolute inset-0 bg-red-700/90 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-0.5"
-                          >
-                            <X className="w-5 h-5" />
-                            <span className="text-[9px] font-mono font-bold">QUITAR</span>
-                          </button>
-                        </div>
-                      ))}
+                      {itemForm.images.map((img, i) => {
+                        const isVid = /\.(mp4|webm|mov|mkv|m4v)(\?.*)?$/i.test(img);
+                        return (
+                          <div key={i} className="relative w-20 h-20 rounded border border-amber-700/40 overflow-hidden flex-shrink-0 group bg-dark-900">
+                            {isVid ? (
+                              <video src={resolveMediaUrl(img)} muted className="w-full h-full object-cover" />
+                            ) : (
+                              <img src={resolveMediaUrl(img)} alt="" className="w-full h-full object-cover" />
+                            )}
+                            {isVid && (
+                              <span className="absolute top-1 left-1 bg-black/80 text-[8px] font-mono font-bold text-gold-400 px-1 rounded border border-gold-500/40">VÍDEO</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImage(i)}
+                              className="absolute inset-0 bg-red-700/90 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-0.5"
+                            >
+                              <X className="w-5 h-5" />
+                              <span className="text-[9px] font-mono font-bold">QUITAR</span>
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -3549,6 +3587,10 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
 
       {activeTab === 'kingdom_requests' && (
         <KingdomRequestsView token={token} />
+      )}
+
+      {activeTab === 'kingdom_hall_of_fame' && (
+        <KingdomHallOfFameAdmin token={token} />
       )}
 
     </div>
