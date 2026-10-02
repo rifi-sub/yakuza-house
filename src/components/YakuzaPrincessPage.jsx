@@ -342,70 +342,57 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
       {activeTab === 'normas' && (
         <div className="max-w-5xl mx-auto space-y-8">
 
-          {/* APARTADO EDITORIAL: RETRATO VERTICAL DESTACADO & VISIÓN D/S */}
-          <div className="grid lg:grid-cols-12 gap-8 items-stretch">
-            
-            {/* Imagen Destacada de la Princesa: Formato Vertical Editorial Amplio */}
-            <div className="lg:col-span-5 flex flex-col">
-              <div className="relative w-full h-full min-h-[460px] sm:min-h-[540px] rounded-2xl overflow-hidden border border-gold-500/50 shadow-2xl group flex flex-col justify-end p-6 bg-dark-950">
-                <img
-                  src={visionBanner || '/j.jpeg'}
-                  alt="La Princesa Yakuza - Retrato Editorial"
-                  className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 filter brightness-95 contrast-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/25 to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-r from-dark-950/50 via-transparent to-dark-950/30" />
-                
-                <div className="relative z-10 space-y-2">
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full legibility-shield border border-gold-500/50 text-gold-300 text-xs font-sans tracking-widest uppercase shadow-xl">
-                    <Crown className="w-3.5 h-3.5 text-gold-400" />
-                    <span>La Princesa Yakuza · Autoridad & Dominio</span>
-                  </div>
-                  <p className="text-[11px] font-mono text-ivory-300 italic">
-                    Retrato oficial · Estética editorial vertical
-                  </p>
-                </div>
+          {/* BANNER VISUAL DE LA PRINCESA YAKUZA (HORIZONTAL) */}
+          <div className="relative w-full rounded-2xl overflow-hidden border border-gold-500/40 shadow-2xl group">
+            <div className="aspect-[16/9] sm:aspect-[21/9] w-full max-h-[460px] overflow-hidden relative">
+              <img
+                src={visionBanner || princessVisionBanner}
+                alt="La Princesa Yakuza"
+                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 filter brightness-95 contrast-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-r from-dark-950/70 via-transparent to-dark-950/70" />
+              <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 flex items-center gap-2 px-3.5 py-1.5 rounded-full legibility-shield border border-gold-500/40 text-gold-300 text-xs font-sans tracking-widest uppercase">
+                <Crown className="w-3.5 h-3.5 text-gold-400" />
+                <span>La Princesa Yakuza · Autoridad & Dominio</span>
               </div>
             </div>
+          </div>
 
-            {/* Bloque: Mi Visión en la Relación D/s */}
-            <div className="lg:col-span-7 legibility-bordeaux p-6 sm:p-8 rounded-2xl border border-gold-500/40 space-y-5 shadow-2xl relative overflow-hidden flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-3 border-b border-gold-500/30 pb-3 mb-4">
-                  <Sparkles className="w-6 h-6 text-gold-400 shrink-0" />
-                  <h2 className="font-sans font-bold text-2xl sm:text-3xl text-ivory-100 tracking-wide">
-                    {visionTitle}
-                  </h2>
-                </div>
+          {/* BLOQUE: MI VISIÓN EN LA RELACIÓN D/S (ENCIMA DE LOS DOS BLOQUES) */}
+          <div className="legibility-bordeaux p-6 sm:p-8 rounded-2xl border border-gold-500/40 space-y-5 shadow-2xl relative overflow-hidden">
+            <div className="flex items-center gap-3 border-b border-gold-500/30 pb-3">
+              <Sparkles className="w-6 h-6 text-gold-400 shrink-0" />
+              <h2 className="font-sans font-bold text-2xl sm:text-3xl text-ivory-100 tracking-wide">
+                {visionTitle}
+              </h2>
+            </div>
 
-                <p className="text-xs sm:text-sm text-ivory-200 font-body leading-relaxed mb-4">
-                  {visionText1}
+            <p className="text-xs sm:text-sm text-ivory-200 font-body leading-relaxed">
+              {visionText1}
+            </p>
+
+            <div className="space-y-3 pt-1">
+              <div className="p-3.5 rounded-xl bg-dark-950/80 border border-gold-500/30 flex items-start gap-3">
+                <span className="text-base leading-none mt-0.5">🔹</span>
+                <p className="text-xs sm:text-sm font-sans text-gold-200 font-semibold leading-relaxed">
+                  {visionPoint1}
                 </p>
-
-                <div className="space-y-3">
-                  <div className="p-3.5 rounded-xl bg-dark-950/80 border border-gold-500/30 flex items-start gap-3">
-                    <span className="text-base leading-none mt-0.5">🔹</span>
-                    <p className="text-xs sm:text-sm font-sans text-gold-200 font-semibold leading-relaxed">
-                      {visionPoint1}
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-dark-950/80 border border-gold-500/30 flex items-start gap-3">
-                    <span className="text-base leading-none mt-0.5">🔹</span>
-                    <p className="text-xs sm:text-sm font-sans text-gold-200 font-semibold leading-relaxed">
-                      {visionPoint2}
-                    </p>
-                  </div>
-                </div>
               </div>
 
-              <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-bordeaux-950/90 via-dark-950 to-bordeaux-950/90 border border-gold-500/30 text-center">
-                <p className="text-xs sm:text-sm text-gold-300 font-sans italic font-medium leading-relaxed">
-                  “{visionQuote}”
+              <div className="p-3.5 rounded-xl bg-dark-950/80 border border-gold-500/30 flex items-start gap-3">
+                <span className="text-base leading-none mt-0.5">🔹</span>
+                <p className="text-xs sm:text-sm font-sans text-gold-200 font-semibold leading-relaxed">
+                  {visionPoint2}
                 </p>
               </div>
             </div>
 
+            <div className="p-4 rounded-xl bg-gradient-to-r from-bordeaux-950/90 via-dark-950 to-bordeaux-950/90 border border-gold-500/30 text-center">
+              <p className="text-xs sm:text-sm text-gold-300 font-sans italic font-medium leading-relaxed">
+                “{visionQuote}”
+              </p>
+            </div>
           </div>
 
           {/* DOS BLOQUES EXISTENTES: REQUISITOS Y NO RESPONDO */}
