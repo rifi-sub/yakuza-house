@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { resolveMediaUrl } from '../config';
 import princessVisionBanner from '../assets/princess-vision-banner.png';
+import yakuzaPrincessTitleImg from '../assets/yakuza-princess-title.png';
 import { KingdomHallOfFame } from './kingdom/KingdomHallOfFame';
 
 export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, onOpenKingdomRequest }) {
@@ -24,6 +25,7 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
   const visionPoint2 = config.visionPoint2 || 'Olvídate de lo demás, solo importo yo. Tu vida será reconfigurada para contribuir en mi visión del BDSM.';
   const visionQuote = config.visionQuote || 'Quienes han sido lo suficientemente valientes como para entregarse lo saben: el miedo se pasa, pero la adicción a mí es para siempre.';
   const visionBanner = config.visionBannerUrl ? resolveMediaUrl(config.visionBannerUrl) : princessVisionBanner;
+  const titleImageUrl = config.titleImageUrl ? resolveMediaUrl(config.titleImageUrl) : yakuzaPrincessTitleImg;
 
   const requirementsTitle = config.requirementsTitle || 'Requisitos para Servirme';
   const requirementsList = config.requirementsList || [
@@ -294,9 +296,15 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
           {badge}
         </div>
 
-        <h1 className="font-sans font-black text-4xl sm:text-6xl text-ivory-100 display-shadow tracking-widest">
-          {titleTop} <span className="text-bordeaux-gradient">{titleAccent}</span>
-        </h1>
+        {/* Emblema Tipográfico Editorial: YAKUZA PRINCESS */}
+        <div className="flex justify-center items-center py-2 sm:py-4">
+          <img
+            src={titleImageUrl || yakuzaPrincessTitleImg}
+            alt="YAKUZA PRINCESS"
+            className="w-full max-w-sm sm:max-w-lg md:max-w-xl lg:max-w-2xl h-auto object-contain filter drop-shadow-[0_12px_28px_rgba(0,0,0,0.9)] hover:scale-[1.02] transition-transform duration-500"
+          />
+          <h1 className="sr-only">YAKUZA PRINCESS</h1>
+        </div>
 
         <div className="artdeco-divider max-w-sm mx-auto">
           <div className="ad-center" />

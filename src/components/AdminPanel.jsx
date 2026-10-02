@@ -56,6 +56,7 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
 
   const defaultPrincessForm = {
     badge: "✦ SECCIÓN EXCLUSIVA D/S & PROTOCOLO DE LA PRINCESA ✦",
+    titleImageUrl: "/yakuza-princess-title.png",
     titleTop: "YAKUZA",
     titleAccent: "PRINCESS",
     headerQuote: "“La sensación es la de entrar en un club privado extremadamente exclusivo. El acceso a mi energía no se compra: se conquista, se honra y se tributa con absoluta devoción.”",
@@ -138,6 +139,8 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
   };
   const [princessForm, setPrincessForm] = useState(defaultPrincessForm);
   const [savingPrincess, setSavingPrincess] = useState(false);
+  const [uploadingVisionBanner, setUploadingVisionBanner] = useState(false);
+  const [uploadingTitleImage, setUploadingTitleImage] = useState(false);
 
   // ISO UTC -> string "YYYY-MM-DDTHH:mm" para <input type="datetime-local">
   const isoToLocalInput = (iso) => {
@@ -372,6 +375,58 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
       alert(err.message);
     } finally {
       setUploadingImage(false);
+    }
+  };
+
+  // Subir imagen para Banner de Visión / Normas D/s
+  const handleUploadVisionBanner = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingVisionBanner(true);
+    const formData = new FormData();
+    formData.append('files', file);
+    try {
+      const res = await fetch(`${API_BASE}/api/store/admin/media/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al subir imagen de banner');
+      if (data.urls && data.urls.length > 0) {
+        setPrincessForm(prev => ({ ...prev, visionBannerUrl: data.urls[0] }));
+      }
+    } catch (err) {
+      alert(err.message || 'Error al subir la imagen');
+    } finally {
+      setUploadingVisionBanner(false);
+      e.target.value = '';
+    }
+  };
+
+  // Subir imagen para Título Gráfico de Yakuza Princess
+  const handleUploadTitleImage = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingTitleImage(true);
+    const formData = new FormData();
+    formData.append('files', file);
+    try {
+      const res = await fetch(`${API_BASE}/api/store/admin/media/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al subir título gráfico');
+      if (data.urls && data.urls.length > 0) {
+        setPrincessForm(prev => ({ ...prev, titleImageUrl: data.urls[0] }));
+      }
+    } catch (err) {
+      alert(err.message || 'Error al subir la imagen');
+    } finally {
+      setUploadingTitleImage(false);
+      e.target.value = '';
     }
   };
 
@@ -2028,6 +2083,59 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
               </div>
             </div>
 
+            {/* Selector y Subida de Logo / Título de la Sección */}
+            <div>
+              <label className="block text-xs font-mono text-gray-300 mb-1">
+                Logo / Título Gráfico Artístico de la Sección (Tipografía Editorial Caligráfica)
+              </label>
+              
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <label className="py-2 px-3.5 rounded-lg bg-bordeaux-950/70 border border-gold-500/50 hover:border-gold-400 text-gold-300 hover:text-white font-mono text-xs font-bold cursor-pointer flex items-center gap-2 transition-colors">
+                  <Upload className="w-3.5 h-3.5 text-gold-400" />
+                  {uploadingTitleImage ? 'Subiendo imagen...' : 'Subir Título Gráfico (PC)'}
+                  <input type="file" accept="image/*" onChange={handleUploadTitleImage} className="hidden" />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMediaPickerTarget('princess_title_image');
+                    setMediaPickerOpen(true);
+                  }}
+                  className="py-2 px-3.5 rounded-lg bg-dark-900 border border-gray-700 hover:border-gold-500/50 text-gray-300 hover:text-white font-mono text-xs flex items-center gap-2 transition-colors"
+                >
+                  <ImageIcon className="w-3.5 h-3.5 text-gold-400" />
+                  Elegir de Biblioteca
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPrincessForm(prev => ({ ...prev, titleImageUrl: '/yakuza-princess-title.png' }))}
+                  className="py-2 px-2.5 rounded-lg bg-dark-900 border border-gray-800 hover:border-gray-600 text-[11px] font-mono text-gray-400 hover:text-white transition-colors"
+                >
+                  Restaurar Logo Oficial
+                </button>
+              </div>
+
+              <input
+                type="text"
+                value={princessForm.titleImageUrl || ''}
+                onChange={e => setPrincessForm({ ...princessForm, titleImageUrl: e.target.value })}
+                placeholder="/yakuza-princess-title.png"
+                className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white font-mono"
+              />
+
+              {princessForm.titleImageUrl && (
+                <div className="mt-2.5 p-3 rounded-xl bg-dark-950/80 border border-gold-500/30 flex items-center justify-center max-w-lg">
+                  <img
+                    src={resolveMediaUrl(princessForm.titleImageUrl)}
+                    alt="Preview Título Yakuza Princess"
+                    className="max-h-24 w-auto object-contain filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]"
+                  />
+                </div>
+              )}
+            </div>
+
             <div>
               <label className="block text-xs font-mono text-gray-300 mb-1">Frase / Cita de la Princesa (Caja destacada superior)</label>
               <textarea
@@ -2049,7 +2157,38 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
             </p>
 
             <div>
-              <label className="block text-xs font-mono text-gray-300 mb-1">URL o Ruta de la Imagen de Banner</label>
+              <label className="block text-xs font-mono text-gray-300 mb-1">
+                Imagen del Banner Horizontal ("Mis Normas D/s")
+              </label>
+
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <label className="py-2 px-3.5 rounded-lg bg-bordeaux-950/70 border border-gold-500/50 hover:border-gold-400 text-gold-300 hover:text-white font-mono text-xs font-bold cursor-pointer flex items-center gap-2 transition-colors">
+                  <Upload className="w-3.5 h-3.5 text-gold-400" />
+                  {uploadingVisionBanner ? 'Subiendo banner...' : 'Subir Foto del Banner (PC)'}
+                  <input type="file" accept="image/*" onChange={handleUploadVisionBanner} className="hidden" />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMediaPickerTarget('princess_vision_banner');
+                    setMediaPickerOpen(true);
+                  }}
+                  className="py-2 px-3.5 rounded-lg bg-dark-900 border border-gray-700 hover:border-gold-500/50 text-gray-300 hover:text-white font-mono text-xs flex items-center gap-2 transition-colors"
+                >
+                  <ImageIcon className="w-3.5 h-3.5 text-gold-400" />
+                  Elegir de Biblioteca
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPrincessForm(prev => ({ ...prev, visionBannerUrl: '/princess-vision-banner.png' }))}
+                  className="py-2 px-2.5 rounded-lg bg-dark-900 border border-gray-800 hover:border-gray-600 text-[11px] font-mono text-gray-400 hover:text-white transition-colors"
+                >
+                  Restaurar Banner Original
+                </button>
+              </div>
+
               <input
                 type="text"
                 value={princessForm.visionBannerUrl || ''}
@@ -2057,13 +2196,17 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
                 placeholder="/princess-vision-banner.png"
                 className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white font-mono"
               />
+
               {princessForm.visionBannerUrl && (
-                <div className="mt-2 rounded-lg overflow-hidden border border-gold-500/30 max-h-48 max-w-md">
+                <div className="mt-2.5 rounded-xl overflow-hidden border border-gold-500/30 max-h-56 max-w-xl relative group">
                   <img 
                     src={resolveMediaUrl(princessForm.visionBannerUrl)} 
                     alt="Preview Banner" 
                     className="w-full h-full object-cover"
                   />
+                  <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[10px] font-mono text-gold-300 border border-gold-500/30">
+                    Vista previa del banner horizontal
+                  </div>
                 </div>
               )}
             </div>
@@ -3396,13 +3539,24 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
         onClose={() => setMediaPickerOpen(false)}
         token={token}
         multiple={mediaPickerTarget === 'item_images'}
-        title={mediaPickerTarget === 'banner_bg' ? 'Elegir Imagen de Fondo del Banner' : 'Añadir Multimedia a la Galería del Artículo'}
+        title={
+          mediaPickerTarget === 'banner_bg' ? 'Elegir Imagen de Fondo del Banner' :
+          mediaPickerTarget === 'princess_vision_banner' ? 'Elegir Foto del Banner Mis Normas D/s' :
+          mediaPickerTarget === 'princess_title_image' ? 'Elegir Logo / Título de Yakuza Princess' :
+          'Añadir Multimedia a la Galería del Artículo'
+        }
         onSelectUrl={(url) => {
           if (mediaPickerTarget === 'banner_bg') {
             setBanner(prev => ({ ...prev, bgImageUrl: url }));
           }
           if (mediaPickerTarget === 'launch_prize') {
             setLaunch(prev => ({ ...prev, prize: { ...prev.prize, imageUrl: url } }));
+          }
+          if (mediaPickerTarget === 'princess_vision_banner') {
+            setPrincessForm(prev => ({ ...prev, visionBannerUrl: url }));
+          }
+          if (mediaPickerTarget === 'princess_title_image') {
+            setPrincessForm(prev => ({ ...prev, titleImageUrl: url }));
           }
         }}
         onSelectUrls={async (urls) => {
