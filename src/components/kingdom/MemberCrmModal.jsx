@@ -328,7 +328,7 @@ export function MemberCrmModal({
       const defaultDueDate = new Date();
       defaultDueDate.setDate(defaultDueDate.getDate() + (template.defaultDurationDays || 3));
 
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assignments`, {
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -345,7 +345,8 @@ export function MemberCrmModal({
           dueDate: defaultDueDate.toISOString()
         })
       });
-      if (!res.ok) throw new Error('Error al asignar actividad');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Error al asignar actividad');
       fetchMemberDetail();
       if (onRefreshList) onRefreshList();
       alert(`Actividad "${template.title}" asignada a ${formData.alias}`);
@@ -366,7 +367,7 @@ export function MemberCrmModal({
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + parseInt(newObjective.dueDays || 3, 10));
 
-      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assignments`, {
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -385,7 +386,8 @@ export function MemberCrmModal({
         })
       });
 
-      if (!res.ok) throw new Error('Error al crear asignación');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Error al crear asignación');
       setShowNewActivityModal(false);
       setNewObjective({
         templateId: '',
