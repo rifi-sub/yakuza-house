@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Crown, Plus, Edit, Trash2, Save, X, Eye, EyeOff, RefreshCw, User, CheckCircle2 } from 'lucide-react';
+import { Crown, Plus, Edit, Trash2, Save, X, Eye, EyeOff, RefreshCw, User, CheckCircle2, Upload, Image as ImageIcon } from 'lucide-react';
 import { API_BASE, resolveMediaUrl } from '../../config';
 
 export function KingdomHallOfFameAdmin({ token }) {
@@ -21,6 +21,36 @@ export function KingdomHallOfFameAdmin({ token }) {
 
   const [form, setForm] = useState(defaultForm);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const handleUploadPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('media', file);
+
+      const res = await fetch(`${API_BASE}/api/store/admin/media/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al subir la imagen');
+
+      if (data.url) {
+        setForm(prev => ({ ...prev, avatarUrl: data.url }));
+      }
+    } catch (err) {
+      alert(`Error subiendo foto: ${err.message}`);
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
 
   const fetchMembers = async () => {
     setLoading(true);
@@ -312,14 +342,40 @@ export function KingdomHallOfFameAdmin({ token }) {
               </div>
 
               <div>
-                <label className="block text-gray-300 mb-1">URL de Foto / Avatar personal o asignado</label>
-                <input
-                  type="text"
-                  value={form.avatarUrl}
-                  onChange={e => setForm({ ...form, avatarUrl: e.target.value })}
-                  placeholder="https://... o ruta interna (/uploads/...)"
-                  className="w-full bg-dark-950 border border-gray-700 rounded px-3 py-2 text-white"
-                />
+                <label className="block text-gray-300 mb-1">Fotografía / Retrato del Miembro (Portada completa)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={form.avatarUrl}
+                    onChange={e => setForm({ ...form, avatarUrl: e.target.value })}
+                    placeholder="https://... o ruta interna (/uploads/... o /portraits/...)"
+                    className="flex-1 bg-dark-950 border border-gray-700 rounded px-3 py-2 text-white text-xs"
+                  />
+                  <label className="cursor-pointer py-2 px-3 rounded bg-bordeaux-900/80 hover:bg-bordeaux-800 border border-gold-500/40 text-gold-300 text-xs font-sans font-bold flex items-center gap-1.5 whitespace-nowrap transition-colors shadow">
+                    <Upload className="w-3.5 h-3.5 text-gold-400" />
+                    {uploadingPhoto ? 'Subiendo...' : 'Subir Foto (PC)'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleUploadPhoto}
+                      disabled={uploadingPhoto}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                {form.avatarUrl && (
+                  <div className="mt-2 flex items-center gap-3 p-2 rounded-lg bg-dark-950 border border-gold-500/20">
+                    <img
+                      src={resolveMediaUrl(form.avatarUrl)}
+                      alt="Vista previa"
+                      className="w-12 h-16 object-cover rounded border border-gold-500/40"
+                    />
+                    <div className="text-[11px] text-gray-400">
+                      <p className="text-gold-300 font-semibold">Vista previa de la foto</p>
+                      <p className="truncate max-w-[280px] text-gray-500">{form.avatarUrl}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
