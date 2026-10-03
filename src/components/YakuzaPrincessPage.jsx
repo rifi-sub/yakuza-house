@@ -299,7 +299,7 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
         {/* Emblema Tipográfico Editorial: YAKUZA PRINCESS */}
         <div className="flex justify-center items-center py-2 sm:py-4">
           <img
-            src={titleImageUrl || yakuzaPrincessTitleImg}
+            src={yakuzaPrincessTitleImg}
             alt="YAKUZA PRINCESS"
             className="w-full max-w-sm sm:max-w-lg md:max-w-xl lg:max-w-2xl h-auto object-contain filter drop-shadow-[0_12px_28px_rgba(0,0,0,0.9)] hover:scale-[1.02] transition-transform duration-500"
           />
