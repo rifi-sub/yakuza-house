@@ -30,7 +30,7 @@ export function KingdomHallOfFameAdmin({ token }) {
     setUploadingPhoto(true);
     try {
       const formData = new FormData();
-      formData.append('media', file);
+      formData.append('files', file);
 
       const res = await fetch(`${API_BASE}/api/store/admin/media/upload`, {
         method: 'POST',
@@ -38,11 +38,18 @@ export function KingdomHallOfFameAdmin({ token }) {
         body: formData
       });
 
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const text = await res.text();
+        throw new Error(`El servidor respondió con un error no JSON (${res.status}): ${text.slice(0, 120)}`);
+      }
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al subir la imagen');
 
-      if (data.url) {
-        setForm(prev => ({ ...prev, avatarUrl: data.url }));
+      const uploadedUrl = (data.urls && data.urls[0]) || data.url;
+      if (uploadedUrl) {
+        setForm(prev => ({ ...prev, avatarUrl: uploadedUrl }));
       }
     } catch (err) {
       alert(`Error subiendo foto: ${err.message}`);
