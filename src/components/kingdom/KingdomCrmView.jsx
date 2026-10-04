@@ -318,6 +318,7 @@ export function KingdomCrmView({ token }) {
       {/* Modal Ficha CRM Individual */}
       {selectedMemberId && (
         <MemberCrmModal
+          key={selectedMemberId}
           memberId={selectedMemberId}
           token={token}
           allGroups={allGroups}

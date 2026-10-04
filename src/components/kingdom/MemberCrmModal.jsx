@@ -71,8 +71,8 @@ export function MemberCrmModal({
     status: 'ACTIVE',
     groupId: '',
     targetGroupId: '',
-    overallProgress: 22,
-    experiencePoints: 135,
+    overallProgress: 0,
+    experiencePoints: 0,
     totalRevenue: 0,
     avatarUrl: '',
     internalNotes: '',
@@ -164,6 +164,7 @@ export function MemberCrmModal({
   const fetchMemberDetail = async () => {
     if (!memberId) return;
     setLoading(true);
+    setMember(null);
     try {
       const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -185,34 +186,34 @@ export function MemberCrmModal({
       setFormData({
         alias: data.alias || '',
         internalName: data.internalName || data.alias || '',
-        memberNumber: data.memberNumber || '#002',
-        email: data.email || data.user?.email || 'ilirifi@yahoo.com',
-        telegram: parsedPrefs.telegram || data.telegram || '@javi_javi_javi',
-        age: parsedPrefs.age || '23',
-        profession: parsedPrefs.profession || 'Ingeniero Becario',
-        quote: parsedPrefs.quote || data.quote || 'No es como empieza, sino como termina.',
-        initialTribute: parsedPrefs.initialTribute || 'Pendiente',
-        servedSince: parsedPrefs.servedSince || '28 sept 2026',
+        memberNumber: data.memberNumber || '',
+        email: data.email || data.user?.email || '',
+        telegram: parsedPrefs.telegram || data.telegram || '',
+        age: parsedPrefs.age || data.age || '',
+        profession: parsedPrefs.profession || data.profession || '',
+        quote: parsedPrefs.quote || data.quote || '',
+        initialTribute: parsedPrefs.initialTribute || '',
+        servedSince: parsedPrefs.servedSince || '',
         status: data.status || 'ACTIVE',
         groupId: data.groupId || '',
         targetGroupId: data.targetGroupId || '',
-        overallProgress: data.overallProgress !== undefined ? data.overallProgress : 22,
-        experiencePoints: data.experiencePoints !== undefined ? data.experiencePoints : 135,
+        overallProgress: data.overallProgress !== undefined ? data.overallProgress : 0,
+        experiencePoints: data.experiencePoints !== undefined ? data.experiencePoints : 0,
         totalRevenue: data.totalRevenue !== undefined ? data.totalRevenue : (data.finances?.total || 0),
         avatarUrl: data.avatarUrl || '',
         internalNotes: data.internalNotes || '',
-        preferences: parsedPrefs.preferences || 'Humillación Psicológica y Verbal',
-        motivation: parsedPrefs.motivation || 'Mencionar otra motivación al lado de sumisión absoluta',
-        fetishes: parsedPrefs.fetishes || 'Pies, humillación, edging, sumisión psicológica',
-        triggers: parsedPrefs.triggers || 'Los pies y las palabras sin filtros de la Princesa',
-        limits: parsedPrefs.limits || 'Daño físico permanente, contacto no consentido',
-        aftercare: parsedPrefs.aftercare || 'Validación tras cumplir tareas, órdenes claras',
-        personalGoals: data.personalGoals || parsedPrefs.personalGoals || 'Consagrarme como sumiso útil en la estructura de la Princesa',
+        preferences: parsedPrefs.preferences || '',
+        motivation: parsedPrefs.motivation || '',
+        fetishes: parsedPrefs.fetishes || '',
+        triggers: parsedPrefs.triggers || '',
+        limits: parsedPrefs.limits || '',
+        aftercare: parsedPrefs.aftercare || '',
+        personalGoals: data.personalGoals || parsedPrefs.personalGoals || '',
         activeSubscription: parsedPrefs.activeSubscription || (data.subscriptions?.[0]?.group?.name ? `Acceso ${data.subscriptions[0].group.name}` : 'Ninguna')
       });
       setIsDirty(false);
     } catch (err) {
-      console.error(err);
+      console.error('Error al cargar detalle del miembro:', err);
     } finally {
       setLoading(false);
     }
@@ -926,7 +927,7 @@ export function MemberCrmModal({
                   
                   <div className="flex items-center justify-between gap-2">
                     <h2 className="font-brand font-black text-xl sm:text-2xl text-white tracking-wide truncate">
-                      {formData.memberNumber || '#002'} / {formData.alias || 'Javi'}
+                      {formData.memberNumber ? `${formData.memberNumber} / ` : ''}{formData.alias || member?.alias || 'Devoto'}
                     </h2>
 
                     {/* Botón Editar perfil */}
@@ -943,31 +944,39 @@ export function MemberCrmModal({
                   <div className="flex flex-wrap items-center gap-2 pt-0.5">
                     <span className="px-2.5 py-0.5 rounded-full bg-blue-950/70 border border-blue-500/40 text-blue-300 text-xs font-mono font-medium flex items-center gap-1.5">
                       <User className="w-3 h-3 text-blue-400" />
-                      @{formData.alias || 'Javi'}
+                      @{formData.alias || member?.alias || 'devoto'}
                     </span>
 
-                    <span className="px-2.5 py-0.5 rounded-full bg-cyan-950/70 border border-cyan-500/40 text-cyan-300 text-xs font-mono font-medium flex items-center gap-1.5">
-                      <Send className="w-3 h-3 text-cyan-400" />
-                      {formData.telegram || '@javi_javi_javi'}
-                    </span>
+                    {formData.telegram && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-cyan-950/70 border border-cyan-500/40 text-cyan-300 text-xs font-mono font-medium flex items-center gap-1.5">
+                        <Send className="w-3 h-3 text-cyan-400" />
+                        {formData.telegram}
+                      </span>
+                    )}
 
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#1b0d15] border border-gray-700/60 text-gray-300 text-xs font-mono flex items-center gap-1.5">
-                      <Mail className="w-3 h-3 text-gray-400" />
-                      {formData.email || 'ilirifi@yahoo.com'}
-                    </span>
+                    {formData.email && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-[#1b0d15] border border-gray-700/60 text-gray-300 text-xs font-mono flex items-center gap-1.5">
+                        <Mail className="w-3 h-3 text-gray-400" />
+                        {formData.email}
+                      </span>
+                    )}
 
-                    <span className="px-2.5 py-0.5 rounded-full bg-bordeaux-950/70 border border-bordeaux-500/40 text-bordeaux-200 text-xs font-sans font-medium flex items-center gap-1.5">
-                      <User className="w-3 h-3 text-bordeaux-400" />
-                      {formData.age ? `${formData.age} ` : ''}{formData.profession || 'Ingeniero Becario'}
-                    </span>
+                    {(formData.age || formData.profession) && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-bordeaux-950/70 border border-bordeaux-500/40 text-bordeaux-200 text-xs font-sans font-medium flex items-center gap-1.5">
+                        <User className="w-3 h-3 text-bordeaux-400" />
+                        {formData.age ? `${formData.age} ` : ''}{formData.profession || ''}
+                      </span>
+                    )}
                   </div>
 
                   {/* Cita de devoción */}
-                  <div className="pt-1">
-                    <p className="text-xs font-serif italic text-gold-200/90 pl-2.5 border-l-2 border-bordeaux-600 leading-snug">
-                      “{formData.quote || 'No es como empieza, sino como termina.'}”
-                    </p>
-                  </div>
+                  {formData.quote && (
+                    <div className="pt-1">
+                      <p className="text-xs font-serif italic text-gold-200/90 pl-2.5 border-l-2 border-bordeaux-600 leading-snug">
+                        “{formData.quote}”
+                      </p>
+                    </div>
+                  )}
 
                 </div>
               </div>
@@ -983,7 +992,7 @@ export function MemberCrmModal({
                       Sirve desde
                     </span>
                     <span className="text-xs font-sans font-bold text-white">
-                      {formData.servedSince || '28 sept 2026'}
+                      {formData.servedSince || (member?.createdAt ? new Date(member.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Reciente')}
                     </span>
                   </div>
                 </div>
@@ -1138,39 +1147,49 @@ export function MemberCrmModal({
         {/* ----------------------------------------------------------------------- */}
         {/* BARRA DE ETIQUETAS HORIZONTAL FULL-WIDTH (PREFERENCIAS, MOTIVACIÓN...)  */}
         {/* ----------------------------------------------------------------------- */}
-        <div className="bg-[#12080c] rounded-2xl border border-[#311721] p-3.5 flex flex-wrap items-center gap-3 shadow-xl">
-          
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#170a10] border border-[#2d151e]">
-            <Heart className="w-3.5 h-3.5 text-bordeaux-400" />
-            <span className="text-xs font-sans text-gold-300 font-bold">Preferencias:</span>
-            <span className="text-xs font-sans text-ivory-200">{formData.preferences}</span>
-          </div>
+        {(formData.preferences || formData.motivation || formData.fetishes || formData.triggers) && (
+          <div className="bg-[#12080c] rounded-2xl border border-[#311721] p-3.5 flex flex-wrap items-center gap-3 shadow-xl">
+            
+            {formData.preferences && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#170a10] border border-[#2d151e]">
+                <Heart className="w-3.5 h-3.5 text-bordeaux-400" />
+                <span className="text-xs font-sans text-gold-300 font-bold">Preferencias:</span>
+                <span className="text-xs font-sans text-ivory-200">{formData.preferences}</span>
+              </div>
+            )}
 
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#170a10] border border-[#2d151e]">
-            <Target className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="text-xs font-sans text-cyan-300 font-bold">Motivación:</span>
-            <span className="text-xs font-sans text-ivory-200">{formData.motivation}</span>
-          </div>
+            {formData.motivation && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#170a10] border border-[#2d151e]">
+                <Target className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="text-xs font-sans text-cyan-300 font-bold">Motivación:</span>
+                <span className="text-xs font-sans text-ivory-200">{formData.motivation}</span>
+              </div>
+            )}
 
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#170a10] border border-[#2d151e]">
-            <Flame className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-xs font-sans text-amber-300 font-bold">Fetiches:</span>
-            <span className="text-xs font-sans text-ivory-200">{formData.fetishes}</span>
-          </div>
+            {formData.fetishes && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#170a10] border border-[#2d151e]">
+                <Flame className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-xs font-sans text-amber-300 font-bold">Fetiches:</span>
+                <span className="text-xs font-sans text-ivory-200">{formData.fetishes}</span>
+              </div>
+            )}
 
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#170a10] border border-[#2d151e]">
-            <Zap className="w-3.5 h-3.5 text-gold-400" />
-            <span className="text-xs font-sans text-gold-300 font-bold">Triggers:</span>
-            <span className="text-xs font-sans text-ivory-200">{formData.triggers}</span>
-          </div>
+            {formData.triggers && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#170a10] border border-[#2d151e]">
+                <Zap className="w-3.5 h-3.5 text-gold-400" />
+                <span className="text-xs font-sans text-gold-300 font-bold">Triggers:</span>
+                <span className="text-xs font-sans text-ivory-200">{formData.triggers}</span>
+              </div>
+            )}
 
-          <button
-            onClick={() => setShowEditDrawer(true)}
-            className="text-[11px] font-mono text-gray-500 hover:text-gold-300 underline ml-auto"
-          >
-            Editar etiquetas
-          </button>
-        </div>
+            <button
+              onClick={() => setShowEditDrawer(true)}
+              className="text-[11px] font-mono text-gray-500 hover:text-gold-300 underline ml-auto"
+            >
+              Editar etiquetas
+            </button>
+          </div>
+        )}
 
         {/* ----------------------------------------------------------------------- */}
         {/* FILA MEDIA: PROGRESO Y MÉRITOS (IZQ) & ÚLTIMA ACTIVIDAD (DER)           */}
