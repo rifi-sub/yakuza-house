@@ -50,6 +50,7 @@ Documento conciso con todas las funcionalidades disponibles en la plataforma **Y
 * **Gestión de Postulantes:** Revisar, aceptar o rechazar solicitudes de devotos aspirantes a cada estamento.
 * **Fichas de Devotos:**
   * Modificar rango, alias, avatar, lema y estado (*Activo / En Pausa / Expulsado*).
+  * **Diario de la Dinámica D/s:** Registro cualitativo y narrativo fechado sobre la evolución de la relación (acuerdos, observaciones, sensaciones, avances, incidencias, decisiones). Permite escribir a la Princesa y autorizar/bloquear la escritura del sumiso con control de acceso individual.
   * Asignar actividades y misiones con fecha límite y descripción.
   * Aprobar o suspender tareas entregadas por los devotos.
   * Anotar tributos manuales y notas disciplinarias.
