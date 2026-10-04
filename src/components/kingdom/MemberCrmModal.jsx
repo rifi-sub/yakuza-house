@@ -5,9 +5,21 @@ import {
   TrendingUp, Trash2, Plus, Star, ShieldCheck, Heart, Zap,
   Flame, Lock, Layers, Settings, Eye, Check, RefreshCw, Mail, User,
   DollarSign, ArrowUp, ArrowDown, Save, CreditCard, Send, Shield,
-  ChevronDown, ChevronUp, ExternalLink, Filter, CheckCircle
+  ChevronDown, ChevronUp, ExternalLink, Filter, CheckCircle,
+  BookOpen, ScrollText, MessageSquare, ToggleLeft, ToggleRight, Bookmark, FileText
 } from 'lucide-react';
 import { API_BASE, resolveMediaUrl } from '../../config';
+
+const JOURNAL_CATEGORIES = [
+  { id: 'ACUERDO', label: 'Acuerdo & Límites', icon: '📜', color: 'border-amber-500/50 text-amber-300 bg-amber-950/40' },
+  { id: 'OBSERVACION', label: 'Observación de Conducta', icon: '👁️', color: 'border-blue-500/50 text-blue-300 bg-blue-950/40' },
+  { id: 'AVANCE', label: 'Avance & Logro', icon: '⚡', color: 'border-emerald-500/50 text-emerald-300 bg-emerald-950/40' },
+  { id: 'INCIDENCIA', label: 'Incidencia / Fricción', icon: '⚠️', color: 'border-red-500/50 text-red-300 bg-red-950/40' },
+  { id: 'SENSACION', label: 'Sensación & Emocional', icon: '🕯️', color: 'border-purple-500/50 text-purple-300 bg-purple-950/40' },
+  { id: 'DECISION', label: 'Decisión / Estatus', icon: '🎯', color: 'border-gold-500/50 text-gold-300 bg-gold-950/40' },
+  { id: 'CONTEXTO', label: 'Contexto de Tarea', icon: '📌', color: 'border-pink-500/50 text-pink-300 bg-pink-950/40' },
+  { id: 'GENERAL', label: 'Nota General', icon: '📝', color: 'border-gray-500/50 text-gray-300 bg-gray-900/50' }
+];
 
 export function MemberCrmModal({ 
   memberId, 
@@ -25,11 +37,24 @@ export function MemberCrmModal({
   const [activitiesLibrary, setActivitiesLibrary] = useState([]);
   const [allGroupsState, setAllGroupsState] = useState(allGroups);
   const [showEditDrawer, setShowEditDrawer] = useState(false);
-  const [activeTabSection, setActiveTabSection] = useState('dashboard'); // 'dashboard', 'finanzas', 'requisitos', 'habilidades', 'notas'
+  const [activeTabSection, setActiveTabSection] = useState('diario'); // 'diario', 'dashboard', 'finanzas', 'requisitos', 'habilidades', 'notas'
   const [selectedActivityCategory, setSelectedActivityCategory] = useState('ALL');
   const [activitySearchQuery, setActivitySearchQuery] = useState('');
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [showMemberSearchDropdown, setShowMemberSearchDropdown] = useState(false);
+
+  // Estados del Diario de la Dinámica
+  const [dashboardActivityView, setDashboardActivityView] = useState('journal'); // 'journal' | 'system'
+  const [journalCategoryFilter, setJournalCategoryFilter] = useState('ALL');
+  const [journalAuthorFilter, setJournalAuthorFilter] = useState('ALL');
+  const [newJournalEntry, setNewJournalEntry] = useState({
+    category: 'OBSERVACION',
+    title: '',
+    content: '',
+    date: new Date().toISOString().slice(0, 10)
+  });
+  const [addingJournalEntry, setAddingJournalEntry] = useState(false);
+  const [togglingJournalAccess, setTogglingJournalAccess] = useState(false);
 
   // Formulario principal del miembro
   const [formData, setFormData] = useState({
@@ -535,6 +560,88 @@ export function MemberCrmModal({
       alert('Error eliminando nota');
     }
   };
+
+  // --- DIARIO DE LA DINÁMICA ---
+  const handleAddJournalEntry = async (e) => {
+    e.preventDefault();
+    if (!newJournalEntry.content.trim()) {
+      alert('El contenido del diario no puede estar vacío');
+      return;
+    }
+    setAddingJournalEntry(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/journal`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(newJournalEntry)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al guardar entrada en el diario');
+
+      setNewJournalEntry({
+        category: 'OBSERVACION',
+        title: '',
+        content: '',
+        date: new Date().toISOString().slice(0, 10)
+      });
+      fetchMemberDetail();
+    } catch (err) {
+      alert(err.message || 'Error guardando entrada');
+    } finally {
+      setAddingJournalEntry(false);
+    }
+  };
+
+  const handleDeleteJournalEntry = async (entryId) => {
+    if (!confirm('¿Eliminar esta entrada del Diario de la Dinámica?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/journal/${entryId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Error al eliminar');
+      fetchMemberDetail();
+    } catch (err) {
+      alert(err.message || 'Error eliminando entrada');
+    }
+  };
+
+  const handleToggleJournalAccess = async () => {
+    setTogglingJournalAccess(true);
+    try {
+      const currentAccess = member?.journalAccess !== false;
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/journal-access`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ journalAccess: !currentAccess })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al actualizar permiso');
+      fetchMemberDetail();
+    } catch (err) {
+      alert(err.message || 'Error al cambiar permiso');
+    } finally {
+      setTogglingJournalAccess(false);
+    }
+  };
+
+  // Filtrado de entradas del diario
+  const filteredJournalEntries = useMemo(() => {
+    let list = member?.journalEntries || [];
+    if (journalCategoryFilter !== 'ALL') {
+      list = list.filter(e => e.category === journalCategoryFilter);
+    }
+    if (journalAuthorFilter !== 'ALL') {
+      list = list.filter(e => e.authorRole === journalAuthorFilter);
+    }
+    return list;
+  }, [member?.journalEntries, journalCategoryFilter, journalAuthorFilter]);
 
   // Filtrado de actividades de la biblioteca
   const filteredTemplates = useMemo(() => {
@@ -1176,37 +1283,144 @@ export function MemberCrmModal({
             </div>
           </div>
 
-          {/* TARJETA 4: ÚLTIMA ACTIVIDAD REGISTRADA (Col 6) */}
+          {/* TARJETA 4: DIARIO DE LA DINÁMICA & HISTORIAL (Col 6) */}
           <div className="lg:col-span-6 bg-[#12080c] rounded-2xl border border-[#311721] p-5 flex flex-col justify-between shadow-2xl">
             <div className="space-y-4">
               
               <div className="flex items-center justify-between pb-3 border-b border-[#24121a]">
                 <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-gold-400" />
-                  <h3 className="font-brand font-bold text-base text-white">Última actividad registrada</h3>
+                  <BookOpen className="w-4 h-4 text-gold-400" />
+                  <h3 className="font-brand font-bold text-base text-white">
+                    {dashboardActivityView === 'journal' ? 'Diario de la Dinámica' : 'Actividad del Sistema'}
+                  </h3>
                 </div>
-                <span className="text-[10px] font-mono text-gray-400">Timeline de devoción</span>
+
+                <div className="flex items-center gap-1.5 bg-[#170a10] p-1 rounded-xl border border-[#2d151e]">
+                  <button
+                    type="button"
+                    onClick={() => setDashboardActivityView('journal')}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition-all flex items-center gap-1.5 ${
+                      dashboardActivityView === 'journal'
+                        ? 'bg-gold-500 text-dark-950 shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <span>📖 Diario</span>
+                    <span className="opacity-90">({(member?.journalEntries || []).length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDashboardActivityView('system')}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition-all flex items-center gap-1.5 ${
+                      dashboardActivityView === 'system'
+                        ? 'bg-gold-500 text-dark-950 shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <span>⏱️ Sistema</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Lista Vertical con Nodos Azules */}
-              <div className="space-y-4 relative pl-5 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[1px] before:bg-gradient-to-b before:from-cyan-500/60 before:via-bordeaux-500/40 before:to-transparent">
-                {activityTimeline.map((item, idx) => (
-                  <div key={item.id || idx} className="relative space-y-0.5">
-                    {/* Punto azul/cyan */}
-                    <div className="absolute -left-5 top-1.5 w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-md shadow-cyan-400/50" />
-                    
-                    <span className="text-[10px] font-mono text-gray-400 block">
-                      {new Date(item.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    <h5 className="text-xs font-sans font-bold text-white">
-                      {item.title}
-                    </h5>
-                    <p className="text-xs text-gray-300 font-sans leading-relaxed">
-                      {item.description}
-                    </p>
-                  </div>
-                ))}
-              </div>
+              {/* VISTA 1: DIARIO DE LA DINÁMICA EN EL DASHBOARD */}
+              {dashboardActivityView === 'journal' && (
+                <div className="space-y-3">
+                  {(member?.journalEntries || []).length === 0 ? (
+                    <div className="p-6 text-center rounded-xl bg-[#170a10] border border-[#2e151f] space-y-2">
+                      <p className="text-xs text-gray-400 font-sans">
+                        No hay anotaciones registradas en el Diario de la Dinámica para este sumiso.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTabSection('diario')}
+                        className="py-1 px-3 rounded-lg bg-gold-500/20 text-gold-300 border border-gold-500/40 text-[11px] font-mono hover:bg-gold-500/30"
+                      >
+                        + Crear primera entrada
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {(member?.journalEntries || []).slice(0, 3).map((entry) => {
+                        const cat = JOURNAL_CATEGORIES.find(c => c.id === entry.category) || JOURNAL_CATEGORIES[7];
+                        const isPrincesa = entry.authorRole === 'PRINCESA';
+
+                        return (
+                          <div 
+                            key={entry.id} 
+                            className="p-3.5 rounded-xl bg-[#170a10] border border-[#2e151f] hover:border-gold-500/30 transition-all space-y-1.5 shadow-sm"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border flex items-center gap-1 ${
+                                  isPrincesa 
+                                    ? 'bg-gradient-to-r from-gold-500/20 to-bordeaux-700/30 border-gold-500/50 text-gold-300' 
+                                    : 'bg-cyan-950/40 border-cyan-500/40 text-cyan-300'
+                                }`}>
+                                  {isPrincesa ? <Crown className="w-2.5 h-2.5 text-gold-400" /> : <User className="w-2.5 h-2.5 text-cyan-400" />}
+                                  {entry.authorName || (isPrincesa ? 'Princesa' : 'Sumiso')}
+                                </span>
+
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono border ${cat.color}`}>
+                                  {cat.icon} {cat.label}
+                                </span>
+                              </div>
+
+                              <span className="text-[10px] font-mono text-gray-400">
+                                {new Date(entry.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+
+                            {entry.title && (
+                              <h5 className="font-sans font-bold text-xs text-white">
+                                {entry.title}
+                              </h5>
+                            )}
+
+                            <p className="text-xs text-gray-300 font-sans leading-relaxed line-clamp-2">
+                              {entry.content}
+                            </p>
+                          </div>
+                        );
+                      })}
+
+                      <div className="pt-2 flex justify-between items-center border-t border-[#24121a]">
+                        <span className="text-[10px] font-mono text-gray-500">
+                          Total entradas: {(member?.journalEntries || []).length}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTabSection('diario')}
+                          className="text-xs font-mono text-gold-400 hover:text-gold-300 flex items-center gap-1"
+                        >
+                          <span>Ver diario completo & redactar</span>
+                          <span>→</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* VISTA 2: TIMELINE AUTOMÁTICO DEL SISTEMA */}
+              {dashboardActivityView === 'system' && (
+                <div className="space-y-4 relative pl-5 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[1px] before:bg-gradient-to-b before:from-cyan-500/60 before:via-bordeaux-500/40 before:to-transparent">
+                  {activityTimeline.map((item, idx) => (
+                    <div key={item.id || idx} className="relative space-y-0.5">
+                      <div className="absolute -left-5 top-1.5 w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-md shadow-cyan-400/50" />
+                      
+                      <span className="text-[10px] font-mono text-gray-400 block">
+                        {new Date(item.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <h5 className="text-xs font-sans font-bold text-white">
+                        {item.title}
+                      </h5>
+                      <p className="text-xs text-gray-300 font-sans leading-relaxed">
+                        {item.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
 
             </div>
           </div>
@@ -1423,6 +1637,7 @@ export function MemberCrmModal({
           <div className="flex flex-wrap items-center justify-between border-b border-[#2d151e] pb-3 gap-2">
             <div className="flex items-center gap-2">
               {[
+                { id: 'diario', label: `📖 Diario de la Dinámica (${(member?.journalEntries || []).length})` },
                 { id: 'finanzas', label: 'Historial Financiero & Pagos' },
                 { id: 'requisitos', label: 'Requisitos & Suscripciones' },
                 { id: 'habilidades', label: 'Habilidades Técnicas' },
@@ -1446,6 +1661,245 @@ export function MemberCrmModal({
               Controles Avanzados del CRM
             </span>
           </div>
+
+          {/* SECCIÓN 0: DIARIO DE LA DINÁMICA (HISTORIAL NARRATIVO Y CUALITATIVO) */}
+          {activeTabSection === 'diario' && (
+            <div className="space-y-6 animate-fade-in pt-2">
+              
+              {/* Cabecera y Switch de Permiso del Sumiso */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl bg-[#170a10] border border-[#2e151f]">
+                <div>
+                  <h4 className="font-brand font-bold text-base text-gold-300 flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-gold-400" />
+                    Diario de la Dinámica D/s & Evolución
+                  </h4>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Registro cualitativo de la relación: acuerdos, cambios de conducta, sensaciones, avances, incidencias y notas de contexto.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 bg-[#0e0408] px-4 py-2.5 rounded-xl border border-[#3e1b29] shrink-0">
+                  <div>
+                    <span className="text-[10px] font-mono text-gray-400 block uppercase">Acceso de escritura del sumiso</span>
+                    <span className={`text-xs font-mono font-bold ${member?.journalAccess !== false ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {member?.journalAccess !== false ? 'Habilitado (Puede escribir)' : 'Restringido (Solo lectura)'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleJournalAccess}
+                    disabled={togglingJournalAccess}
+                    className={`py-1.5 px-3 rounded-lg text-xs font-mono font-bold border transition-all ${
+                      member?.journalAccess !== false
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                        : 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                    }`}
+                  >
+                    {togglingJournalAccess ? 'Actualizando...' : (member?.journalAccess !== false ? 'Bloquear Escritura' : 'Permitir Escritura')}
+                  </button>
+                </div>
+              </div>
+
+              {/* FORMULARIO: AÑADIR NUEVA ENTRADA (PRINCESA) */}
+              <form onSubmit={handleAddJournalEntry} className="p-5 rounded-xl bg-[#160910] border border-gold-500/30 space-y-4 shadow-lg">
+                <div className="flex items-center justify-between border-b border-[#2d151e] pb-2">
+                  <span className="text-xs font-mono font-bold text-gold-300 uppercase flex items-center gap-1.5">
+                    <Edit3 className="w-3.5 h-3.5 text-gold-400" />
+                    Nueva Entrada en el Diario (Princesa Yakuza)
+                  </span>
+                  <span className="text-[10px] font-mono text-gray-400">Quedará registrada cronológicamente</span>
+                </div>
+
+                {/* Chips de Categorías */}
+                <div>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1.5">
+                    Tipo de Anotación / Categoría *
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {JOURNAL_CATEGORIES.map(cat => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setNewJournalEntry({ ...newJournalEntry, category: cat.id })}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5 border ${
+                          newJournalEntry.category === cat.id
+                            ? `${cat.color} font-bold shadow-md ring-1 ring-gold-400/50`
+                            : 'bg-[#10050a] text-gray-400 border-[#2a131c] hover:text-white'
+                        }`}
+                      >
+                        <span>{cat.icon}</span>
+                        <span>{cat.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Título opcional y Fecha */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="md:col-span-2">
+                    <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                      Título o Resumen Breve (Opcional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Acuerdo sobre límites en sesión privada, Cambio de conducta matutina..."
+                      value={newJournalEntry.title}
+                      onChange={e => setNewJournalEntry({ ...newJournalEntry, title: e.target.value })}
+                      className="w-full bg-[#0e0408] border border-[#3e1b29] rounded-lg px-3 py-2 text-xs text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                      Fecha del Suceso / Registro
+                    </label>
+                    <input
+                      type="date"
+                      value={newJournalEntry.date}
+                      onChange={e => setNewJournalEntry({ ...newJournalEntry, date: e.target.value })}
+                      className="w-full bg-[#0e0408] border border-[#3e1b29] rounded-lg px-3 py-2 text-xs text-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Contenido Narrativo */}
+                <div>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                    Contenido Narrativo de la Dinámica *
+                  </label>
+                  <textarea
+                    rows={4}
+                    required
+                    placeholder="Describe qué ha ocurrido, acuerdos pactados, observaciones sobre su devoción, cambios de actitud, avances logrados, incidencias o sensaciones relevantes..."
+                    value={newJournalEntry.content}
+                    onChange={e => setNewJournalEntry({ ...newJournalEntry, content: e.target.value })}
+                    className="w-full bg-[#0e0408] border border-[#3e1b29] rounded-lg p-3 text-xs text-white leading-relaxed placeholder:text-gray-600"
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={addingJournalEntry}
+                    className="py-2.5 px-6 rounded-lg bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-gold-500/20"
+                  >
+                    <Save className="w-4 h-4" />
+                    {addingJournalEntry ? 'Guardando...' : 'Guardar Entrada en el Diario'}
+                  </button>
+                </div>
+              </form>
+
+              {/* BARRA DE FILTROS & HISTORIAL */}
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#2d151e] pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-gray-400">Filtrar por categoría:</span>
+                    <select
+                      value={journalCategoryFilter}
+                      onChange={e => setJournalCategoryFilter(e.target.value)}
+                      className="bg-[#0e0408] border border-[#3e1b29] text-gold-300 text-xs rounded-lg px-2.5 py-1 font-mono"
+                    >
+                      <option value="ALL">Todas las categorías</option>
+                      {JOURNAL_CATEGORIES.map(c => (
+                        <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-gray-400">Autor:</span>
+                    <select
+                      value={journalAuthorFilter}
+                      onChange={e => setJournalAuthorFilter(e.target.value)}
+                      className="bg-[#0e0408] border border-[#3e1b29] text-gray-200 text-xs rounded-lg px-2.5 py-1 font-mono"
+                    >
+                      <option value="ALL">Todos los autores</option>
+                      <option value="PRINCESA">👑 Solo Princesa</option>
+                      <option value="SUMISO">⛓️ Solo Sumiso</option>
+                    </select>
+                  </div>
+
+                  <span className="text-xs font-mono text-gray-500">
+                    {filteredJournalEntries.length} entradas registradas
+                  </span>
+                </div>
+
+                {/* LISTADO CRONOLÓGICO DE ENTRADAS DEL DIARIO */}
+                <div className="space-y-3">
+                  {filteredJournalEntries.length === 0 ? (
+                    <div className="p-8 text-center rounded-xl bg-[#170a10] border border-[#2e151f] text-gray-500 font-mono text-xs">
+                      No hay entradas en el diario que coincidan con los filtros seleccionados.
+                    </div>
+                  ) : (
+                    filteredJournalEntries.map((entry) => {
+                      const cat = JOURNAL_CATEGORIES.find(c => c.id === entry.category) || JOURNAL_CATEGORIES[7];
+                      const isPrincesa = entry.authorRole === 'PRINCESA';
+
+                      return (
+                        <div
+                          key={entry.id}
+                          className="p-5 rounded-xl bg-[#15080f] border border-[#2e151f] hover:border-gold-500/40 transition-all space-y-3 shadow-md relative group"
+                        >
+                          {/* Cabecera de la entrada */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#26111a] pb-2.5">
+                            <div className="flex items-center gap-2.5">
+                              {/* Insignia de autor */}
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase border flex items-center gap-1.5 shadow-sm ${
+                                isPrincesa 
+                                  ? 'bg-gradient-to-r from-gold-500/25 to-bordeaux-700/35 border-gold-500/60 text-gold-300' 
+                                  : 'bg-cyan-950/50 border-cyan-500/50 text-cyan-300'
+                              }`}>
+                                {isPrincesa ? <Crown className="w-3 h-3 text-gold-400" /> : <User className="w-3 h-3 text-cyan-400" />}
+                                {entry.authorName || (isPrincesa ? 'Princesa Yakuza' : 'Sumiso')}
+                              </span>
+
+                              {/* Chip de categoría */}
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono border ${cat.color}`}>
+                                {cat.icon} {cat.label}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <span className="text-[11px] font-mono text-gray-400">
+                                📅 {new Date(entry.createdAt).toLocaleDateString('es-ES', { 
+                                  day: 'numeric', 
+                                  month: 'long', 
+                                  year: 'numeric', 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteJournalEntry(entry.id)}
+                                title="Eliminar entrada del diario"
+                                className="p-1 rounded text-gray-500 hover:text-red-400 opacity-60 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Título de la entrada */}
+                          {entry.title && (
+                            <h5 className="font-serif font-bold text-sm text-gold-200">
+                              {entry.title}
+                            </h5>
+                          )}
+
+                          {/* Contenido narrativo */}
+                          <p className="text-xs text-gray-200 font-sans leading-relaxed whitespace-pre-wrap">
+                            {entry.content}
+                          </p>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+            </div>
+          )}
 
           {/* SECCIÓN 1: FINANZAS COMPLETAS & REGISTRO DE TRIBUTOS */}
           {activeTabSection === 'finanzas' && (

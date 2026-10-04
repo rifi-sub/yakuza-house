@@ -23,6 +23,14 @@ export function KingdomAuthModal({
   const [completingTaskId, setCompletingTaskId] = useState(null);
   const [taskFeedback, setTaskFeedback] = useState('');
   const [taskFilter, setTaskFilter] = useState('pending'); // 'pending', 'completed', 'all'
+  const [profileViewSection, setProfileViewSection] = useState('tasks'); // 'tasks' | 'journal'
+  const [memberJournalEntries, setMemberJournalEntries] = useState([]);
+  const [loadingJournal, setLoadingJournal] = useState(false);
+  const [journalAccess, setJournalAccess] = useState(true);
+  const [newJournalCategory, setNewJournalCategory] = useState('SENSACION');
+  const [newJournalTitle, setNewJournalTitle] = useState('');
+  const [newJournalContent, setNewJournalContent] = useState('');
+  const [submittingJournal, setSubmittingJournal] = useState(false);
 
   // Form states - Solicitud de acceso
   const [reqAlias, setReqAlias] = useState('');
@@ -77,12 +85,68 @@ export function KingdomAuthModal({
         const data = await res.json();
         if (data.member) {
           onAuthSuccess?.(data.member, token);
+          if (Array.isArray(data.member.journalEntries)) {
+            setMemberJournalEntries(data.member.journalEntries);
+          }
+          if (typeof data.member.journalAccess === 'boolean') {
+            setJournalAccess(data.member.journalAccess);
+          }
         }
       }
     } catch (err) {
       console.error('Error al actualizar expediente:', err);
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  // Sincronizar entradas de diario si currentMember cambia externamente
+  useEffect(() => {
+    if (currentMember) {
+      if (Array.isArray(currentMember.journalEntries)) {
+        setMemberJournalEntries(currentMember.journalEntries);
+      }
+      if (typeof currentMember.journalAccess === 'boolean') {
+        setJournalAccess(currentMember.journalAccess);
+      }
+    }
+  }, [currentMember]);
+
+  const fetchMemberJournal = async () => {
+    return fetchMe();
+  };
+
+  const handleSubmitMemberJournal = async (e) => {
+    e.preventDefault();
+    if (!newJournalContent.trim()) return;
+    const token = localStorage.getItem('yakuza_member_token');
+    if (!token) return;
+
+    setSubmittingJournal(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/kingdom/me/journal`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          category: newJournalCategory,
+          title: newJournalTitle.trim() || undefined,
+          content: newJournalContent.trim()
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al guardar la entrada en el diario');
+
+      setNewJournalTitle('');
+      setNewJournalContent('');
+      setMemberJournalEntries(prev => [data, ...prev]);
+      await fetchMe();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSubmittingJournal(false);
     }
   };
 
@@ -702,7 +766,37 @@ export function KingdomAuthModal({
                     </div>
                   </div>
 
-                  {/* PANEL DE TAREAS Y RITUALES DEL CLIENTE */}
+                  {/* Selector de Sección del Expediente: Órdenes / Diario de la Dinámica */}
+                  <div className="flex items-center gap-2 p-1.5 rounded-xl bg-dark-900 border border-gold-500/30">
+                    <button
+                      type="button"
+                      onClick={() => setProfileViewSection('tasks')}
+                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-mono font-bold transition-all flex items-center justify-center gap-2 ${
+                        profileViewSection === 'tasks'
+                          ? 'bg-gold-500 text-dark-950 shadow-md'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <Award className="w-3.5 h-3.5" />
+                      <span>Órdenes & Rituales ({assignments.length})</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setProfileViewSection('journal')}
+                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-mono font-bold transition-all flex items-center justify-center gap-2 ${
+                        profileViewSection === 'journal'
+                          ? 'bg-gold-500 text-dark-950 shadow-md'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span>Diario de la Dinámica ({memberJournalEntries.length})</span>
+                    </button>
+                  </div>
+
+                  {/* VISTA A: PANEL DE TAREAS Y RITUALES */}
+                  {profileViewSection === 'tasks' && (
                   <div className="p-4 rounded-xl bg-dark-950 border border-gray-800 space-y-3">
                     <div className="flex items-center justify-between border-b border-gray-800 pb-2.5">
                       <div className="flex items-center gap-2">
@@ -828,6 +922,158 @@ export function KingdomAuthModal({
                       </div>
                     )}
                   </div>
+                  )}
+
+                  {/* VISTA B: DIARIO DE LA DINÁMICA DEL SUMISO */}
+                  {profileViewSection === 'journal' && (
+                    <div className="space-y-4">
+                      
+                      {/* Cabecera del diario */}
+                      <div className="p-4 rounded-xl bg-dark-950 border border-gold-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <h4 className="font-serif font-bold text-sm text-gold-300 flex items-center gap-2">
+                            <BookOpen className="w-4 h-4 text-gold-400" />
+                            Diario de la Dinámica D/s
+                          </h4>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            Historial cualitativo de la relación: acuerdos, reflexiones, avances, sensaciones y evolución personal.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={fetchMemberJournal}
+                          disabled={loadingJournal}
+                          className="self-start sm:self-auto py-1 px-2.5 rounded bg-dark-900 border border-gray-700 text-[10px] font-mono text-gray-300 hover:text-white flex items-center gap-1"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${loadingJournal ? 'animate-spin' : ''}`} />
+                          <span>Actualizar</span>
+                        </button>
+                      </div>
+
+                      {/* Formulario de Reflexión del Sumiso (si tiene permiso) */}
+                      {journalAccess ? (
+                        <form onSubmit={handleSubmitMemberJournal} className="p-4 rounded-xl bg-dark-950 border border-[#3e1b29] space-y-3">
+                          <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                            <span className="text-xs font-mono font-bold text-gold-300 uppercase flex items-center gap-1.5">
+                              <span>✍️</span> Añadir Reflexión al Diario
+                            </span>
+                            <span className="text-[10px] font-mono text-gray-400">Visible para la Princesa</span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                              <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                                Categoría de tu nota
+                              </label>
+                              <select
+                                value={newJournalCategory}
+                                onChange={e => setNewJournalCategory(e.target.value)}
+                                className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-gold-300 font-mono"
+                              >
+                                <option value="SENSACION">🕯️ Sensación & Emocional</option>
+                                <option value="AVANCE">⚡ Avance Personal / Logro</option>
+                                <option value="OBSERVACION">👁️ Reflexión sobre mi conducta</option>
+                                <option value="INCIDENCIA">⚠️ Duda, Fricción o Dificultad</option>
+                                <option value="GENERAL">📝 Nota General</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                                Título (Opcional)
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="Ej: Sensaciones tras cumplir la tarea semanal..."
+                                value={newJournalTitle}
+                                onChange={e => setNewJournalTitle(e.target.value)}
+                                className="w-full bg-dark-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">
+                              Tu relato / reflexión *
+                            </label>
+                            <textarea
+                              rows={3}
+                              required
+                              placeholder="Escribe tus sensaciones, dificultades, estado de devoción o avances en las órdenes recibidas..."
+                              value={newJournalContent}
+                              onChange={e => setNewJournalContent(e.target.value)}
+                              className="w-full bg-dark-900 border border-gray-700 rounded p-2.5 text-xs text-white leading-relaxed"
+                            />
+                          </div>
+
+                          <div className="flex justify-end">
+                            <button
+                              type="submit"
+                              disabled={submittingJournal}
+                              className="py-2 px-4 rounded-lg bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs uppercase flex items-center gap-1.5"
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                              <span>{submittingJournal ? 'Guardando...' : 'Registrar en el Diario'}</span>
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <div className="p-3.5 rounded-xl bg-dark-950 border border-amber-500/30 text-amber-300/80 text-xs font-mono flex items-center gap-2">
+                          <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span>El acceso de escritura al diario está reservado a la Princesa para este perfil actualmente.</span>
+                        </div>
+                      )}
+
+                      {/* Lista de Entradas del Diario */}
+                      <div className="space-y-3">
+                        {memberJournalEntries.length === 0 ? (
+                          <div className="p-6 text-center rounded-xl bg-dark-950 border border-gray-800 text-gray-500 font-mono text-xs">
+                            No hay entradas registradas en tu diario de la dinámica aún.
+                          </div>
+                        ) : (
+                          memberJournalEntries.map((entry) => {
+                            const isPrincesa = entry.authorRole === 'PRINCESA';
+                            return (
+                              <div
+                                key={entry.id}
+                                className="p-4 rounded-xl bg-dark-950 border border-gray-800 space-y-2"
+                              >
+                                <div className="flex items-center justify-between gap-2 border-b border-gray-800/80 pb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border flex items-center gap-1 ${
+                                      isPrincesa
+                                        ? 'bg-gold-500/20 text-gold-300 border-gold-500/40'
+                                        : 'bg-cyan-950/40 text-cyan-300 border-cyan-500/40'
+                                    }`}>
+                                      {isPrincesa ? <Crown className="w-2.5 h-2.5 text-gold-400" /> : <User className="w-2.5 h-2.5 text-cyan-400" />}
+                                      {entry.authorName || (isPrincesa ? 'Princesa Yakuza' : 'Tú')}
+                                    </span>
+                                    <span className="text-[10px] font-mono text-gray-400 uppercase bg-dark-900 px-2 py-0.5 rounded border border-gray-800">
+                                      {entry.category}
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] font-mono text-gray-400">
+                                    {new Date(entry.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+
+                                {entry.title && (
+                                  <h5 className="font-serif font-bold text-xs text-white">
+                                    {entry.title}
+                                  </h5>
+                                )}
+
+                                <p className="text-xs text-gray-300 font-sans leading-relaxed whitespace-pre-wrap">
+                                  {entry.content}
+                                </p>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+
+                    </div>
+                  )}
 
                   {/* Habilidades Reconocidas */}
                   {currentMember.skills && currentMember.skills.length > 0 && (
