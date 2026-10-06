@@ -427,7 +427,13 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
         orderStatus: newStatus,
         internalNotes: internalNotesInput
       };
-      if (paymentStatus) body.paymentStatus = paymentStatus;
+      if (paymentStatus) {
+        body.paymentStatus = paymentStatus;
+      } else if (['PAGADO', 'EN_PROCESO', 'ENVIADO', 'ENTREGADO'].includes(newStatus)) {
+        body.paymentStatus = 'PAID';
+      } else if (newStatus === 'PAGO_PENDIENTE') {
+        body.paymentStatus = 'PENDING';
+      }
 
       const res = await fetch(`${API_BASE}/api/store/admin/orders/${orderId}/status`, {
         method: 'PUT',
@@ -1073,9 +1079,18 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
                         </td>
                         <td className="p-3.5 font-sans font-bold text-white text-sm">{ord.totalAmount.toFixed(2)}€</td>
                         <td className="p-3.5">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ord.paymentStatus === 'PAID' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                            {ord.paymentStatus}
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateOrderStatus(ord.id, ord.orderStatus, ord.paymentStatus === 'PAID' ? 'PENDING' : 'PAID')}
+                            title="Pulsar para alternar entre PAID y PENDING"
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all hover:scale-105 border ${
+                              ord.paymentStatus === 'PAID'
+                                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                                : 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                            }`}
+                          >
+                            {ord.paymentStatus === 'PAID' ? '✓ PAID' : 'PENDING'}
+                          </button>
                         </td>
                         <td className="p-3.5">
                           <select
