@@ -150,11 +150,24 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
     setError('');
     setLoading(true);
     try {
-      const data = await safeFetchJson(`${API_BASE}/api/kingdom/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail.trim(), password: loginPassword })
-      });
+      let data = null;
+      try {
+        data = await safeFetchJson(`${API_BASE}/api/kingdom/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: loginEmail.trim(), password: loginPassword })
+        });
+      } catch (loginErr) {
+        if (loginErr.message && loginErr.message.includes('404')) {
+          data = await safeFetchJson(`${API_BASE}/api/kingdom/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: loginEmail.trim(), password: loginPassword })
+          });
+        } else {
+          throw loginErr;
+        }
+      }
 
       if (data.token && data.member) {
         localStorage.setItem('yakuza_member_token', data.token);
