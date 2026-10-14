@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Filter, Plus, RefreshCw, User, Snowflake, Award, Briefcase, ChevronRight, CheckCircle, Clock } from 'lucide-react';
 import { API_BASE } from '../../config';
-import { MemberCrmModal } from './MemberCrmModal';
 import { KingdomMassAssignModal } from './KingdomMassAssignModal';
 
-export function KingdomCrmView({ token }) {
+export function KingdomCrmView({ token, onOpenMember }) {
+  const navigate = useNavigate();
   const [members, setMembers] = useState([]);
   const [allGroups, setAllGroups] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -15,10 +16,17 @@ export function KingdomCrmView({ token }) {
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedSkillCategory, setSelectedSkillCategory] = useState('');
 
-  // Modals
-  const [selectedMemberId, setSelectedMemberId] = useState(null);
+  // Modals & Navigation
   const [showMassAssign, setShowMassAssign] = useState(false);
   const [showNewMemberModal, setShowNewMemberModal] = useState(false);
+
+  const handleMemberClick = (id) => {
+    if (onOpenMember) {
+      onOpenMember(id);
+    } else {
+      navigate(`/admin/crm/${id}`);
+    }
+  };
 
   // New member form
   const [newMemberForm, setNewMemberForm] = useState({
@@ -90,7 +98,7 @@ export function KingdomCrmView({ token }) {
       setShowNewMemberModal(false);
       setNewMemberForm({ memberNumber: '', alias: '', internalName: '', groupId: '', status: 'ACTIVE', internalNotes: '' });
       fetchMembers();
-      setSelectedMemberId(data.id);
+      handleMemberClick(data.id);
     } catch (err) {
       alert(err.message);
     }
@@ -231,7 +239,7 @@ export function KingdomCrmView({ token }) {
             return (
               <div
                 key={m.id}
-                onClick={() => setSelectedMemberId(m.id)}
+                onClick={() => handleMemberClick(m.id)}
                 className="glass-panel p-4 rounded-xl border border-gray-800 hover:border-gold-500/40 transition-all cursor-pointer flex flex-col md:flex-row items-start md:items-center justify-between gap-4 group"
               >
                 <div className="flex items-center gap-3.5">
@@ -314,20 +322,6 @@ export function KingdomCrmView({ token }) {
           })
         )}
       </div>
-
-      {/* Modal Ficha CRM Individual */}
-      {selectedMemberId && (
-        <MemberCrmModal
-          key={selectedMemberId}
-          memberId={selectedMemberId}
-          token={token}
-          allGroups={allGroups}
-          allMembers={members}
-          onSelectMember={(id) => setSelectedMemberId(id)}
-          onClose={() => setSelectedMemberId(null)}
-          onRefreshList={fetchMembers}
-        />
-      )}
 
       {/* Modal Asignación Masiva */}
       {showMassAssign && (

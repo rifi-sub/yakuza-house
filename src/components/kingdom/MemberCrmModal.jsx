@@ -6,7 +6,7 @@ import {
   Flame, Lock, Layers, Settings, Eye, Check, RefreshCw, Mail, User,
   DollarSign, ArrowUp, ArrowDown, Save, CreditCard, Send, Shield,
   ChevronDown, ChevronUp, ExternalLink, Filter, CheckCircle,
-  BookOpen, ScrollText, MessageSquare, ToggleLeft, ToggleRight, Bookmark, FileText
+  BookOpen, ScrollText, MessageSquare, ToggleLeft, ToggleRight, Bookmark, FileText, ArrowLeft
 } from 'lucide-react';
 import { API_BASE, resolveMediaUrl } from '../../config';
 
@@ -28,7 +28,8 @@ export function MemberCrmModal({
   onRefreshList, 
   allGroups = [], 
   allMembers = [],
-  onSelectMember 
+  onSelectMember,
+  isSubpage = false 
 }) {
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -740,7 +741,7 @@ export function MemberCrmModal({
 
   if (loading && !member) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#090305] text-gold-400 font-mono text-xs space-y-3">
+      <div className={isSubpage ? "min-h-[70vh] flex flex-col items-center justify-center bg-[#090305] text-gold-400 font-mono text-xs space-y-3" : "fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#090305] text-gold-400 font-mono text-xs space-y-3"}>
         <Crown className="w-8 h-8 text-gold-400 animate-bounce" />
         <span className="tracking-widest uppercase animate-pulse">Cargando expediente del sumiso DOMINIUM...</span>
       </div>
@@ -748,7 +749,7 @@ export function MemberCrmModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#090305] text-[#f5ebe1] w-screen h-screen overflow-y-auto flex flex-col font-sans select-none custom-scrollbar animate-fade-in">
+    <div className={isSubpage ? "min-h-screen bg-[#090305] text-[#f5ebe1] w-full flex flex-col font-sans select-none custom-scrollbar animate-fade-in" : "fixed inset-0 z-50 bg-[#090305] text-[#f5ebe1] w-screen h-screen overflow-y-auto flex flex-col font-sans select-none custom-scrollbar animate-fade-in"}>
       
       {/* ========================================================================= */}
       {/* 1. TOP BAR LUXURY BRAND (DOMINIUM)                                         */}
@@ -784,7 +785,7 @@ export function MemberCrmModal({
           </div>
         </div>
 
-        {/* Lado derecho: Cita & Botón Salir */}
+        {/* Lado derecho: Cita & Botón Salir / Volver */}
         <div className="flex items-center gap-4">
           <div className="text-right hidden lg:block">
             <p className="text-[11px] font-serif italic text-[#c2a393] leading-none">
@@ -797,10 +798,11 @@ export function MemberCrmModal({
 
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-[#190c12] hover:bg-[#2b121d] border border-[#3e1b29] hover:border-gold-500/60 text-gray-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-            title="Cerrar ficha de sumiso (ESC)"
+            className="px-3 py-1.5 rounded-lg bg-[#190c12] hover:bg-[#2b121d] border border-[#3e1b29] hover:border-gold-500/60 text-gold-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer text-xs font-mono"
+            title="Volver a la lista de miembros del CRM (ESC)"
           >
-            <X className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 text-gold-400" />
+            <span className="hidden sm:inline">Volver al CRM</span>
           </button>
         </div>
       </header>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ShoppingBag, Crown, Menu, X, Settings, Castle } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 export default function Header({ 
   activeTab, 
@@ -10,13 +11,39 @@ export default function Header({
   currentMember
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const navLinks = [
-    { id: 'fetish', label: 'Tienda' },
-    { id: 'findreamland', label: 'FinDreamland' },
-    { id: 'princess', label: 'Yakuza Princess' },
-    { id: 'giveaway', label: 'Grand Opening' }
+    { id: 'fetish', path: '/tienda', label: 'Tienda' },
+    { id: 'findreamland', path: '/findreamland', label: 'FinDreamland' },
+    { id: 'princess', path: '/princess', label: 'Yakuza Princess' },
+    { id: 'giveaway', path: '/sorteo', label: 'Grand Opening' }
   ];
+
+  const handleNavClick = (link) => {
+    if (setActiveTab) setActiveTab(link.id);
+    navigate(link.path);
+    setMobileMenuOpen(false);
+  };
+
+  const handleKingdomClick = () => {
+    navigate('/perfil');
+    if (onOpenKingdomAuth) onOpenKingdomAuth();
+    setMobileMenuOpen(false);
+  };
+
+  const handleAdminClick = () => {
+    if (setActiveTab) setActiveTab('admin');
+    navigate('/admin');
+    setMobileMenuOpen(false);
+  };
+
+  const handleLogoClick = () => {
+    if (setActiveTab) setActiveTab('home');
+    navigate('/');
+    setMobileMenuOpen(false);
+  };
 
   return (
     <header className="sticky top-0 z-40 legibility-shield border-b border-gold-500/35 shadow-2xl">
@@ -25,7 +52,7 @@ export default function Header({
           
           {/* Logo Brand (Izquierda) */}
           <div 
-            onClick={() => setActiveTab('home')}
+            onClick={handleLogoClick}
             className="flex items-center gap-3.5 cursor-pointer group shrink-0"
             title="Ir a Inicio"
           >
@@ -45,11 +72,12 @@ export default function Header({
           {/* (Padding Medio) Navegación Central: (Tienda | Yakuza Princess | Grand Opening) */}
           <nav className="hidden md:flex items-center gap-2 lg:gap-3 px-6 lg:px-10 mx-auto">
             {navLinks.map((link) => {
-              const isActive = activeTab === link.id;
+              const isPathActive = location.pathname.startsWith(link.path) || (link.path === '/tienda' && location.pathname === '/catalogo');
+              const isActive = isPathActive || activeTab === link.id;
               return (
                 <button
                   key={link.id}
-                  onClick={() => setActiveTab(link.id)}
+                  onClick={() => handleNavClick(link)}
                   className={`px-4 py-2 rounded-lg font-sans text-xs uppercase tracking-widest font-semibold transition-all ${
                     isActive
                       ? 'bg-bordeaux-600/60 text-gold-300 border border-gold-500/50 shadow-md shadow-bordeaux-700/40'
@@ -64,18 +92,22 @@ export default function Header({
 
           {/* (Padding Medio) Derecha: Acceso Reino | Cesta | Config */}
           <div className="hidden md:flex items-center gap-3 shrink-0">
-            {/* Acceso Reino */}
+            {/* Acceso Reino / Mi Perfil (Navega a la página completa de perfil) */}
             <button
-              onClick={onOpenKingdomAuth}
+              onClick={handleKingdomClick}
               className={`py-2 px-3.5 rounded-lg border text-xs font-sans flex items-center gap-2 transition-all shadow-md ${
-                currentMember
-                  ? 'bg-gold-500/15 border-gold-400 text-gold-300 font-bold'
-                  : 'bg-gradient-to-r from-bordeaux-700/80 to-bordeaux-600/80 hover:from-bordeaux-600 hover:to-bordeaux-500 border-gold-500/50 hover:border-gold-400 text-gold-200 font-semibold'
+                location.pathname.startsWith('/perfil') || location.pathname.startsWith('/reino')
+                  ? 'bg-gold-500 text-dark-950 font-bold border-gold-400'
+                  : currentMember
+                    ? 'bg-gold-500/15 border-gold-400 text-gold-300 font-bold hover:bg-gold-500/25'
+                    : 'bg-gradient-to-r from-bordeaux-700/80 to-bordeaux-600/80 hover:from-bordeaux-600 hover:to-bordeaux-500 border-gold-500/50 hover:border-gold-400 text-gold-200 font-semibold'
               }`}
-              title={currentMember ? 'Ver mi ficha del Reino' : 'Solicitar entrada o entrar al Reino'}
+              title={currentMember ? 'Ir a mi perfil del Reino (Pantalla Completa)' : 'Solicitar entrada o entrar al Reino'}
             >
               <Castle className="w-4 h-4 text-gold-400" />
-              <span className="tracking-wider">{currentMember ? `${currentMember.memberNumber || '#'} ${currentMember.alias}` : 'Acceso Reino'}</span>
+              <span className="tracking-wider">
+                {currentMember ? `Mi Perfil: ${currentMember.memberNumber || '#'} ${currentMember.alias}` : 'Acceso Reino'}
+              </span>
             </button>
 
             {/* Cesta */}
@@ -97,9 +129,9 @@ export default function Header({
 
             {/* Config (Admin) */}
             <button
-              onClick={() => setActiveTab('admin')}
+              onClick={handleAdminClick}
               className={`py-2 px-3 rounded-lg border text-xs font-sans flex items-center gap-1.5 transition-all ${
-                activeTab === 'admin'
+                location.pathname.startsWith('/admin') || activeTab === 'admin'
                   ? 'bg-gold-500/20 border-gold-400 text-gold-300'
                   : 'border-gold-500/20 text-gold-500/70 hover:text-gold-300 hover:border-gold-400 bg-dark-950/60'
               }`}
@@ -113,9 +145,9 @@ export default function Header({
           {/* Mobile Menu Buttons */}
           <div className="flex md:hidden items-center gap-2">
             <button
-              onClick={onOpenKingdomAuth}
+              onClick={handleKingdomClick}
               className="p-2 text-gold-400 hover:text-white rounded-lg border border-gold-500/30 bg-dark-950"
-              title="Acceso al Reino"
+              title="Mi Perfil del Reino"
             >
               <Castle className="w-4 h-4" />
             </button>
@@ -148,14 +180,12 @@ export default function Header({
       {mobileMenuOpen && (
         <div className="md:hidden legibility-shield border-b border-gold-500/40 px-4 pt-2 pb-6 space-y-2">
           {navLinks.map((link) => {
-            const isActive = activeTab === link.id;
+            const isPathActive = location.pathname.startsWith(link.path);
+            const isActive = isPathActive || activeTab === link.id;
             return (
               <button
                 key={link.id}
-                onClick={() => {
-                  setActiveTab(link.id);
-                  setMobileMenuOpen(false);
-                }}
+                onClick={() => handleNavClick(link)}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-sans text-xs tracking-widest ${
                   isActive
                     ? 'bg-bordeaux-600/50 text-gold-300 font-bold border border-gold-500/40'
@@ -169,21 +199,15 @@ export default function Header({
 
           <div className="pt-4 border-t border-gold-500/20 flex flex-col gap-2">
             <button
-              onClick={() => {
-                onOpenKingdomAuth();
-                setMobileMenuOpen(false);
-              }}
+              onClick={handleKingdomClick}
               className="w-full text-center py-2.5 text-xs font-sans tracking-wider text-gold-200 bg-gradient-to-r from-bordeaux-700 to-bordeaux-600 rounded border border-gold-500/40 flex items-center justify-center gap-2"
             >
               <Castle className="w-4 h-4 text-gold-400" />
-              {currentMember ? `Expediente: ${currentMember.memberNumber} ${currentMember.alias}` : 'Acceso al Reino / Solicitud'}
+              {currentMember ? `Mi Perfil: ${currentMember.memberNumber} ${currentMember.alias}` : 'Acceso al Reino / Solicitud'}
             </button>
 
             <button
-              onClick={() => {
-                setActiveTab('admin');
-                setMobileMenuOpen(false);
-              }}
+              onClick={handleAdminClick}
               className="w-full flex items-center justify-center gap-2 py-2 text-xs font-sans text-ivory-400 hover:text-white"
             >
               <Settings className="w-4 h-4 text-gold-400" />

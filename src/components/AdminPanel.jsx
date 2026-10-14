@@ -8,8 +8,52 @@ import { KingdomHierarchyView } from './kingdom/KingdomHierarchyView';
 import { KingdomActivitiesView } from './kingdom/KingdomActivitiesView';
 import { KingdomRequestsView } from './kingdom/KingdomRequestsView';
 import { KingdomHallOfFameAdmin } from './kingdom/KingdomHallOfFameAdmin';
+import { MemberCrmModal } from './kingdom/MemberCrmModal';
+import { useLocation, useNavigate } from 'react-router-dom';
+
+const ROUTE_TAB_MAP = {
+  'pedidos': 'orders',
+  'orders': 'orders',
+  'catalogo': 'items',
+  'items': 'items',
+  'categorias': 'categories',
+  'categories': 'categories',
+  'extras': 'extras',
+  'paqueteria': 'packaging',
+  'packaging': 'packaging',
+  'crm': 'kingdom_crm',
+  'jerarquia': 'kingdom_hierarchy',
+  'actividades': 'kingdom_activities',
+  'solicitudes': 'kingdom_requests',
+  'muro-fama': 'kingdom_hall_of_fame',
+  'sorteo': 'launch',
+  'launch': 'launch',
+  'princess': 'princess',
+  'banner': 'banner',
+  'valoraciones': 'reviews',
+  'reviews': 'reviews'
+};
+
+const TAB_ROUTE_MAP = {
+  'orders': '/admin/pedidos',
+  'items': '/admin/catalogo',
+  'categories': '/admin/categorias',
+  'extras': '/admin/extras',
+  'packaging': '/admin/paqueteria',
+  'kingdom_crm': '/admin/crm',
+  'kingdom_hierarchy': '/admin/jerarquia',
+  'kingdom_activities': '/admin/actividades',
+  'kingdom_requests': '/admin/solicitudes',
+  'kingdom_hall_of_fame': '/admin/muro-fama',
+  'launch': '/admin/sorteo',
+  'princess': '/admin/princess',
+  'banner': '/admin/banner',
+  'reviews': '/admin/valoraciones'
+};
 
 export default function AdminPanel({ onBackToStore, onRefreshData }) {
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [token, setToken] = useState(localStorage.getItem('yakuza_admin_token') || '');
   const [emailInput, setEmailInput] = useState('');
@@ -17,6 +61,27 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
   const [loginError, setLoginError] = useState('');
 
   const [activeTab, setActiveTab] = useState('orders'); // orders, items, categories, reviews, banner, princess, launch, extras, packaging
+
+  // Detectar si estamos en una subpágina de sumiso: /admin/crm/:memberId o /admin/crm/member/:memberId
+  const crmMemberMatch = location.pathname.match(/\/admin\/crm\/(?:member\/)?([a-zA-Z0-9_-]+)/);
+  const activeMemberId = crmMemberMatch ? crmMemberMatch[1] : null;
+
+  useEffect(() => {
+    if (activeMemberId) {
+      setActiveTab('kingdom_crm');
+      return;
+    }
+    const cleanPath = location.pathname.replace(/^\/admin\/?/, '').split('/')[0];
+    if (cleanPath && ROUTE_TAB_MAP[cleanPath]) {
+      setActiveTab(ROUTE_TAB_MAP[cleanPath]);
+    }
+  }, [location.pathname, activeMemberId]);
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    const targetRoute = TAB_ROUTE_MAP[tabId] || '/admin';
+    navigate(targetRoute);
+  };
 
   // Data states
   const [orders, setOrders] = useState([]);
@@ -870,6 +935,26 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
     );
   }
 
+  // Subpágina independiente de cada sumiso en el CRM (NO como modal)
+  if (token && activeMemberId) {
+    return (
+      <div className="w-full min-h-screen bg-[#080305]">
+        <MemberCrmModal
+          key={activeMemberId}
+          memberId={activeMemberId}
+          token={token}
+          isSubpage={true}
+          onSelectMember={(newId) => navigate(`/admin/crm/${newId}`)}
+          onClose={() => navigate('/admin/crm')}
+          onRefreshList={() => {
+            fetchAllData();
+            if (onRefreshData) onRefreshData();
+          }}
+        />
+      </div>
+    );
+  }
+
   const pendingOrdersCount = orders.filter(o => o.orderStatus === 'PAGO_PENDIENTE' || o.paymentStatus !== 'PAID').length;
   const pendingRaffleCount = Object.values(launch.raffleNumbers?.assigned || {}).filter(a => a.status === 'PENDING').length;
 
@@ -963,7 +1048,7 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
                 type="button"
                 onClick={() => {
                   if (!isGroupActive) {
-                    setActiveTab(group.subTabs[0].id);
+                    handleTabChange(group.subTabs[0].id);
                   }
                 }}
                 className={`py-3 px-3.5 rounded-xl font-sans text-xs font-bold transition-all flex items-center justify-between relative overflow-hidden group ${
@@ -1001,7 +1086,7 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
               <button
                 key={sub.id}
                 type="button"
-                onClick={() => setActiveTab(sub.id)}
+                onClick={() => handleTabChange(sub.id)}
                 className={`py-2 px-3.5 rounded-lg font-bold transition-all whitespace-nowrap flex items-center gap-2 text-xs ${
                   isSubActive
                     ? 'bg-gold-500/20 text-gold-300 border border-gold-400/50 shadow-sm'
@@ -3659,7 +3744,10 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
 
       {/* KINGDOM ARCHITECTURE TABS */}
       {activeTab === 'kingdom_crm' && (
-        <KingdomCrmView token={token} />
+        <KingdomCrmView 
+          token={token} 
+          onOpenMember={(memberId) => navigate(`/admin/crm/${memberId}`)} 
+        />
       )}
 
       {activeTab === 'kingdom_hierarchy' && (
