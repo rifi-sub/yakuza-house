@@ -9,6 +9,7 @@ import {
   BookOpen, ScrollText, MessageSquare, ToggleLeft, ToggleRight, Bookmark, FileText, ArrowLeft
 } from 'lucide-react';
 import { API_BASE, resolveMediaUrl } from '../../config';
+import { KingdomChatBox } from './KingdomChatBox';
 
 const JOURNAL_CATEGORIES = [
   { id: 'ACUERDO', label: 'Acuerdo & Límites', icon: '📜', color: 'border-amber-500/50 text-amber-300 bg-amber-950/40' },
@@ -702,12 +703,14 @@ export function MemberCrmModal({
 
   // Estadísticas calculadas
   const assignments = member?.assignments || [];
-  const completedAssignmentsCount = assignments.filter(a => a.status === 'COMPLETED' || a.status === 'COMPLETED_ON_TIME').length;
-  const totalAssignmentsCount = assignments.length || 4;
+  const completedAssignmentsCount = assignments.filter(a => ['COMPLETED', 'COMPLETED_ON_TIME', 'COMPLETED_LATE'].includes(a.status)).length;
+  const totalAssignmentsCount = assignments.length || 1;
+  const taskProgressPct = assignments.length > 0 ? Math.round((completedAssignmentsCount / assignments.length) * 100) : 0;
+  const effectiveProgress = Math.max(formData.overallProgress || 0, taskProgressPct);
   const ritualsCount = assignments.filter(a => a.type === 'RITUAL').length;
-  const ritualsCompleted = assignments.filter(a => a.type === 'RITUAL' && (a.status === 'COMPLETED' || a.status === 'COMPLETED_ON_TIME')).length;
+  const ritualsCompleted = assignments.filter(a => a.type === 'RITUAL' && ['COMPLETED', 'COMPLETED_ON_TIME', 'COMPLETED_LATE'].includes(a.status)).length;
   const trainingsCount = assignments.filter(a => a.type === 'TASK' || a.type === 'GOAL').length;
-  const trainingsCompleted = assignments.filter(a => (a.type === 'TASK' || a.type === 'GOAL') && (a.status === 'COMPLETED' || a.status === 'COMPLETED_ON_TIME')).length;
+  const trainingsCompleted = assignments.filter(a => (a.type === 'TASK' || a.type === 'GOAL') && ['COMPLETED', 'COMPLETED_ON_TIME', 'COMPLETED_LATE'].includes(a.status)).length;
 
   const currentRankName = member?.group?.name || 'SIRVIENTES';
   const currentRankBadge = member?.group?.badge || 'NIVEL 2';
@@ -1129,12 +1132,12 @@ export function MemberCrmModal({
                 <div>
                   <div className="flex items-center justify-between text-xs mb-1">
                     <span className="text-[10px] font-mono text-[#937b85] uppercase tracking-wider">Progreso</span>
-                    <span className="font-mono font-bold text-gold-400 text-xs">{formData.overallProgress}%</span>
+                    <span className="font-mono font-bold text-gold-400 text-xs">{effectiveProgress}%</span>
                   </div>
                   <div className="w-full bg-[#1b0c13] rounded-full h-1.5 overflow-hidden border border-[#301621]">
                     <div 
                       className="bg-gradient-to-r from-bordeaux-600 via-gold-500 to-amber-300 h-full rounded-full transition-all duration-700" 
-                      style={{ width: `${Math.min(100, Math.max(5, formData.overallProgress))}%` }} 
+                      style={{ width: `${Math.min(100, Math.max(effectiveProgress > 0 ? 5 : 0, effectiveProgress))}%` }} 
                     />
                   </div>
                 </div>
@@ -1228,7 +1231,7 @@ export function MemberCrmModal({
                       strokeWidth="9"
                       fill="transparent"
                       strokeDasharray={238.76}
-                      strokeDashoffset={238.76 - (238.76 * formData.overallProgress) / 100}
+                      strokeDashoffset={238.76 - (238.76 * effectiveProgress) / 100}
                       strokeLinecap="round"
                       className="transition-all duration-1000 ease-out"
                     />
@@ -1242,7 +1245,7 @@ export function MemberCrmModal({
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="font-mono font-extrabold text-xl text-white">
-                      {formData.overallProgress}%
+                      {effectiveProgress}%
                     </span>
                   </div>
                 </div>
@@ -1658,6 +1661,7 @@ export function MemberCrmModal({
           <div className="flex flex-wrap items-center justify-between border-b border-[#2d151e] pb-3 gap-2">
             <div className="flex items-center gap-2">
               {[
+                { id: 'chat', label: '💬 Chat Privado' },
                 { id: 'diario', label: `📖 Diario de la Dinámica (${(member?.journalEntries || []).length})` },
                 { id: 'finanzas', label: 'Historial Financiero & Pagos' },
                 { id: 'requisitos', label: 'Requisitos & Suscripciones' },
@@ -2188,6 +2192,30 @@ export function MemberCrmModal({
                   Guardar Nota
                 </button>
               </form>
+            </div>
+          )}
+
+          {/* SECCIÓN 6: CHAT PRIVADO CON EL SUMISO */}
+          {activeTabSection === 'chat' && (
+            <div className="space-y-4 animate-fade-in pt-2">
+              <div className="bg-[#180a11] border border-gold-500/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="font-serif font-bold text-sm text-gold-300 flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-gold-400" />
+                    <span>Línea Directa con #{member?.memberNumber} {member?.alias}</span>
+                  </h4>
+                  <p className="text-xs text-gray-400">Canal bidireccional en tiempo real. Los mensajes enviados aquí alertan al sumiso y quedan archivados en su expediente.</p>
+                </div>
+              </div>
+
+              <KingdomChatBox
+                memberId={member.id}
+                token={token}
+                userRole="ADMIN"
+                memberInfo={member}
+                heightClass="h-[620px]"
+                showQuickReplies={false}
+              />
             </div>
           )}
 

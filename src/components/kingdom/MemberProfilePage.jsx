@@ -3,10 +3,11 @@ import {
   Castle, Crown, CheckCircle, ShieldAlert, Key, LogIn, Sparkles, Send, 
   Lock, BookOpen, Clock, Award, Check, RefreshCw, AlertCircle, ChevronRight, 
   User, Shield, Calendar, ArrowRight, ArrowLeft, ExternalLink, ScrollText,
-  FileText, MessageSquare, AlertTriangle, Star, Zap
+  FileText, MessageSquare, AlertTriangle, Star, Zap, MessageCircle
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE, safeFetchJson } from '../../config';
+import { KingdomChatBox } from './KingdomChatBox';
 
 const JOURNAL_CATEGORIES = [
   { id: 'ACUERDO', label: 'Acuerdo & Límites', icon: '📜', color: 'border-amber-500/50 text-amber-300 bg-amber-950/40' },
@@ -212,25 +213,61 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
     }
   };
 
-  // Completar tarea
+  // Completar tarea (soporta PUT y fallback a POST para compatibilidad con cualquier versión del backend)
   const handleCompleteTask = async (taskId) => {
     const token = localStorage.getItem('yakuza_member_token');
     if (!token) return;
     setSubmittingTask(true);
     setError('');
+    const evidenceContent = taskEvidence.trim();
+
     try {
-      await safeFetchJson(`${API_BASE}/api/kingdom/me/assignments/${taskId}/complete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ evidence: taskEvidence.trim() })
-      });
+      let resData = null;
+      try {
+        // Intento 1: PUT (método esperado en producción actual)
+        resData = await safeFetchJson(`${API_BASE}/api/kingdom/me/assignments/${taskId}/complete`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ evidence: evidenceContent, memberEvidence: evidenceContent })
+        });
+      } catch (putErr) {
+        // Si PUT da 404, reintentar con POST
+        if (putErr.message && (putErr.message.includes('404') || putErr.message.includes('405'))) {
+          resData = await safeFetchJson(`${API_BASE}/api/kingdom/me/assignments/${taskId}/complete`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ evidence: evidenceContent, memberEvidence: evidenceContent })
+          });
+        } else {
+          throw putErr;
+        }
+      }
 
       setTaskFeedback('✓ Tarea completada y entregada solemnemente a la Princesa.');
       setCompletingTaskId(null);
       setTaskEvidence('');
+      
+      // Actualización optimista inmediata en memoria para que no se quede en 0% ni un segundo
+      setMember(prev => {
+        if (!prev) return prev;
+        const updatedAssignments = (prev.assignments || []).map(a => 
+          a.id === taskId ? { ...a, status: 'COMPLETED_ON_TIME', completedAt: new Date().toISOString(), memberEvidence: evidenceContent } : a
+        );
+        const compCount = updatedAssignments.filter(a => ['COMPLETED_ON_TIME', 'COMPLETED_LATE', 'COMPLETED'].includes(a.status)).length;
+        const newProg = updatedAssignments.length > 0 ? Math.round((compCount / updatedAssignments.length) * 100) : prev.overallProgress;
+        return {
+          ...prev,
+          assignments: updatedAssignments,
+          overallProgress: Math.max(prev.overallProgress || 0, newProg)
+        };
+      });
+
       fetchMe();
       setTimeout(() => setTaskFeedback(''), 5000);
     } catch (err) {
@@ -273,8 +310,17 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
     }
   };
 
-  // Tareas filtradas
+  // Tareas filtradas y cálculo dinámico de progreso
   const assignments = member?.assignments || [];
+  const completedTasksCount = assignments.filter(task => 
+    ['COMPLETED_ON_TIME', 'COMPLETED_LATE', 'COMPLETED'].includes(task.status)
+  ).length;
+  const taskProgressPercent = assignments.length > 0 
+    ? Math.round((completedTasksCount / assignments.length) * 100) 
+    : 0;
+  // El progreso efectivo nunca se queda en 0% si hay tareas completadas
+  const effectiveProgress = Math.max(Math.round(member?.overallProgress || 0), taskProgressPercent);
+
   const filteredAssignments = assignments.filter(task => {
     const isCompleted = ['COMPLETED_ON_TIME', 'COMPLETED_LATE', 'COMPLETED'].includes(task.status);
     if (taskFilter === 'pending') return !isCompleted;
@@ -509,7 +555,10 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
 
                     <div className="bg-dark-950/80 border border-gold-500/20 rounded-2xl p-4 text-center min-w-[100px]">
                       <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Progreso</span>
-                      <span className="font-serif font-black text-xl text-emerald-400">{Math.round(member.overallProgress || 0)}%</span>
+                      <span className="font-serif font-black text-xl text-emerald-400">{effectiveProgress}%</span>
+                      {assignments.length > 0 && (
+                        <span className="text-[9px] font-mono text-gray-400 block mt-0.5">{completedTasksCount}/{assignments.length} tareas</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -522,12 +571,12 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
                       <span>Evolución en el Reino:</span>
                       <strong className="text-gold-300">{member.experiencePoints || 0} XP Acumulados</strong>
                     </div>
-                    <span className="font-mono text-gold-400 font-bold">{Math.round(member.overallProgress || 0)}% hacia ascenso</span>
+                    <span className="font-mono text-gold-400 font-bold">{effectiveProgress}% hacia ascenso</span>
                   </div>
                   <div className="w-full bg-dark-900 rounded-full h-2.5 overflow-hidden border border-gray-800">
                     <div 
                       className="bg-gradient-to-r from-bordeaux-600 via-gold-500 to-gold-400 h-full rounded-full transition-all duration-700 shadow-sm shadow-gold-500/50"
-                      style={{ width: `${Math.min(100, Math.max(5, member.overallProgress || 0))}%` }}
+                      style={{ width: `${Math.min(100, Math.max(effectiveProgress > 0 ? 5 : 0, effectiveProgress))}%` }}
                     />
                   </div>
                 </div>
@@ -568,6 +617,18 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
                   >
                     <ScrollText className="w-4 h-4" />
                     <span>Normas y Privilegios</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveSection('chat')}
+                    className={`py-2.5 px-5 rounded-xl font-mono text-xs uppercase tracking-wider font-bold transition-all flex items-center gap-2 relative ${
+                      activeSection === 'chat'
+                        ? 'bg-gold-500 text-dark-950 shadow-lg shadow-gold-500/20'
+                        : 'bg-dark-950 text-gray-400 hover:text-white border border-gray-800'
+                    }`}
+                  >
+                    <MessageCircle className="w-4 h-4 text-gold-400" />
+                    <span>Línea Directa / Chat</span>
                   </button>
                 </div>
 
@@ -933,6 +994,34 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* ========================================================================= */}
+                {/* SECCIÓN D: LÍNEA DIRECTA / CHAT CON LA PRINCESA                          */}
+                {/* ========================================================================= */}
+                {activeSection === 'chat' && (
+                  <div className="space-y-4 animate-fade-in">
+                    <div className="bg-dark-950/60 p-4 rounded-2xl border border-gold-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div>
+                        <h3 className="font-serif font-bold text-lg text-white flex items-center gap-2">
+                          <span>Línea Directa con el Trono</span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-gold-500/10 text-gold-400 border border-gold-500/30 uppercase tracking-widest">
+                            Encriptado 1 a 1
+                          </span>
+                        </h3>
+                        <p className="text-xs text-gray-400">Canal exclusivo con la Princesa. Consulta dudas sobre tus mandatos, envía reportes solemnes o atiende sus órdenes directas.</p>
+                      </div>
+                    </div>
+
+                    <KingdomChatBox
+                      memberId={member.id}
+                      token={localStorage.getItem('yakuza_member_token')}
+                      userRole="MEMBER"
+                      memberInfo={member}
+                      heightClass="h-[600px] md:h-[680px]"
+                      showQuickReplies={true}
+                    />
                   </div>
                 )}
 

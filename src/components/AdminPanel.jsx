@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Edit, Trash2, Eye, EyeOff, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart, Crown, Users, Castle, BookOpen, Inbox, ShoppingBag, Gift } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Eye, EyeOff, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart, Crown, Users, Castle, BookOpen, Inbox, ShoppingBag, Gift, MessageSquare } from 'lucide-react';
 import { API_BASE, resolveMediaUrl, safeFetchJson } from '../config';
 import princessVideo from '../princess-yakuza.mp4';
 import { MediaPickerModal } from './MediaPickerModal';
@@ -8,6 +8,7 @@ import { KingdomHierarchyView } from './kingdom/KingdomHierarchyView';
 import { KingdomActivitiesView } from './kingdom/KingdomActivitiesView';
 import { KingdomRequestsView } from './kingdom/KingdomRequestsView';
 import { KingdomHallOfFameAdmin } from './kingdom/KingdomHallOfFameAdmin';
+import { KingdomAdminChatView } from './kingdom/KingdomAdminChatView';
 import { MemberCrmModal } from './kingdom/MemberCrmModal';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -22,6 +23,8 @@ const ROUTE_TAB_MAP = {
   'paqueteria': 'packaging',
   'packaging': 'packaging',
   'crm': 'kingdom_crm',
+  'chat': 'kingdom_chat',
+  'mensajes': 'kingdom_chat',
   'jerarquia': 'kingdom_hierarchy',
   'actividades': 'kingdom_activities',
   'solicitudes': 'kingdom_requests',
@@ -41,6 +44,7 @@ const TAB_ROUTE_MAP = {
   'extras': '/admin/extras',
   'packaging': '/admin/paqueteria',
   'kingdom_crm': '/admin/crm',
+  'kingdom_chat': '/admin/chat',
   'kingdom_hierarchy': '/admin/jerarquia',
   'kingdom_activities': '/admin/actividades',
   'kingdom_requests': '/admin/solicitudes',
@@ -978,6 +982,7 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
       icon: Castle,
       subTabs: [
         { id: 'kingdom_crm', label: 'CRM Miembros', icon: Users },
+        { id: 'kingdom_chat', label: 'Chat y Mensajería', icon: MessageSquare },
         { id: 'kingdom_hierarchy', label: 'Jerarquía Reino', icon: Castle },
         { id: 'kingdom_activities', label: 'Biblioteca Objetivos', icon: BookOpen },
         { id: 'kingdom_requests', label: 'Candidatos (Comparativa)', icon: Inbox },
@@ -3748,6 +3753,10 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
           token={token} 
           onOpenMember={(memberId) => navigate(`/admin/crm/${memberId}`)} 
         />
+      )}
+
+      {activeTab === 'kingdom_chat' && (
+        <KingdomAdminChatView token={token} />
       )}
 
       {activeTab === 'kingdom_hierarchy' && (

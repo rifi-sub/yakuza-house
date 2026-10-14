@@ -36,3 +36,12 @@ export async function safeFetchJson(url, options = {}) {
   }
   return data;
 }
+
+// Devuelve la URL base para la conexión de Socket.io
+export function getSocketUrl() {
+  if (API_BASE) return API_BASE;
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'http://localhost:5000';
+  }
+  return '';
+}

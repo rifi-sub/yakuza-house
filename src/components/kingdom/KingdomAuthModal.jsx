@@ -293,10 +293,12 @@ export function KingdomAuthModal({
     }
   };
 
-  // Filtrado de tareas del miembro activo
+  // Filtrado de tareas del miembro activo y progreso efectivo
   const assignments = currentMember?.assignments || [];
   const pendingAssignments = assignments.filter(a => ['ASSIGNED', 'ACTIVE', 'DUE_SOON', 'OVERDUE'].includes(a.status));
-  const completedAssignments = assignments.filter(a => ['COMPLETED_ON_TIME', 'COMPLETED_LATE'].includes(a.status));
+  const completedAssignments = assignments.filter(a => ['COMPLETED_ON_TIME', 'COMPLETED_LATE', 'COMPLETED'].includes(a.status));
+  const taskProgressPct = assignments.length > 0 ? Math.round((completedAssignments.length / assignments.length) * 100) : 0;
+  const effectiveProgress = Math.max(currentMember?.overallProgress || 0, taskProgressPct);
 
   const displayedAssignments = taskFilter === 'pending'
     ? pendingAssignments
@@ -751,13 +753,13 @@ export function KingdomAuthModal({
                         <span>Progreso de Consagración</span>
                       </div>
                       <div className="font-mono font-bold text-gold-400">
-                        {currentMember.experiencePoints || 0} XP <span className="text-gray-500">({currentMember.overallProgress || 0}%)</span>
+                        {currentMember.experiencePoints || 0} XP <span className="text-gray-500">({effectiveProgress}%)</span>
                       </div>
                     </div>
                     <div className="w-full bg-gray-800 h-2.5 rounded-full overflow-hidden p-0.5">
                       <div 
                         className="h-full bg-gradient-to-r from-bordeaux-500 via-gold-500 to-gold-300 rounded-full transition-all duration-700 shadow-sm shadow-gold-500/50"
-                        style={{ width: `${Math.min(100, Math.max(5, currentMember.overallProgress || 0))}%` }}
+                        style={{ width: `${Math.min(100, Math.max(effectiveProgress > 0 ? 5 : 0, effectiveProgress))}%` }}
                       />
                     </div>
                     <div className="flex justify-between items-center text-[10px] text-gray-400 font-mono">
