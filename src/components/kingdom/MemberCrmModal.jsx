@@ -705,8 +705,8 @@ export function MemberCrmModal({
   const assignments = member?.assignments || [];
   const completedAssignmentsCount = assignments.filter(a => ['COMPLETED', 'COMPLETED_ON_TIME', 'COMPLETED_LATE'].includes(a.status)).length;
   const totalAssignmentsCount = assignments.length || 1;
-  const taskProgressPct = assignments.length > 0 ? Math.round((completedAssignmentsCount / assignments.length) * 100) : 0;
-  const effectiveProgress = Math.max(formData.overallProgress || 0, taskProgressPct);
+  const currentXp = formData.experiencePoints || member?.experiencePoints || 0;
+  const effectiveProgress = Math.min(100, Math.round((currentXp / 5000) * 100));
   const ritualsCount = assignments.filter(a => a.type === 'RITUAL').length;
   const ritualsCompleted = assignments.filter(a => a.type === 'RITUAL' && ['COMPLETED', 'COMPLETED_ON_TIME', 'COMPLETED_LATE'].includes(a.status)).length;
   const trainingsCount = assignments.filter(a => a.type === 'TASK' || a.type === 'GOAL').length;

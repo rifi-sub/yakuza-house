@@ -280,18 +280,21 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
       setCompletingTaskId(null);
       setTaskEvidence('');
       
-      // Actualización optimista inmediata en memoria para que no se quede en 0% ni un segundo
+      // Actualización optimista inmediata en memoria basada en XP (meta 5000 XP para ascenso)
       setMember(prev => {
         if (!prev) return prev;
+        const taskObj = (prev.assignments || []).find(a => a.id === taskId);
+        const addedXp = taskObj?.pointsAwarded || 10;
+        const newXp = (prev.experiencePoints || 0) + addedXp;
+        const newProg = Math.min(100, Math.round((newXp / 5000) * 100));
         const updatedAssignments = (prev.assignments || []).map(a => 
           a.id === taskId ? { ...a, status: 'COMPLETED_ON_TIME', completedAt: new Date().toISOString(), memberEvidence: evidenceContent } : a
         );
-        const compCount = updatedAssignments.filter(a => ['COMPLETED_ON_TIME', 'COMPLETED_LATE', 'COMPLETED'].includes(a.status)).length;
-        const newProg = updatedAssignments.length > 0 ? Math.round((compCount / updatedAssignments.length) * 100) : prev.overallProgress;
         return {
           ...prev,
           assignments: updatedAssignments,
-          overallProgress: Math.max(prev.overallProgress || 0, newProg)
+          experiencePoints: newXp,
+          overallProgress: newProg
         };
       });
 
@@ -340,16 +343,15 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
     }
   };
 
-  // Tareas filtradas y cálculo dinámico de progreso
+  // Cálculo de progreso basado en XP ganados por tareas (meta: 5000 XP para solicitar ascenso)
+  const XP_GOAL_ASCENT = 5000;
+  const currentXp = member?.experiencePoints || 0;
+  const effectiveProgress = Math.min(100, Math.round((currentXp / XP_GOAL_ASCENT) * 100));
+
   const assignments = member?.assignments || [];
   const completedTasksCount = assignments.filter(task => 
     ['COMPLETED_ON_TIME', 'COMPLETED_LATE', 'COMPLETED'].includes(task.status)
   ).length;
-  const taskProgressPercent = assignments.length > 0 
-    ? Math.round((completedTasksCount / assignments.length) * 100) 
-    : 0;
-  // El progreso efectivo nunca se queda en 0% si hay tareas completadas
-  const effectiveProgress = Math.max(Math.round(member?.overallProgress || 0), taskProgressPercent);
 
   const filteredAssignments = assignments.filter(task => {
     const isCompleted = ['COMPLETED_ON_TIME', 'COMPLETED_LATE', 'COMPLETED'].includes(task.status);
@@ -577,36 +579,36 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
                   </div>
 
                   {/* STATS RÁPIDOS */}
-                  <div className="flex items-center gap-4 z-10">
-                    <div className="bg-dark-950/80 border border-gold-500/20 rounded-2xl p-4 text-center min-w-[100px]">
-                      <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Nivel Exp.</span>
+                  <div className="flex items-center gap-3 z-10">
+                    <div className="bg-dark-950/80 border border-gold-500/20 rounded-2xl p-4 text-center min-w-[105px]">
+                      <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Experiencia</span>
                       <span className="font-serif font-black text-xl text-gold-400">{member.experiencePoints || 0} XP</span>
                     </div>
 
-                    <div className="bg-dark-950/80 border border-gold-500/20 rounded-2xl p-4 text-center min-w-[100px]">
-                      <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Progreso</span>
+                    <div className="bg-dark-950/80 border border-gold-500/20 rounded-2xl p-4 text-center min-w-[125px]">
+                      <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Progreso Ascenso</span>
                       <span className="font-serif font-black text-xl text-emerald-400">{effectiveProgress}%</span>
-                      {assignments.length > 0 && (
-                        <span className="text-[9px] font-mono text-gray-400 block mt-0.5">{completedTasksCount}/{assignments.length} tareas</span>
-                      )}
+                      <span className="text-[9px] font-mono text-gray-400 block mt-0.5">{member.experiencePoints || 0} / 5.000 XP</span>
                     </div>
                   </div>
                 </div>
 
-                {/* BARRA DE PROGRESO DE NIVEL */}
+                {/* BARRA DE PROGRESO DE NIVEL BASADA EN XP (5000 XP PARA ASCENSO) */}
                 <div className="p-5 rounded-2xl bg-dark-950/80 border border-gold-500/25 space-y-3">
-                  <div className="flex justify-between items-center text-xs">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 text-xs">
                     <div className="flex items-center gap-2 text-gray-300 font-mono">
                       <Sparkles className="w-4 h-4 text-gold-400" />
-                      <span>Evolución en el Reino:</span>
-                      <strong className="text-gold-300">{member.experiencePoints || 0} XP Acumulados</strong>
+                      <span>Evolución hacia Ascenso:</span>
+                      <strong className="text-gold-300">{member.experiencePoints || 0} / 5.000 XP</strong>
                     </div>
-                    <span className="font-mono text-gold-400 font-bold">{effectiveProgress}% hacia ascenso</span>
+                    <span className="font-mono text-gold-400 font-bold">
+                      {effectiveProgress}% {(member.experiencePoints || 0) >= 5000 ? '✓ Listo para solicitar ascenso' : 'hacia ascenso'}
+                    </span>
                   </div>
-                  <div className="w-full bg-dark-900 rounded-full h-2.5 overflow-hidden border border-gray-800">
+                  <div className="w-full bg-dark-900 rounded-full h-3 overflow-hidden border border-gray-800">
                     <div 
                       className="bg-gradient-to-r from-bordeaux-600 via-gold-500 to-gold-400 h-full rounded-full transition-all duration-700 shadow-sm shadow-gold-500/50"
-                      style={{ width: `${Math.min(100, Math.max(effectiveProgress > 0 ? 5 : 0, effectiveProgress))}%` }}
+                      style={{ width: `${Math.min(100, Math.max(effectiveProgress > 0 ? 3 : 0, effectiveProgress))}%` }}
                     />
                   </div>
                 </div>

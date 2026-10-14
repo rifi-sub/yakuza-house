@@ -297,8 +297,8 @@ export function KingdomAuthModal({
   const assignments = currentMember?.assignments || [];
   const pendingAssignments = assignments.filter(a => ['ASSIGNED', 'ACTIVE', 'DUE_SOON', 'OVERDUE'].includes(a.status));
   const completedAssignments = assignments.filter(a => ['COMPLETED_ON_TIME', 'COMPLETED_LATE', 'COMPLETED'].includes(a.status));
-  const taskProgressPct = assignments.length > 0 ? Math.round((completedAssignments.length / assignments.length) * 100) : 0;
-  const effectiveProgress = Math.max(currentMember?.overallProgress || 0, taskProgressPct);
+  const xp = currentMember?.experiencePoints || 0;
+  const effectiveProgress = Math.min(100, Math.round((xp / 5000) * 100));
 
   const displayedAssignments = taskFilter === 'pending'
     ? pendingAssignments
