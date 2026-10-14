@@ -67,6 +67,9 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
   useEffect(() => {
     if (currentMember) {
       setMember(currentMember);
+      if (Array.isArray(currentMember.journalEntries)) {
+        setJournalEntries(currentMember.journalEntries);
+      }
       setTab('profile');
     } else {
       const token = localStorage.getItem('yakuza_member_token');
@@ -99,6 +102,9 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
       });
       if (data && data.member) {
         setMember(data.member);
+        if (Array.isArray(data.member.journalEntries)) {
+          setJournalEntries(data.member.journalEntries);
+        }
         onAuthSuccess?.(data.member);
         setTab('profile');
       }
@@ -123,9 +129,14 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
       });
       if (Array.isArray(data)) {
         setJournalEntries(data);
+      } else if (data && Array.isArray(data.entries)) {
+        setJournalEntries(data.entries);
       }
     } catch (e) {
       console.error('Error cargando diario:', e);
+      if (member && Array.isArray(member.journalEntries) && member.journalEntries.length > 0) {
+        setJournalEntries(member.journalEntries);
+      }
     } finally {
       setLoadingJournal(false);
     }
@@ -172,6 +183,9 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
       if (data.token && data.member) {
         localStorage.setItem('yakuza_member_token', data.token);
         setMember(data.member);
+        if (Array.isArray(data.member.journalEntries)) {
+          setJournalEntries(data.member.journalEntries);
+        }
         onAuthSuccess?.(data.member);
         setTab('profile');
         setLoginPassword('');
@@ -298,7 +312,7 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
     if (!token) return;
     setSubmittingJournal(true);
     try {
-      await safeFetchJson(`${API_BASE}/api/kingdom/me/journal`, {
+      const createdEntry = await safeFetchJson(`${API_BASE}/api/kingdom/me/journal`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -308,13 +322,16 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
           category: newJournalCategory,
           title: newJournalTitle.trim() || 'Reflexión de servicio',
           content: newJournalContent.trim(),
-          date: new Date().toISOString().slice(0, 10)
+          date: new Date().toISOString()
         })
       });
 
       setNewJournalTitle('');
       setNewJournalContent('');
       setShowNewJournalModal(false);
+      if (createdEntry && createdEntry.id) {
+        setJournalEntries(prev => [createdEntry, ...prev.filter(e => e.id !== createdEntry.id)]);
+      }
       fetchJournal();
     } catch (err) {
       alert(err.message || 'Error al registrar entrada en el diario');
@@ -935,7 +952,11 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
                       <div className="space-y-4">
                         {filteredJournal.map((entry) => {
                           const catInfo = JOURNAL_CATEGORIES.find(c => c.id === entry.category) || JOURNAL_CATEGORIES[7];
-                          const isPrincess = entry.author === 'PRINCESA' || entry.author === 'ADMIN';
+                          const isPrincess = entry.authorRole === 'PRINCESA' || entry.authorRole === 'ADMIN' || entry.author === 'PRINCESA' || entry.author === 'ADMIN';
+                          const authorDisplay = isPrincess
+                            ? '👑 Princesa Yakuza'
+                            : `👤 ${entry.authorName || entry.author || member.alias || 'Sumiso'}`;
+                          const entryDate = entry.createdAt || entry.date;
                           return (
                             <div 
                               key={entry.id}
@@ -953,12 +974,12 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
                                   <span className={`text-[11px] font-mono uppercase tracking-wider font-bold ${
                                     isPrincess ? 'text-gold-400 flex items-center gap-1' : 'text-gray-400'
                                   }`}>
-                                    {isPrincess ? '👑 Princesa Yakuza' : `👤 ${entry.author || member.alias}`}
+                                    {authorDisplay}
                                   </span>
                                 </div>
 
                                 <span className="text-[11px] font-mono text-gray-500">
-                                  {entry.date ? new Date(entry.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' }) : ''}
+                                  {entryDate ? new Date(entryDate).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' }) : ''}
                                 </span>
                               </div>
 
