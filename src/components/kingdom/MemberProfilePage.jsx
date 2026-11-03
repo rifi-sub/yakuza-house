@@ -206,6 +206,15 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
     setSuccessMsg('');
     setLoading(true);
     try {
+      const formDataObj = {
+        telegram: reqTelegram.trim(),
+        ageStatus: reqAgeStatus.trim(),
+        skills: reqSkills,
+        preferences: reqPreferences.trim(),
+        motivation: reqMotivation.trim(),
+        submittedAt: new Date().toISOString()
+      };
+
       const payload = {
         alias: reqAlias.trim(),
         email: reqEmail.trim(),
@@ -215,14 +224,24 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
         targetGroupId: reqTargetGroupId || null,
         skills: reqSkills,
         preferences: reqPreferences.trim(),
-        motivation: reqMotivation.trim()
+        motivation: reqMotivation.trim(),
+        formData: formDataObj
       };
 
-      const data = await safeFetchJson(`${API_BASE}/api/kingdom/access-requests`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      let data;
+      try {
+        data = await safeFetchJson(`${API_BASE}/api/kingdom/request-access`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (err) {
+        data = await safeFetchJson(`${API_BASE}/api/kingdom/access-requests`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
 
       setSuccessMsg(data.message || '¡Tu solicitud ha sido entregada a la Princesa con éxito!');
       if (data.token && data.member) {
