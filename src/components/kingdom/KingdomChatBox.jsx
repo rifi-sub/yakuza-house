@@ -3,7 +3,8 @@ import { io } from 'socket.io-client';
 import { 
   Send, Crown, Pin, Check, CheckCheck, Sparkles, MessageCircle, 
   Circle, AlertCircle, RefreshCw, PinOff, Shield, User, ChevronDown, ChevronUp,
-  Camera, Lock, Flame, Eye, Image as ImageIcon, Video, X, UploadCloud
+  Camera, Lock, Flame, Eye, Image as ImageIcon, Video, X, UploadCloud,
+  Mic, Square, Volume2, Trash2, Headphones
 } from 'lucide-react';
 import { API_BASE, getSocketUrl, resolveMediaUrl } from '../../config';
 import { SecureMediaViewer } from './SecureMediaViewer';
@@ -45,6 +46,14 @@ export function KingdomChatBox({
   const [mediaCaption, setMediaCaption] = useState('');
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Estados para Grabación de Audio / Notas de Voz
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
+  const audioStreamRef = useRef(null);
 
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -299,13 +308,128 @@ export function KingdomChatBox({
     }
   };
 
-  // Gestión de subida de archivos multimedia protegidos
+  // Limpieza de streams de audio al desmontar
+  useEffect(() => {
+    return () => {
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Formateador de tiempo mm:ss
+  const formatDuration = (sec) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  // Iniciar grabación de audio en vivo
+  const startRecording = async () => {
+    try {
+      setErrorMsg('');
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setErrorMsg('Tu navegador no soporta grabación de audio.');
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
+
+      const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4'];
+      let selectedMime = '';
+      for (const m of mimeTypes) {
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) {
+          selectedMime = m;
+          break;
+        }
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, selectedMime ? { mimeType: selectedMime } : undefined);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const mime = selectedMime || mediaRecorder.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mime });
+        const ext = mime.includes('mp4') ? 'm4a' : (mime.includes('ogg') ? 'ogg' : 'webm');
+        const audioFile = new File([audioBlob], `nota_voz_${Date.now()}.${ext}`, { type: mime });
+
+        setSelectedFile(audioFile);
+        setFilePreviewUrl(URL.createObjectURL(audioBlob));
+        setIsViewOnce(true);
+        setMediaCaption('');
+        setUploadModalOpen(true);
+
+        if (audioStreamRef.current) {
+          audioStreamRef.current.getTracks().forEach((t) => t.stop());
+          audioStreamRef.current = null;
+        }
+      };
+
+      mediaRecorder.start(200);
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('[Microphone error]:', err);
+      setErrorMsg('No se pudo acceder al micrófono. Por favor revisa los permisos del navegador.');
+    }
+  };
+
+  // Finalizar grabación de audio y preparar envío
+  const stopRecording = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  // Cancelar grabación y descartar audio
+  const cancelRecording = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current.stop();
+    }
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach((t) => t.stop());
+      audioStreamRef.current = null;
+    }
+    audioChunksRef.current = [];
+    setIsRecording(false);
+    setRecordingDuration(0);
+  };
+
+  // Gestión de subida de archivos multimedia protegidos (fotos, vídeos y audios)
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-      setErrorMsg('Por favor selecciona una imagen o vídeo válido.');
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    const isAudio = file.type.startsWith('audio/');
+
+    if (!isImage && !isVideo && !isAudio) {
+      setErrorMsg('Por favor selecciona una imagen, vídeo o archivo de audio válido (MP3, WAV, M4A, OGG, WEBM).');
       return;
     }
 
@@ -315,7 +439,7 @@ export function KingdomChatBox({
     }
 
     setSelectedFile(file);
-    if (file.type.startsWith('image/')) {
+    if (isImage || isAudio) {
       setFilePreviewUrl(URL.createObjectURL(file));
     } else {
       setFilePreviewUrl(null);
@@ -567,7 +691,7 @@ export function KingdomChatBox({
                             <Flame className="w-4 h-4 text-gold-400/80 shrink-0" />
                             <div className="space-y-0.5">
                               <p className="text-[11px] font-mono font-bold text-gold-300">
-                                {msg.mediaType === 'VIDEO' ? '🎥 Vídeo efímero enviado' : '📸 Foto efímera enviada'}
+                                {msg.mediaType === 'VIDEO' ? '🎥 Vídeo efímero enviado' : (msg.mediaType === 'AUDIO' ? '🎙️ Audio efímero enviado' : '📸 Foto efímera enviada')}
                               </p>
                               <p className="text-[10px] font-mono text-gray-500">
                                 ✓ Visualizado y destruido para el receptor
@@ -579,7 +703,7 @@ export function KingdomChatBox({
                             <Lock className="w-4 h-4 text-gold-400 shrink-0 animate-pulse" />
                             <div className="space-y-0.5">
                               <p className="text-[11px] font-mono font-bold text-gold-200">
-                                {msg.mediaType === 'VIDEO' ? '🎥 Vídeo de 1 sola visualización' : '📸 Foto de 1 sola visualización'}
+                                {msg.mediaType === 'VIDEO' ? '🎥 Vídeo de 1 sola visualización' : (msg.mediaType === 'AUDIO' ? '🎙️ Audio de 1 sola escucha' : '📸 Foto de 1 sola visualización')}
                               </p>
                               <p className="text-[10px] font-mono text-gold-400/70">
                                 ⏳ Pendiente de apertura por el destinatario
@@ -594,7 +718,7 @@ export function KingdomChatBox({
                             <Flame className="w-4 h-4 text-red-400/80 shrink-0" />
                             <div className="space-y-0.5">
                               <p className="text-[11px] font-mono font-bold text-gray-300">
-                                {msg.mediaType === 'VIDEO' ? '🎥 Vídeo efímero destruido' : '📸 Foto efímera destruida'}
+                                {msg.mediaType === 'VIDEO' ? '🎥 Vídeo efímero destruido' : (msg.mediaType === 'AUDIO' ? '🎙️ Audio efímero destruido' : '📸 Foto efímera destruida')}
                               </p>
                               <p className="text-[10px] font-mono text-gray-500">
                                 ✓ Ya visualizado de forma irreversible
@@ -609,20 +733,24 @@ export function KingdomChatBox({
                           >
                             <div className="flex items-center gap-2.5">
                               <div className="w-8 h-8 rounded-full bg-gold-500/20 border border-gold-400/50 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-sm shadow-gold-500/30">
-                                <Eye className="w-4 h-4 text-gold-300 animate-pulse" />
+                                {msg.mediaType === 'AUDIO' ? (
+                                  <Headphones className="w-4 h-4 text-gold-300 animate-pulse" />
+                                ) : (
+                                  <Eye className="w-4 h-4 text-gold-300 animate-pulse" />
+                                )}
                               </div>
                               <div>
                                 <p className="font-mono font-bold text-xs text-gold-200 flex items-center gap-1.5">
-                                  <span>{msg.mediaType === 'VIDEO' ? '🎥 Vídeo Protegido' : '📸 Foto Protegida'}</span>
+                                  <span>{msg.mediaType === 'VIDEO' ? '🎥 Vídeo Protegido' : (msg.mediaType === 'AUDIO' ? '🎙️ Audio Protegido' : '📸 Foto Protegida')}</span>
                                   <span className="text-[9px] px-1.5 py-0.2 rounded bg-gold-500/30 text-gold-300 border border-gold-400/40 uppercase font-mono">1 vez</span>
                                 </p>
                                 <p className="text-[10px] text-gold-400/80 font-mono">
-                                  Toca para revelar · Anti-captura activo
+                                  {msg.mediaType === 'AUDIO' ? 'Toca para escuchar · Anti-captura activo' : 'Toca para revelar · Anti-captura activo'}
                                 </p>
                               </div>
                             </div>
                             <span className="text-[10px] font-mono tracking-wider bg-gold-400 text-black px-2.5 py-1 rounded-lg font-bold shadow hover:bg-gold-300">
-                              VER
+                              {msg.mediaType === 'AUDIO' ? 'ESCUCHAR' : 'VER'}
                             </span>
                           </button>
                         )
@@ -639,6 +767,17 @@ export function KingdomChatBox({
                           controls
                           className="w-full max-h-64 bg-black rounded-xl"
                         />
+                      ) : msg.mediaType === 'AUDIO' ? (
+                        <div className="p-3 bg-black/60 rounded-xl border border-gold-500/30 flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gold-500/20 border border-gold-400/40 flex items-center justify-center shrink-0">
+                            <Volume2 className="w-4 h-4 text-gold-300" />
+                          </div>
+                          <audio
+                            src={resolveMediaUrl(msg.mediaUrl)}
+                            controls
+                            className="w-full h-8"
+                          />
+                        </div>
                       ) : (
                         <img
                           src={resolveMediaUrl(msg.mediaUrl)}
@@ -728,7 +867,7 @@ export function KingdomChatBox({
           <input
             type="file"
             ref={fileInputRef}
-            accept="image/*,video/*"
+            accept="image/*,video/*,audio/*"
             onChange={handleFileChange}
             className="hidden"
           />
@@ -737,32 +876,76 @@ export function KingdomChatBox({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             className="p-3 rounded-xl border border-gold-500/30 bg-[#0c0508] text-gold-400 hover:text-gold-200 hover:border-gold-400 hover:bg-gold-500/10 transition-all shadow-md active:scale-95 shrink-0"
-            title="Enviar foto o vídeo seguro (1 sola visualización)"
+            title="Enviar foto, vídeo o archivo de audio seguro"
           >
             <Camera className="w-4 h-4" />
           </button>
 
-          <div className="flex-1 relative">
-            <textarea
-              rows={1}
-              value={inputText}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                userRole === 'ADMIN'
-                  ? 'Escribe una orden o mensaje al sumiso (Enter para enviar)...'
-                  : 'Escribe tu respuesta solemne a la Princesa (Enter para enviar)...'
-              }
-              className="w-full bg-[#080205] border border-gold-500/30 focus:border-gold-400 text-[#f5ebe1] placeholder-gray-600 rounded-xl px-3.5 py-2.5 text-xs font-sans resize-none focus:outline-none focus:ring-1 focus:ring-gold-400/50 max-h-28 custom-scrollbar leading-relaxed"
-            />
-          </div>
+          <button
+            type="button"
+            onClick={startRecording}
+            disabled={isRecording || sending}
+            className={`p-3 rounded-xl border transition-all shadow-md active:scale-95 shrink-0 ${
+              isRecording
+                ? 'bg-red-950/80 border-red-500 text-red-300 animate-pulse'
+                : 'border-gold-500/30 bg-[#0c0508] text-gold-400 hover:text-gold-200 hover:border-gold-400 hover:bg-gold-500/10'
+            }`}
+            title="Grabar nota de voz efímera"
+          >
+            <Mic className="w-4 h-4" />
+          </button>
+
+          {isRecording ? (
+            <div className="flex-1 flex items-center justify-between gap-3 bg-[#1e0a15] border border-red-500/50 rounded-xl px-4 py-2 text-white animate-pulse min-h-[44px]">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-red-500 animate-ping" />
+                <span className="text-xs font-mono font-bold text-red-300">
+                  Grabando audio... {formatDuration(recordingDuration)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={cancelRecording}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                  title="Descartar grabación"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={stopRecording}
+                  className="py-1 px-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold flex items-center gap-1.5 shadow-md shadow-red-900/40 active:scale-95 transition-all"
+                  title="Finalizar y revisar nota de voz"
+                >
+                  <Square className="w-3 h-3 fill-current" />
+                  <span>Listo</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 relative">
+              <textarea
+                rows={1}
+                value={inputText}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  userRole === 'ADMIN'
+                    ? 'Escribe una orden o mensaje al sumiso (Enter para enviar)...'
+                    : 'Escribe tu respuesta solemne a la Princesa (Enter para enviar)...'
+                }
+                className="w-full bg-[#080205] border border-gold-500/30 focus:border-gold-400 text-[#f5ebe1] placeholder-gray-600 rounded-xl px-3.5 py-2.5 text-xs font-sans resize-none focus:outline-none focus:ring-1 focus:ring-gold-400/50 max-h-28 custom-scrollbar leading-relaxed"
+              />
+            </div>
+          )}
 
           <button
             type="button"
             onClick={() => handleSendMessage()}
-            disabled={!inputText.trim() || sending}
+            disabled={!inputText.trim() || sending || isRecording}
             className={`p-3 rounded-xl border flex items-center justify-center transition-all shadow-lg active:scale-95 shrink-0 ${
-              inputText.trim() && !sending
+              inputText.trim() && !sending && !isRecording
                 ? 'bg-gradient-to-r from-bordeaux-700 to-bordeaux-600 border-gold-400 text-gold-200 hover:text-white shadow-bordeaux-900/50'
                 : 'bg-dark-950 border-gray-800 text-gray-600 cursor-not-allowed'
             }`}
@@ -788,9 +971,19 @@ export function KingdomChatBox({
           <div className="w-full max-w-md bg-[#12070c] border border-gold-500/40 rounded-2xl shadow-2xl p-5 space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-gold-500/20 pb-3">
               <div className="flex items-center gap-2">
-                <Camera className="w-4 h-4 text-gold-400" />
+                {selectedFile?.type?.startsWith('audio/') ? (
+                  <Headphones className="w-4 h-4 text-gold-400" />
+                ) : selectedFile?.type?.startsWith('video/') ? (
+                  <Video className="w-4 h-4 text-gold-400" />
+                ) : (
+                  <Camera className="w-4 h-4 text-gold-400" />
+                )}
                 <h3 className="font-serif font-bold text-sm text-gold-200">
-                  Enviar Archivo Multimedia
+                  {selectedFile?.type?.startsWith('audio/')
+                    ? 'Enviar Nota de Voz / Audio'
+                    : selectedFile?.type?.startsWith('video/')
+                    ? 'Enviar Vídeo Seguro'
+                    : 'Enviar Fotografía Segura'}
                 </h3>
               </div>
               <button
@@ -803,13 +996,32 @@ export function KingdomChatBox({
             </div>
 
             {/* Previsualización del archivo */}
-            <div className="rounded-xl overflow-hidden bg-black/60 border border-gold-500/20 p-2 flex flex-col items-center justify-center min-h-[140px]">
-              {filePreviewUrl ? (
+            <div className="rounded-xl overflow-hidden bg-black/60 border border-gold-500/20 p-3 flex flex-col items-center justify-center min-h-[140px]">
+              {selectedFile?.type?.startsWith('image/') && filePreviewUrl ? (
                 <img
                   src={filePreviewUrl}
                   alt="Preview"
                   className="max-h-48 rounded-lg object-contain"
                 />
+              ) : selectedFile?.type?.startsWith('audio/') ? (
+                <div className="flex flex-col items-center justify-center py-3 px-2 space-y-3 text-gold-300 w-full">
+                  <div className="w-14 h-14 rounded-full bg-gold-500/10 border border-gold-400/40 flex items-center justify-center shadow-lg shadow-gold-500/10">
+                    <Volume2 className="w-7 h-7 text-gold-400 animate-pulse" />
+                  </div>
+                  <div className="text-center px-2">
+                    <span className="text-xs font-mono font-bold text-gray-200 block truncate max-w-xs">{selectedFile.name}</span>
+                    <span className="text-[10px] font-mono text-gold-400/80">
+                      {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Archivo de Audio Cifrado
+                    </span>
+                  </div>
+                  {filePreviewUrl && (
+                    <audio
+                      controls
+                      src={filePreviewUrl}
+                      className="w-full max-w-xs h-9 accent-gold-500 rounded-lg"
+                    />
+                  )}
+                </div>
               ) : selectedFile?.type?.startsWith('video/') ? (
                 <div className="flex flex-col items-center justify-center py-4 space-y-2 text-gold-300">
                   <Video className="w-10 h-10 text-gold-400 animate-pulse" />
@@ -842,7 +1054,7 @@ export function KingdomChatBox({
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4 text-gold-400" />
                   <span className="text-xs font-mono font-bold text-gold-200">
-                    Ver 1 Sola Vez (Blindado)
+                    {selectedFile?.type?.startsWith('audio/') ? 'Escuchar 1 Sola Vez (Blindado)' : 'Ver 1 Sola Vez (Blindado)'}
                   </span>
                 </div>
                 <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${isViewOnce ? 'bg-gold-500' : 'bg-gray-700'}`}>
@@ -851,7 +1063,9 @@ export function KingdomChatBox({
               </div>
               <p className="text-[10px] font-mono text-gray-400 mt-1.5 leading-relaxed">
                 {isViewOnce
-                  ? '🔒 Destrucción inmediata tras visualizar. Anti-captura activo. Retención de seguridad 48h en el servidor sin acceso público.'
+                  ? selectedFile?.type?.startsWith('audio/')
+                    ? '🔒 Destrucción inmediata tras escuchar. Anti-captura activo. Retención de seguridad 48h en el servidor sin acceso público.'
+                    : '🔒 Destrucción inmediata tras visualizar. Anti-captura activo. Retención de seguridad 48h en el servidor sin acceso público.'
                   : 'El archivo permanecerá accesible normalmente en el chat.'}
               </p>
             </div>
@@ -892,7 +1106,7 @@ export function KingdomChatBox({
                 ) : (
                   <>
                     <UploadCloud className="w-3.5 h-3.5" />
-                    <span>Enviar a la Bóveda</span>
+                    <span>{selectedFile?.type?.startsWith('audio/') ? 'Transmitir Audio' : 'Enviar a la Bóveda'}</span>
                   </>
                 )}
               </button>

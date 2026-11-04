@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Shield, Eye, Flame, AlertTriangle, X, Lock } from 'lucide-react';
+import { Shield, Eye, Flame, AlertTriangle, X, Lock, Volume2, Headphones } from 'lucide-react';
 import { API_BASE, resolveMediaUrl } from '../../config';
 
 export function SecureMediaViewer({
@@ -12,8 +12,9 @@ export function SecureMediaViewer({
   onBurned
 }) {
   const [isHolding, setIsHolding] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(message.mediaType === 'VIDEO' ? 30 : 10);
-  const [totalTime] = useState(message.mediaType === 'VIDEO' ? 30 : 10);
+  const initialTime = (message.mediaType === 'VIDEO' || message.mediaType === 'AUDIO') ? 30 : 10;
+  const [timeLeft, setTimeLeft] = useState(initialTime);
+  const [totalTime] = useState(initialTime);
   const [isBurned, setIsBurned] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [securityAlert, setSecurityAlert] = useState(false);
@@ -23,6 +24,7 @@ export function SecureMediaViewer({
 
   const timerRef = useRef(null);
   const videoRef = useRef(null);
+  const audioRef = useRef(null);
   const burnedRef = useRef(false);
 
   // 1. Cargar archivo multimedia en memoria RAM cifrada (sin exponer URL directa)
@@ -134,6 +136,9 @@ export function SecureMediaViewer({
     if (message.mediaType === 'VIDEO' && videoRef.current) {
       videoRef.current.play().catch(() => {});
     }
+    if (message.mediaType === 'AUDIO' && audioRef.current) {
+      audioRef.current.play().catch(() => {});
+    }
 
     if (!timerRef.current) {
       timerRef.current = setInterval(() => {
@@ -158,6 +163,9 @@ export function SecureMediaViewer({
     }
     if (message.mediaType === 'VIDEO' && videoRef.current) {
       videoRef.current.pause();
+    }
+    if (message.mediaType === 'AUDIO' && audioRef.current) {
+      audioRef.current.pause();
     }
   };
 
@@ -252,20 +260,26 @@ export function SecureMediaViewer({
           {!isHolding && (
             <div className="absolute inset-0 z-30 bg-black/90 border border-gold-500/30 rounded-3xl flex flex-col items-center justify-center text-center p-6 space-y-4 cursor-pointer backdrop-blur-md">
               <div className="w-16 h-16 rounded-full border border-gold-400/50 bg-[#12070c] flex items-center justify-center shadow-lg shadow-gold-500/20 animate-pulse">
-                <Eye className="w-8 h-8 text-gold-300" />
+                {message.mediaType === 'AUDIO' ? (
+                  <Headphones className="w-8 h-8 text-gold-300" />
+                ) : (
+                  <Eye className="w-8 h-8 text-gold-300" />
+                )}
               </div>
               <div className="space-y-1">
                 <h4 className="font-serif font-bold text-base text-gold-100">
-                  {hasStarted ? 'Visualización en Pausa' : 'Contenido de 1 Sola Visualización'}
+                  {hasStarted ? 'Reproducción en Pausa' : (message.mediaType === 'AUDIO' ? 'Audio de 1 Sola Escucha' : 'Contenido de 1 Sola Visualización')}
                 </h4>
                 <p className="text-xs font-mono text-gray-400 max-w-xs leading-relaxed">
                   {hasStarted
-                    ? 'Mantén pulsado con el dedo o ratón para reanudar el tiempo restante.'
-                    : 'Mantén pulsado sobre la pantalla para revelar. Al soltar o agotarse el tiempo se destruirá.'}
+                    ? 'Mantén pulsado con el dedo o ratón para reanudar la reproducción.'
+                    : message.mediaType === 'AUDIO'
+                    ? 'Mantén pulsado sobre la pantalla para escuchar. Al soltar o agotarse el tiempo se destruirá de forma permanente.'
+                    : 'Mantén pulsado sobre la pantalla para revelar. Al soltar o agotarse el tiempo se destruirá de forma permanente.'}
                 </p>
               </div>
               <div className="py-2 px-5 rounded-full bg-gold-500/20 border border-gold-400/40 text-gold-300 text-xs font-mono uppercase tracking-widest font-bold">
-                👆 Mantén presionado para ver
+                {message.mediaType === 'AUDIO' ? '🎧 Mantén presionado para escuchar' : '👆 Mantén presionado para ver'}
               </div>
             </div>
           )}
@@ -290,6 +304,55 @@ export function SecureMediaViewer({
                   isHolding ? 'opacity-100 filter-none' : 'opacity-0 blur-2xl'
                 }`}
               />
+            ) : message.mediaType === 'AUDIO' ? (
+              <div className={`flex flex-col items-center justify-center space-y-6 p-6 transition-all duration-300 ${
+                isHolding ? 'opacity-100 filter-none' : 'opacity-0 blur-2xl'
+              }`}>
+                <audio
+                  ref={audioRef}
+                  src={mediaBlobUrl}
+                  playsInline
+                  controls={false}
+                  onLoadedMetadata={(e) => {
+                    if (e.target.duration && isFinite(e.target.duration)) {
+                      setTimeLeft(Math.max(10, Math.ceil(e.target.duration)));
+                    }
+                  }}
+                  onEnded={() => burnAndClose('audio_ended')}
+                />
+
+                <div className={`w-28 h-28 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
+                  isHolding
+                    ? 'border-gold-400 bg-gold-500/20 shadow-2xl shadow-gold-500/50 scale-105'
+                    : 'border-gold-500/40 bg-dark-950/80 shadow-lg'
+                }`}>
+                  <Volume2 className={`w-12 h-12 text-gold-300 ${isHolding ? 'animate-pulse' : 'opacity-70'}`} />
+                </div>
+
+                {/* Barras de ecualizador de audio blindado */}
+                <div className="flex items-center gap-1.5 h-14 px-4 py-2 rounded-xl bg-black/60 border border-gold-500/20">
+                  {[35, 70, 50, 95, 60, 85, 45, 100, 75, 40, 80, 65, 90, 45, 70, 55].map((h, i) => (
+                    <span
+                      key={i}
+                      className={`w-1 rounded-full transition-all duration-150 ${
+                        isHolding ? 'bg-gradient-to-t from-gold-600 via-gold-400 to-amber-200 shadow-sm shadow-gold-400/50' : 'bg-gray-700/60'
+                      }`}
+                      style={{
+                        height: isHolding ? `${Math.max(20, Math.min(100, h * (0.5 + ((i % 4) * 0.18))))}%` : '20%'
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-serif font-bold text-gold-200">
+                    Mensaje de Voz Cifrado
+                  </p>
+                  <p className="text-xs font-mono text-gold-400/80">
+                    {isHolding ? 'Reproduciendo audio seguro en memoria...' : 'Mantén pulsado para escuchar'}
+                  </p>
+                </div>
+              </div>
             ) : (
               <img
                 src={mediaBlobUrl}
