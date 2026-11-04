@@ -17,6 +17,70 @@ const SUMISO_QUICK_RESPONSES = [
   "🕯️ Permanezco a la espera de sus órdenes."
 ];
 
+// Reproductor para que el remitente pueda volver a escuchar su propio audio efímero
+// (no consume la escucha única del destinatario). Carga el archivo solo al pulsar.
+function OwnAudioPlayer({ message, token }) {
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [blobUrl]);
+
+  const handleLoad = async () => {
+    if (loading) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(resolveMediaUrl(message.mediaUrl), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        if (res.status === 404 || res.status === 410) {
+          throw new Error('Este audio ya no está disponible (se elimina del servidor a las 48h).');
+        }
+        throw new Error('No se pudo cargar el audio.');
+      }
+      const blob = await res.blob();
+      setBlobUrl(URL.createObjectURL(blob));
+    } catch (err) {
+      setError(err.message || 'No se pudo cargar el audio.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (blobUrl) {
+    return (
+      <audio
+        src={blobUrl}
+        controls
+        autoPlay
+        controlsList="nodownload"
+        className="w-full h-8 mt-2"
+      />
+    );
+  }
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={handleLoad}
+        disabled={loading}
+        className="flex items-center gap-1.5 text-[10px] font-mono font-bold tracking-wider px-2.5 py-1 rounded-lg bg-gold-500/20 hover:bg-gold-500/30 border border-gold-400/40 text-gold-200 disabled:opacity-60 transition-colors"
+      >
+        <Headphones className="w-3 h-3" />
+        {loading ? 'CARGANDO...' : 'ESCUCHAR MI AUDIO'}
+      </button>
+      {error && <p className="mt-1 text-[10px] font-mono text-red-400">{error}</p>}
+    </div>
+  );
+}
+
 export function KingdomChatBox({
   memberId,
   token,
@@ -689,25 +753,29 @@ export function KingdomChatBox({
                         (msg.viewedAt || (msg.viewCount > 0)) ? (
                           <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-black/40 border border-gold-500/20 text-gray-400">
                             <Flame className="w-4 h-4 text-gold-400/80 shrink-0" />
-                            <div className="space-y-0.5">
+                            <div className="space-y-0.5 flex-1 min-w-0">
                               <p className="text-[11px] font-mono font-bold text-gold-300">
                                 {msg.mediaType === 'VIDEO' ? '🎥 Vídeo efímero enviado' : (msg.mediaType === 'AUDIO' ? '🎙️ Audio efímero enviado' : '📸 Foto efímera enviada')}
                               </p>
                               <p className="text-[10px] font-mono text-gray-500">
-                                ✓ Visualizado y destruido para el receptor
+                                {msg.mediaType === 'AUDIO'
+                                  ? '✓ Escuchado por el receptor (ya no puede volver a abrirlo)'
+                                  : '✓ Visualizado y destruido para el receptor'}
                               </p>
+                              {msg.mediaType === 'AUDIO' && <OwnAudioPlayer message={msg} token={effectiveToken} />}
                             </div>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-black/40 border border-gold-500/30 text-gold-200">
                             <Lock className="w-4 h-4 text-gold-400 shrink-0 animate-pulse" />
-                            <div className="space-y-0.5">
+                            <div className="space-y-0.5 flex-1 min-w-0">
                               <p className="text-[11px] font-mono font-bold text-gold-200">
                                 {msg.mediaType === 'VIDEO' ? '🎥 Vídeo de 1 sola visualización' : (msg.mediaType === 'AUDIO' ? '🎙️ Audio de 1 sola escucha' : '📸 Foto de 1 sola visualización')}
                               </p>
                               <p className="text-[10px] font-mono text-gold-400/70">
                                 ⏳ Pendiente de apertura por el destinatario
                               </p>
+                              {msg.mediaType === 'AUDIO' && <OwnAudioPlayer message={msg} token={effectiveToken} />}
                             </div>
                           </div>
                         )
