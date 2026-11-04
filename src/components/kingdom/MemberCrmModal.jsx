@@ -22,6 +22,13 @@ const JOURNAL_CATEGORIES = [
   { id: 'GENERAL', label: 'Nota General', icon: '📝', color: 'border-gray-500/50 text-gray-300 bg-gray-900/50' }
 ];
 
+// Convierte un texto libre (separado por comas, punto y coma o saltos de línea) en etiquetas
+const splitTags = (text) =>
+  String(text || '')
+    .split(/[\n,;]+/)
+    .map(t => t.trim())
+    .filter(Boolean);
+
 export function MemberCrmModal({ 
   memberId, 
   token, 
@@ -107,10 +114,14 @@ export function MemberCrmModal({
     dueDays: 3,
     pointsAwarded: 20,
     priority: 'MEDIUM',
-    customInstructions: ''
+    customInstructions: '',
+    startDate: ''
   });
   const [showNewActivityModal, setShowNewActivityModal] = useState(false);
   const [addingObjective, setAddingObjective] = useState(false);
+  // Reprogramación inline de una tarea ya programada
+  const [reschedulingId, setReschedulingId] = useState(null);
+  const [rescheduleValue, setRescheduleValue] = useState('');
 
   // Estado para nueva habilidad
   const [newSkill, setNewSkill] = useState({
@@ -124,6 +135,10 @@ export function MemberCrmModal({
   // Nueva nota interna
   const [newNote, setNewNote] = useState('');
   const [addingNote, setAddingNote] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [editingNoteText, setEditingNoteText] = useState('');
+  const [savingNoteEdit, setSavingNoteEdit] = useState(false);
+  const [noteSearch, setNoteSearch] = useState('');
 
   // Cerrar con Escape
   useEffect(() => {
@@ -390,9 +405,16 @@ export function MemberCrmModal({
       alert('Introduce un título para la actividad');
       return;
     }
+    const scheduledStart = newObjective.startDate ? new Date(newObjective.startDate) : null;
+    if (scheduledStart && (isNaN(scheduledStart.getTime()) || scheduledStart.getTime() <= Date.now())) {
+      alert('La fecha de programación debe ser futura. Déjala vacía para asignar la tarea ahora.');
+      return;
+    }
+
     setAddingObjective(true);
     try {
-      const dueDate = new Date();
+      // El plazo se cuenta desde el inicio programado (o desde ahora si se asigna al instante)
+      const dueDate = new Date(scheduledStart || Date.now());
       dueDate.setDate(dueDate.getDate() + parseInt(newObjective.dueDays || 3, 10));
 
       const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assign`, {
@@ -410,6 +432,7 @@ export function MemberCrmModal({
           pointsAwarded: parseFloat(newObjective.pointsAwarded) || 0,
           status: 'ACTIVE',
           dueDate: dueDate.toISOString(),
+          ...(scheduledStart && { startDate: scheduledStart.toISOString() }),
           priority: newObjective.priority || 'MEDIUM'
         })
       });
@@ -424,11 +447,14 @@ export function MemberCrmModal({
         dueDays: 3,
         pointsAwarded: 20,
         priority: 'MEDIUM',
-        customInstructions: ''
+        customInstructions: '',
+        startDate: ''
       });
       fetchMemberDetail();
       if (onRefreshList) onRefreshList();
-      alert('¡Actividad asignada con éxito!');
+      alert(scheduledStart
+        ? `¡Actividad programada para el ${scheduledStart.toLocaleString('es-ES')}!`
+        : '¡Actividad asignada con éxito!');
     } catch (err) {
       alert(err.message);
     } finally {
@@ -448,6 +474,33 @@ export function MemberCrmModal({
         body: JSON.stringify({ status: nextStatus })
       });
       if (!res.ok) throw new Error('Error actualizando estado');
+      fetchMemberDetail();
+      if (onRefreshList) onRefreshList();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Reprogramar una actividad ya programada (fecha vacía => activarla ahora)
+  const handleRescheduleAssignment = async (assignmentId) => {
+    try {
+      const newStart = rescheduleValue ? new Date(rescheduleValue) : null;
+      if (newStart && isNaN(newStart.getTime())) {
+        alert('Fecha no válida');
+        return;
+      }
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assignments/${assignmentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ startDate: newStart ? newStart.toISOString() : null })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Error al reprogramar');
+      setReschedulingId(null);
+      setRescheduleValue('');
       fetchMemberDetail();
       if (onRefreshList) onRefreshList();
     } catch (err) {
@@ -534,7 +587,7 @@ export function MemberCrmModal({
     if (!newNote.trim()) return;
     setAddingNote(true);
     try {
-      await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/notes`, {
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/notes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -542,25 +595,67 @@ export function MemberCrmModal({
         },
         body: JSON.stringify({ note: newNote.trim() })
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Error guardando nota');
       setNewNote('');
       fetchMemberDetail();
     } catch (err) {
-      alert('Error guardando nota');
+      alert(err.message || 'Error guardando nota');
     } finally {
       setAddingNote(false);
     }
   };
 
+  // Editar nota existente
+  const handleStartEditNote = (n) => {
+    setEditingNoteId(n.id);
+    setEditingNoteText(n.note || '');
+  };
+
+  const handleCancelEditNote = () => {
+    setEditingNoteId(null);
+    setEditingNoteText('');
+  };
+
+  const handleSaveNoteEdit = async () => {
+    if (!editingNoteId || !editingNoteText.trim()) return;
+    setSavingNoteEdit(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/notes/${editingNoteId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ note: editingNoteText.trim() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Error actualizando la nota');
+      handleCancelEditNote();
+      fetchMemberDetail();
+    } catch (err) {
+      alert(err.message || 'Error actualizando la nota');
+    } finally {
+      setSavingNoteEdit(false);
+    }
+  };
+
   // Eliminar nota
   const handleDeleteNote = async (noteId) => {
+    if (!confirm('¿Eliminar esta nota confidencial?')) return;
     try {
-      await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/notes/${noteId}`, {
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/members/${memberId}/notes/${noteId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Error eliminando nota');
+      }
+      if (editingNoteId === noteId) handleCancelEditNote();
       fetchMemberDetail();
     } catch (err) {
-      alert('Error eliminando nota');
+      alert(err.message || 'Error eliminando nota');
     }
   };
 
@@ -1152,7 +1247,59 @@ export function MemberCrmModal({
         {/* ----------------------------------------------------------------------- */}
         {/* BARRA DE ETIQUETAS HORIZONTAL FULL-WIDTH (PREFERENCIAS, MOTIVACIÓN...)  */}
         {/* ----------------------------------------------------------------------- */}
-        {(formData.preferences || formData.motivation || formData.fetishes || formData.triggers) && (
+        {/* PANEL RÁPIDO: LÍMITES, TRIGGERS Y FETICHES (siempre visible) */}
+        <div className="bg-[#12080c] rounded-2xl border border-red-900/40 p-4 shadow-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-red-400" />
+              <h3 className="font-brand font-bold text-sm text-white">Límites, triggers y fetiches</h3>
+              <span className="text-[10px] font-mono text-gray-500 hidden sm:inline">consulta rápida</span>
+            </div>
+            <button
+              onClick={() => setShowEditDrawer(true)}
+              className="text-[11px] font-mono text-gray-500 hover:text-gold-300 underline"
+            >
+              Editar
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[
+              { key: 'limits', label: 'Límites', Icon: AlertTriangle, iconColor: 'text-red-400', box: 'border-red-500/40 bg-red-950/20', chip: 'bg-red-500/15 border-red-500/40 text-red-200' },
+              { key: 'triggers', label: 'Triggers', Icon: Zap, iconColor: 'text-gold-400', box: 'border-gold-500/30 bg-gold-950/10', chip: 'bg-gold-500/15 border-gold-500/40 text-gold-200' },
+              { key: 'fetishes', label: 'Fetiches', Icon: Flame, iconColor: 'text-amber-400', box: 'border-amber-500/30 bg-amber-950/10', chip: 'bg-amber-500/15 border-amber-500/40 text-amber-200' }
+            ].map(({ key, label, Icon, iconColor, box, chip }) => {
+              const tags = splitTags(formData[key]);
+              return (
+                <div key={key} className={`rounded-xl border p-3 ${box}`}>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Icon className={`w-3.5 h-3.5 ${iconColor}`} />
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-300">{label}</span>
+                    <span className="text-[10px] font-mono text-gray-600">({tags.length})</span>
+                  </div>
+                  {tags.length === 0 ? (
+                    <button
+                      onClick={() => setShowEditDrawer(true)}
+                      className="text-[11px] font-mono text-gray-500 hover:text-gold-300 italic"
+                    >
+                      Sin definir — añadir
+                    </button>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {tags.map((t, i) => (
+                        <span key={`${t}-${i}`} className={`px-2 py-0.5 rounded-full border text-[11px] font-sans ${chip}`}>
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {(formData.preferences || formData.motivation) && (
           <div className="bg-[#12080c] rounded-2xl border border-[#311721] p-3.5 flex flex-wrap items-center gap-3 shadow-xl">
             
             {formData.preferences && (
@@ -1171,21 +1318,6 @@ export function MemberCrmModal({
               </div>
             )}
 
-            {formData.fetishes && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#170a10] border border-[#2d151e]">
-                <Flame className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-xs font-sans text-amber-300 font-bold">Fetiches:</span>
-                <span className="text-xs font-sans text-ivory-200">{formData.fetishes}</span>
-              </div>
-            )}
-
-            {formData.triggers && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#170a10] border border-[#2d151e]">
-                <Zap className="w-3.5 h-3.5 text-gold-400" />
-                <span className="text-xs font-sans text-gold-300 font-bold">Triggers:</span>
-                <span className="text-xs font-sans text-ivory-200">{formData.triggers}</span>
-              </div>
-            )}
 
             <button
               onClick={() => setShowEditDrawer(true)}
@@ -1585,6 +1717,7 @@ export function MemberCrmModal({
                     ) : (
                       assignments.map(a => {
                         const isDone = a.status === 'COMPLETED' || a.status === 'COMPLETED_ON_TIME';
+                        const isScheduled = a.status === 'SCHEDULED';
                         return (
                           <tr key={a.id} className="hover:bg-white/[0.02] transition-colors">
                             <td className="py-3 font-semibold text-white max-w-[200px] truncate pr-2">
@@ -1602,10 +1735,40 @@ export function MemberCrmModal({
                             <td className="py-3">
                               <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
                                 isDone ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                                isScheduled ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
                                 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                               }`}>
-                                {isDone ? 'Completada' : 'Asignada'}
+                                {isDone ? 'Completada' : (isScheduled ? 'Programada' : 'Asignada')}
                               </span>
+                              {isScheduled && a.startDate && (
+                                <span className="block mt-1 text-[10px] font-mono text-purple-300/80 whitespace-nowrap">
+                                  ⏰ {new Date(a.startDate).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                              {isScheduled && reschedulingId === a.id && (
+                                <div className="mt-1.5 flex items-center gap-1">
+                                  <input
+                                    type="datetime-local"
+                                    value={rescheduleValue}
+                                    onChange={e => setRescheduleValue(e.target.value)}
+                                    className="bg-[#180a11] border border-[#381a25] rounded px-1.5 py-1 text-[10px] text-white font-mono"
+                                  />
+                                  <button
+                                    onClick={() => handleRescheduleAssignment(a.id)}
+                                    className="p-1 rounded bg-gold-500 text-dark-950"
+                                    title="Guardar (vacío = activar ahora)"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => { setReschedulingId(null); setRescheduleValue(''); }}
+                                    className="p-1 rounded bg-[#1b0c13] text-gray-400"
+                                    title="Cancelar"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
                             </td>
                             <td className="py-3 text-gray-400 font-mono text-[11px]">
                               {a.dueDate ? new Date(a.dueDate).toLocaleDateString('es-ES') : '—'}
@@ -1619,6 +1782,27 @@ export function MemberCrmModal({
                             </td>
                             <td className="py-3 text-right">
                               <div className="flex items-center justify-end gap-1.5">
+                                {isScheduled ? (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setReschedulingId(reschedulingId === a.id ? null : a.id);
+                                        setRescheduleValue(a.startDate ? new Date(new Date(a.startDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '');
+                                      }}
+                                      className="p-1.5 rounded text-purple-300 hover:text-white bg-purple-500/20 transition-colors"
+                                      title="Reprogramar"
+                                    >
+                                      <Clock className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleUpdateAssignmentStatus(a.id, 'ACTIVE')}
+                                      className="p-1.5 rounded text-gray-400 hover:text-emerald-300 bg-[#1b0c13] transition-colors"
+                                      title="Activar ahora"
+                                    >
+                                      <Send className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                ) : (
                                 <button
                                   onClick={() => handleUpdateAssignmentStatus(a.id, isDone ? 'ASSIGNED' : 'COMPLETED')}
                                   className={`p-1.5 rounded transition-colors ${
@@ -1630,6 +1814,7 @@ export function MemberCrmModal({
                                 >
                                   <Check className="w-3.5 h-3.5" />
                                 </button>
+                                )}
                                 <button
                                   onClick={() => handleDeleteAssignment(a.id)}
                                   className="p-1.5 rounded text-gray-400 hover:text-red-400 bg-[#1b0c13] transition-colors"
@@ -2156,41 +2341,114 @@ export function MemberCrmModal({
                 <Lock className="w-4 h-4 text-gold-400" /> Notas Confidenciales de la Princesa
               </h4>
 
+              {(member?.notes || []).length > 3 && (
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Buscar en las notas..."
+                    value={noteSearch}
+                    onChange={e => setNoteSearch(e.target.value)}
+                    className="w-full bg-[#0e0408] border border-[#3e1b29] rounded-lg pl-9 pr-3 py-2 text-xs text-white"
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
-                {(member?.notes || []).length === 0 ? (
-                  <p className="text-xs font-mono text-gray-500 bg-[#170a10] p-4 rounded-xl">Sin notas registradas</p>
-                ) : (
-                  (member.notes || []).map(n => (
+                {(() => {
+                  const allNotes = member?.notes || [];
+                  const term = noteSearch.trim().toLowerCase();
+                  const visibleNotes = term
+                    ? allNotes.filter(n => (n.note || '').toLowerCase().includes(term))
+                    : allNotes;
+
+                  if (allNotes.length === 0) {
+                    return <p className="text-xs font-mono text-gray-500 bg-[#170a10] p-4 rounded-xl">Sin notas registradas</p>;
+                  }
+                  if (visibleNotes.length === 0) {
+                    return <p className="text-xs font-mono text-gray-500 bg-[#170a10] p-4 rounded-xl">Ninguna nota coincide con la búsqueda</p>;
+                  }
+
+                  return visibleNotes.map(n => (
                     <div key={n.id} className="p-3 bg-[#170a10] border border-[#2e151f] rounded-xl flex items-start justify-between gap-3">
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <span className="text-[10px] font-mono text-gray-400 block mb-1">
                           {new Date(n.createdAt).toLocaleString('es-ES')} · por {n.author || 'Princesa'}
                         </span>
-                        <p className="text-xs text-white font-sans whitespace-pre-wrap">{n.note}</p>
+                        {editingNoteId === n.id ? (
+                          <div className="space-y-2">
+                            <textarea
+                              autoFocus
+                              rows={Math.min(14, Math.max(4, editingNoteText.split('\n').length + 1))}
+                              value={editingNoteText}
+                              onChange={e => setEditingNoteText(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSaveNoteEdit();
+                                if (e.key === 'Escape') { e.stopPropagation(); handleCancelEditNote(); }
+                              }}
+                              className="w-full bg-[#0e0408] border border-gold-500/50 rounded-lg px-3 py-2 text-xs text-white font-sans resize-y custom-scrollbar"
+                            />
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={handleCancelEditNote}
+                                className="py-1 px-3 rounded-lg bg-dark-900 border border-gray-700 text-gray-300 text-[11px] font-bold"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleSaveNoteEdit}
+                                disabled={savingNoteEdit || !editingNoteText.trim()}
+                                className="py-1 px-3 rounded-lg bg-gold-500 hover:bg-gold-400 disabled:opacity-50 text-dark-950 font-bold text-[11px] uppercase"
+                              >
+                                {savingNoteEdit ? 'Guardando...' : 'Guardar'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-white font-sans whitespace-pre-wrap break-words">{n.note}</p>
+                        )}
                       </div>
-                      <button onClick={() => handleDeleteNote(n.id)} className="text-gray-500 hover:text-red-400">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {editingNoteId !== n.id && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button onClick={() => handleStartEditNote(n)} className="text-gray-500 hover:text-gold-300" title="Editar nota">
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => handleDeleteNote(n.id)} className="text-gray-500 hover:text-red-400" title="Eliminar nota">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  ))
-                )}
+                  ));
+                })()}
               </div>
 
-              <form onSubmit={handleAddNote} className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Escribir nota confidencial sobre este sumiso..."
+              <form onSubmit={handleAddNote} className="space-y-2">
+                <textarea
+                  rows={4}
+                  placeholder="Escribir nota confidencial sobre este sumiso... (Ctrl+Enter para guardar)"
                   value={newNote}
                   onChange={e => setNewNote(e.target.value)}
-                  className="flex-1 bg-[#0e0408] border border-[#3e1b29] rounded-lg px-3 py-2 text-xs text-white"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      handleAddNote(e);
+                    }
+                  }}
+                  className="w-full bg-[#0e0408] border border-[#3e1b29] focus:border-gold-500/60 rounded-lg px-3 py-2 text-xs text-white font-sans resize-y custom-scrollbar"
                 />
-                <button
-                  type="submit"
-                  disabled={addingNote}
-                  className="py-2 px-4 rounded-lg bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs uppercase"
-                >
-                  Guardar Nota
-                </button>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-gray-500">{newNote.length} caracteres · sin límite de longitud</span>
+                  <button
+                    type="submit"
+                    disabled={addingNote || !newNote.trim()}
+                    className="py-2 px-4 rounded-lg bg-gold-500 hover:bg-gold-400 disabled:opacity-50 text-dark-950 font-bold text-xs uppercase"
+                  >
+                    {addingNote ? 'Guardando...' : 'Guardar Nota'}
+                  </button>
+                </div>
               </form>
             </div>
           )}
@@ -2414,22 +2672,35 @@ export function MemberCrmModal({
               </div>
 
               <div>
+                <label className="block text-[10px] font-mono text-red-300 uppercase mb-1">Límites</label>
+                <textarea
+                  rows={2}
+                  value={formData.limits}
+                  onChange={e => handleFieldChange('limits', e.target.value)}
+                  placeholder="Separados por comas o saltos de línea. Ej: sin marcas visibles, nada de fotos con cara"
+                  className="w-full bg-[#180a11] border border-red-900/50 rounded-lg px-3 py-2 text-xs text-white resize-y"
+                />
+              </div>
+
+              <div>
                 <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Fetiches</label>
-                <input
-                  type="text"
+                <textarea
+                  rows={2}
                   value={formData.fetishes}
                   onChange={e => handleFieldChange('fetishes', e.target.value)}
-                  className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
+                  placeholder="Separados por comas o saltos de línea"
+                  className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white resize-y"
                 />
               </div>
 
               <div>
                 <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Triggers</label>
-                <input
-                  type="text"
+                <textarea
+                  rows={2}
                   value={formData.triggers}
                   onChange={e => handleFieldChange('triggers', e.target.value)}
-                  className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
+                  placeholder="Separados por comas o saltos de línea"
+                  className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white resize-y"
                 />
               </div>
 
@@ -2501,7 +2772,7 @@ export function MemberCrmModal({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Días límite</label>
+                  <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Días de plazo</label>
                   <input
                     type="number"
                     min="1"
@@ -2537,6 +2808,35 @@ export function MemberCrmModal({
                 </div>
               </div>
 
+              <div className="rounded-lg border border-gold-500/30 bg-gold-950/10 p-3 space-y-1.5">
+                <label className="flex items-center gap-1.5 text-[10px] font-mono text-gold-300 uppercase">
+                  <Clock className="w-3 h-3" /> Programar inicio (opcional)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="datetime-local"
+                    value={newObjective.startDate}
+                    min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                    onChange={e => setNewObjective({ ...newObjective, startDate: e.target.value })}
+                    className="flex-1 bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white font-mono"
+                  />
+                  {newObjective.startDate && (
+                    <button
+                      type="button"
+                      onClick={() => setNewObjective({ ...newObjective, startDate: '' })}
+                      className="text-[11px] font-mono text-gray-400 hover:text-white underline"
+                    >
+                      Quitar
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] font-mono text-gray-500">
+                  {newObjective.startDate
+                    ? 'El sumiso no verá la tarea hasta esa fecha; el plazo se cuenta desde entonces.'
+                    : 'Vacío = se asigna y se muestra al instante.'}
+                </p>
+              </div>
+
               <div>
                 <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Instrucciones Específicas</label>
                 <textarea
@@ -2561,7 +2861,7 @@ export function MemberCrmModal({
                   disabled={addingObjective}
                   className="py-2 px-5 rounded-lg bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs uppercase"
                 >
-                  {addingObjective ? 'Asignando...' : 'Asignar Actividad'}
+                  {addingObjective ? 'Guardando...' : (newObjective.startDate ? 'Programar Actividad' : 'Asignar Actividad')}
                 </button>
               </div>
             </form>

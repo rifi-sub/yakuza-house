@@ -7,6 +7,7 @@ export function KingdomMassAssignModal({ token, members = [], allGroups = [], on
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
   const [dueDays, setDueDays] = useState(3);
+  const [startDate, setStartDate] = useState('');
   const [customInstructions, setCustomInstructions] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -65,6 +66,12 @@ export function KingdomMassAssignModal({ token, members = [], allGroups = [], on
       return;
     }
 
+    const scheduledStart = startDate ? new Date(startDate) : null;
+    if (scheduledStart && (isNaN(scheduledStart.getTime()) || scheduledStart.getTime() <= Date.now())) {
+      alert('La fecha de programación debe ser futura. Déjala vacía para asignar ahora.');
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assign`, {
@@ -80,12 +87,15 @@ export function KingdomMassAssignModal({ token, members = [], allGroups = [], on
           type: template.type,
           customInstructions: customInstructions.trim() || template.instructions,
           dueDays,
+          ...(scheduledStart && { startDate: scheduledStart.toISOString() }),
           pointsAwarded: template.pointsValue
         })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al asignar');
-      alert(`¡Actividad asignada con éxito a ${selectedMemberIds.length} devoto(s)!`);
+      alert(scheduledStart
+        ? `¡Actividad programada para el ${scheduledStart.toLocaleString('es-ES')} para ${selectedMemberIds.length} devoto(s)!`
+        : `¡Actividad asignada con éxito a ${selectedMemberIds.length} devoto(s)!`);
       onSuccess();
     } catch (err) {
       alert(err.message);
@@ -158,6 +168,29 @@ export function KingdomMassAssignModal({ token, members = [], allGroups = [], on
                 className="w-full bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white"
               />
             </div>
+          </div>
+
+          <div className="rounded-lg border border-gold-500/30 bg-gold-950/10 p-3 space-y-1.5">
+            <label className="block text-xs font-mono text-gold-300">Programar inicio (opcional)</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="datetime-local"
+                value={startDate}
+                min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                onChange={e => setStartDate(e.target.value)}
+                className="flex-1 bg-dark-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white font-mono"
+              />
+              {startDate && (
+                <button type="button" onClick={() => setStartDate('')} className="text-[11px] font-mono text-gray-400 hover:text-white underline">
+                  Quitar
+                </button>
+              )}
+            </div>
+            <p className="text-[10px] font-mono text-gray-500">
+              {startDate
+                ? 'Los devotos no verán la tarea hasta esa fecha; el plazo se cuenta desde entonces.'
+                : 'Vacío = se asigna y se muestra al instante.'}
+            </p>
           </div>
 
           {/* Filtros rápidos de selección de miembros */}
