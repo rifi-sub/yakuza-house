@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { API_BASE, getSocketUrl, resolveMediaUrl } from '../../config';
 import { SecureMediaViewer } from './SecureMediaViewer';
+import { ChatAudioPlayer } from './ChatAudioPlayer';
 
 const SUMISO_QUICK_RESPONSES = [
   "✦ Sí, Mi Ama.",
@@ -55,13 +56,7 @@ function OwnAudioPlayer({ message, token }) {
 
   if (blobUrl) {
     return (
-      <audio
-        src={blobUrl}
-        controls
-        autoPlay
-        controlsList="nodownload"
-        className="w-full h-8 mt-2"
-      />
+      <ChatAudioPlayer src={blobUrl} autoPlay noDownload className="w-full h-8 mt-2" />
     );
   }
 
@@ -840,9 +835,8 @@ export function KingdomChatBox({
                           <div className="w-8 h-8 rounded-full bg-gold-500/20 border border-gold-400/40 flex items-center justify-center shrink-0">
                             <Volume2 className="w-4 h-4 text-gold-300" />
                           </div>
-                          <audio
+                          <ChatAudioPlayer
                             src={resolveMediaUrl(msg.mediaUrl)}
-                            controls
                             className="w-full h-8"
                           />
                         </div>
@@ -1083,8 +1077,7 @@ export function KingdomChatBox({
                     </span>
                   </div>
                   {filePreviewUrl && (
-                    <audio
-                      controls
+                    <ChatAudioPlayer
                       src={filePreviewUrl}
                       className="w-full max-w-xs h-9 accent-gold-500 rounded-lg"
                     />
