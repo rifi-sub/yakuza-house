@@ -6,10 +6,11 @@ import {
   Flame, Lock, Layers, Settings, Eye, Check, RefreshCw, Mail, User,
   DollarSign, ArrowUp, ArrowDown, Save, CreditCard, Send, Shield,
   ChevronDown, ChevronUp, ExternalLink, Filter, CheckCircle,
-  BookOpen, ScrollText, MessageSquare, ToggleLeft, ToggleRight, Bookmark, FileText, ArrowLeft
+  BookOpen, ScrollText, MessageSquare, ToggleLeft, ToggleRight, Bookmark, FileText, ArrowLeft, Paperclip
 } from 'lucide-react';
 import { API_BASE, resolveMediaUrl } from '../../config';
 import { KingdomChatBox } from './KingdomChatBox';
+import { TaskMediaGallery, TaskMediaUploader, parseTaskMedia } from './TaskMediaGallery';
 
 const JOURNAL_CATEGORIES = [
   { id: 'ACUERDO', label: 'Acuerdo & Límites', icon: '📜', color: 'border-amber-500/50 text-amber-300 bg-amber-950/40' },
@@ -115,10 +116,16 @@ export function MemberCrmModal({
     pointsAwarded: 20,
     priority: 'MEDIUM',
     customInstructions: '',
-    startDate: ''
+    startDate: '',
+    adminMedia: []
   });
   const [showNewActivityModal, setShowNewActivityModal] = useState(false);
   const [addingObjective, setAddingObjective] = useState(false);
+  // Inspección / gestión de adjuntos multimedia y pruebas de una tarea existente
+  const [inspectingAssignment, setInspectingAssignment] = useState(null);
+  const [editAssignmentMedia, setEditAssignmentMedia] = useState([]);
+  const [editAssignmentFeedback, setEditAssignmentFeedback] = useState('');
+  const [savingAssignmentDetail, setSavingAssignmentDetail] = useState(false);
   // Reprogramación inline de una tarea ya programada
   const [reschedulingId, setReschedulingId] = useState(null);
   const [rescheduleValue, setRescheduleValue] = useState('');
@@ -433,7 +440,8 @@ export function MemberCrmModal({
           status: 'ACTIVE',
           dueDate: dueDate.toISOString(),
           ...(scheduledStart && { startDate: scheduledStart.toISOString() }),
-          priority: newObjective.priority || 'MEDIUM'
+          priority: newObjective.priority || 'MEDIUM',
+          adminMedia: newObjective.adminMedia || []
         })
       });
 
@@ -448,7 +456,8 @@ export function MemberCrmModal({
         pointsAwarded: 20,
         priority: 'MEDIUM',
         customInstructions: '',
-        startDate: ''
+        startDate: '',
+        adminMedia: []
       });
       fetchMemberDetail();
       if (onRefreshList) onRefreshList();
@@ -459,6 +468,40 @@ export function MemberCrmModal({
       alert(err.message);
     } finally {
       setAddingObjective(false);
+    }
+  };
+
+  // Guardar adjuntos y feedback de una asignación existente
+  const handleOpenInspectAssignment = (assignment) => {
+    setInspectingAssignment(assignment);
+    setEditAssignmentMedia(parseTaskMedia(assignment.adminMedia));
+    setEditAssignmentFeedback(assignment.adminFeedback || '');
+  };
+
+  const handleSaveAssignmentDetail = async () => {
+    if (!inspectingAssignment) return;
+    setSavingAssignmentDetail(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/kingdom/admin/activities/assignments/${inspectingAssignment.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          adminMedia: editAssignmentMedia,
+          adminFeedback: editAssignmentFeedback
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Error al guardar cambios de la tarea');
+      setInspectingAssignment(null);
+      fetchMemberDetail();
+      if (onRefreshList) onRefreshList();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSavingAssignmentDetail(false);
     }
   };
 
@@ -1718,10 +1761,38 @@ export function MemberCrmModal({
                       assignments.map(a => {
                         const isDone = a.status === 'COMPLETED' || a.status === 'COMPLETED_ON_TIME';
                         const isScheduled = a.status === 'SCHEDULED';
+                        const adminFilesCount = parseTaskMedia(a.adminMedia).length;
+                        const memberFilesCount = parseTaskMedia(a.memberMedia).length;
                         return (
                           <tr key={a.id} className="hover:bg-white/[0.02] transition-colors">
-                            <td className="py-3 font-semibold text-white max-w-[200px] truncate pr-2">
-                              {a.title}
+                            <td className="py-3 font-semibold text-white max-w-[220px] pr-2">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenInspectAssignment(a)}
+                                className="text-left hover:text-gold-300 transition-colors truncate block max-w-full"
+                                title="Ver detalle, pruebas y adjuntos multimedia"
+                              >
+                                {a.title}
+                              </button>
+                              {(adminFilesCount > 0 || memberFilesCount > 0 || a.memberEvidence) && (
+                                <div className="flex flex-wrap items-center gap-1 mt-1">
+                                  {adminFilesCount > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded bg-gold-500/15 border border-gold-500/30 text-[9px] font-mono text-gold-300">
+                                      📎 {adminFilesCount} Admin
+                                    </span>
+                                  )}
+                                  {memberFilesCount > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-[9px] font-mono text-emerald-300">
+                                      📸 {memberFilesCount} Sumiso
+                                    </span>
+                                  )}
+                                  {a.memberEvidence && memberFilesCount === 0 && (
+                                    <span className="px-1.5 py-0.5 rounded bg-blue-500/15 border border-blue-500/30 text-[9px] font-mono text-blue-300">
+                                      📝 Entrega
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </td>
                             <td className="py-3">
                               <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
@@ -1782,6 +1853,18 @@ export function MemberCrmModal({
                             </td>
                             <td className="py-3 text-right">
                               <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenInspectAssignment(a)}
+                                  className={`p-1.5 rounded transition-colors ${
+                                    (adminFilesCount > 0 || memberFilesCount > 0 || a.memberEvidence)
+                                      ? 'text-gold-300 hover:text-white bg-gold-500/20'
+                                      : 'text-gray-400 hover:text-gold-300 bg-[#1b0c13]'
+                                  }`}
+                                  title="Ver pruebas y gestionar adjuntos multimedia"
+                                >
+                                  <Paperclip className="w-3.5 h-3.5" />
+                                </button>
                                 {isScheduled ? (
                                   <>
                                     <button
@@ -2848,6 +2931,17 @@ export function MemberCrmModal({
                 />
               </div>
 
+              <div className="rounded-lg border border-[#381a25] bg-[#180a11]/70 p-3">
+                <TaskMediaUploader
+                  token={token}
+                  endpoint="/api/kingdom/admin/activities/media/upload"
+                  mediaList={newObjective.adminMedia}
+                  onChange={(list) => setNewObjective({ ...newObjective, adminMedia: list })}
+                  label="Adjuntar multimedia (fotos, vídeos o audios)"
+                  compact
+                />
+              </div>
+
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -2866,6 +2960,110 @@ export function MemberCrmModal({
               </div>
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DETALLE, PRUEBAS Y ADJUNTOS MULTIMEDIA DE TAREA */}
+      {inspectingAssignment && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setInspectingAssignment(null)}
+        >
+          <div
+            className="bg-[#12080c] border border-gold-500/40 rounded-2xl w-full max-w-2xl p-6 space-y-4 shadow-2xl my-auto max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between border-b border-[#2d151e] pb-3 gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-gold-500/20 text-gold-300 border border-gold-500/30">
+                    {inspectingAssignment.type || 'TASK'}
+                  </span>
+                  <span className="text-[10px] font-mono text-gray-400">
+                    +{inspectingAssignment.pointsAwarded || 0} XP
+                  </span>
+                </div>
+                <h3 className="font-brand font-bold text-lg text-white mt-1">{inspectingAssignment.title}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInspectingAssignment(null)}
+                className="text-gray-400 hover:text-white p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {inspectingAssignment.customInstructions && (
+              <div className="p-3 rounded-xl bg-[#180a11] border border-[#381a25] space-y-1">
+                <span className="text-[10px] font-mono uppercase text-gray-400 font-bold">Instrucciones</span>
+                <p className="text-xs text-gray-200 whitespace-pre-line">{inspectingAssignment.customInstructions}</p>
+              </div>
+            )}
+
+            {/* Entrega / Pruebas del Sumiso */}
+            <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30 space-y-3">
+              <span className="text-[11px] font-mono uppercase font-bold text-emerald-300 block">
+                📥 Entrega & Pruebas del Sumiso ({formData.alias || 'Devoto'})
+              </span>
+              {inspectingAssignment.memberEvidence ? (
+                <p className="text-xs text-gray-200 whitespace-pre-line bg-black/40 p-3 rounded-lg border border-emerald-500/20">
+                  {inspectingAssignment.memberEvidence}
+                </p>
+              ) : (
+                <p className="text-xs font-mono text-gray-500 italic">Sin mensaje de entrega escrito.</p>
+              )}
+              {parseTaskMedia(inspectingAssignment.memberMedia).length > 0 ? (
+                <TaskMediaGallery
+                  media={inspectingAssignment.memberMedia}
+                  label="Archivos adjuntos por el sumiso"
+                />
+              ) : (
+                <p className="text-[11px] font-mono text-gray-500 italic">El sumiso aún no ha adjuntado archivos multimedia.</p>
+              )}
+            </div>
+
+            {/* Adjuntos Multimedia de Admin (editables) */}
+            <div className="p-4 rounded-xl bg-[#180a11] border border-gold-500/30 space-y-3">
+              <TaskMediaUploader
+                token={token}
+                endpoint="/api/kingdom/admin/activities/media/upload"
+                mediaList={editAssignmentMedia}
+                onChange={setEditAssignmentMedia}
+                label="Material adjunto por la Princesa / Admin"
+              />
+            </div>
+
+            {/* Feedback de Admin */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-mono text-gold-300 uppercase">👑 Feedback de la Princesa (opcional)</label>
+              <textarea
+                rows={2}
+                value={editAssignmentFeedback}
+                onChange={(e) => setEditAssignmentFeedback(e.target.value)}
+                placeholder="Comentario o valoración sobre la entrega del sumiso..."
+                className="w-full bg-[#180a11] border border-[#381a25] rounded-lg px-3 py-2 text-xs text-white"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-[#2d151e]">
+              <button
+                type="button"
+                onClick={() => setInspectingAssignment(null)}
+                className="py-2 px-4 rounded-lg bg-dark-900 border border-gray-700 text-gray-300 text-xs font-bold"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                disabled={savingAssignmentDetail}
+                onClick={handleSaveAssignmentDetail}
+                className="py-2 px-5 rounded-lg bg-gold-500 hover:bg-gold-400 text-dark-950 font-bold text-xs uppercase disabled:opacity-50"
+              >
+                {savingAssignmentDetail ? 'Guardando...' : 'Guardar Adjuntos y Feedback'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ import {
   User, Shield, Calendar, ArrowRight
 } from 'lucide-react';
 import { API_BASE, safeFetchJson } from '../../config';
+import { TaskMediaGallery, TaskMediaUploader, parseTaskMedia } from './TaskMediaGallery';
 
 export function KingdomAuthModal({ 
   isOpen, 
@@ -266,6 +267,8 @@ export function KingdomAuthModal({
     }
   };
 
+  const [taskMediaById, setTaskMediaById] = useState({});
+
   // Completar Tarea Asignada (Acción del cliente)
   const handleCompleteTask = async (assignmentId) => {
     const token = localStorage.getItem('yakuza_member_token');
@@ -273,16 +276,23 @@ export function KingdomAuthModal({
     setCompletingTaskId(assignmentId);
     setTaskFeedback('');
     try {
+      const mediaForTask = taskMediaById[assignmentId] || [];
       const res = await fetch(`${API_BASE}/api/kingdom/me/assignments/${assignmentId}/complete`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
-        }
+        },
+        body: JSON.stringify({ memberMedia: mediaForTask })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo completar la tarea');
 
+      setTaskMediaById(prev => {
+        const next = { ...prev };
+        delete next[assignmentId];
+        return next;
+      });
       setTaskFeedback('✓ ¡Tarea completada solemnemente! Puntos de devoción acumulados.');
       await fetchMe();
       setTimeout(() => setTaskFeedback(''), 4000);
@@ -891,6 +901,36 @@ export function KingdomAuthModal({
                                     <div className="flex items-center gap-1 text-[10px] text-gray-400 font-mono pt-0.5">
                                       <Calendar className="w-3 h-3 text-gold-400/70" />
                                       <span>Límite: {new Date(task.dueDate).toLocaleDateString()}</span>
+                                    </div>
+                                  )}
+                                  {parseTaskMedia(task.adminMedia).length > 0 && (
+                                    <div className="pt-2">
+                                      <TaskMediaGallery
+                                        media={task.adminMedia}
+                                        label="Material adjunto por la Princesa"
+                                        compact
+                                      />
+                                    </div>
+                                  )}
+                                  {isDone && parseTaskMedia(task.memberMedia).length > 0 && (
+                                    <div className="pt-2">
+                                      <TaskMediaGallery
+                                        media={task.memberMedia}
+                                        label="Tus archivos adjuntos"
+                                        compact
+                                      />
+                                    </div>
+                                  )}
+                                  {!isDone && (
+                                    <div className="pt-2">
+                                      <TaskMediaUploader
+                                        token={localStorage.getItem('yakuza_member_token')}
+                                        endpoint="/api/kingdom/me/assignments/media/upload"
+                                        mediaList={taskMediaById[task.id] || parseTaskMedia(task.memberMedia)}
+                                        onChange={(list) => setTaskMediaById(prev => ({ ...prev, [task.id]: list }))}
+                                        label="Adjuntar pruebas multimedia"
+                                        compact
+                                      />
                                     </div>
                                   )}
                                 </div>

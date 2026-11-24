@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Award, CheckSquare, Square, Calendar, Filter } from 'lucide-react';
 import { API_BASE } from '../../config';
+import { TaskMediaUploader } from './TaskMediaGallery';
 
 export function KingdomMassAssignModal({ token, members = [], allGroups = [], onClose, onSuccess }) {
   const [library, setLibrary] = useState([]);
@@ -9,6 +10,7 @@ export function KingdomMassAssignModal({ token, members = [], allGroups = [], on
   const [dueDays, setDueDays] = useState(3);
   const [startDate, setStartDate] = useState('');
   const [customInstructions, setCustomInstructions] = useState('');
+  const [adminMedia, setAdminMedia] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Filtros locales para selección
@@ -88,7 +90,8 @@ export function KingdomMassAssignModal({ token, members = [], allGroups = [], on
           customInstructions: customInstructions.trim() || template.instructions,
           dueDays,
           ...(scheduledStart && { startDate: scheduledStart.toISOString() }),
-          pointsAwarded: template.pointsValue
+          pointsAwarded: template.pointsValue,
+          adminMedia
         })
       });
       const data = await res.json();
@@ -191,6 +194,17 @@ export function KingdomMassAssignModal({ token, members = [], allGroups = [], on
                 ? 'Los devotos no verán la tarea hasta esa fecha; el plazo se cuenta desde entonces.'
                 : 'Vacío = se asigna y se muestra al instante.'}
             </p>
+          </div>
+
+          <div className="rounded-lg border border-gray-800 bg-dark-950/70 p-3">
+            <TaskMediaUploader
+              token={token}
+              endpoint="/api/kingdom/admin/activities/media/upload"
+              mediaList={adminMedia}
+              onChange={setAdminMedia}
+              label="Adjuntar multimedia para este lote (opcional)"
+              compact
+            />
           </div>
 
           {/* Filtros rápidos de selección de miembros */}

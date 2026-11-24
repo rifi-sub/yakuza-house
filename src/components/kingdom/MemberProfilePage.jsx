@@ -8,6 +8,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE, safeFetchJson } from '../../config';
 import { KingdomChatBox } from './KingdomChatBox';
+import { TaskMediaGallery, TaskMediaUploader, parseTaskMedia } from './TaskMediaGallery';
 
 const JOURNAL_CATEGORIES = [
   { id: 'ACUERDO', label: 'Acuerdo & Límites', icon: '📜', color: 'border-amber-500/50 text-amber-300 bg-amber-950/40' },
@@ -33,6 +34,7 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
   // Tareas states
   const [completingTaskId, setCompletingTaskId] = useState(null);
   const [taskEvidence, setTaskEvidence] = useState('');
+  const [taskMedia, setTaskMedia] = useState([]);
   const [taskFilter, setTaskFilter] = useState('pending'); // 'pending', 'completed', 'all'
   const [submittingTask, setSubmittingTask] = useState(false);
   const [taskFeedback, setTaskFeedback] = useState('');
@@ -277,7 +279,7 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`
           },
-          body: JSON.stringify({ evidence: evidenceContent, memberEvidence: evidenceContent })
+          body: JSON.stringify({ evidence: evidenceContent, memberEvidence: evidenceContent, memberMedia: taskMedia })
         });
       } catch (putErr) {
         // Si PUT da 404, reintentar con POST
@@ -288,7 +290,7 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`
             },
-            body: JSON.stringify({ evidence: evidenceContent, memberEvidence: evidenceContent })
+            body: JSON.stringify({ evidence: evidenceContent, memberEvidence: evidenceContent, memberMedia: taskMedia })
           });
         } else {
           throw putErr;
@@ -298,6 +300,7 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
       setTaskFeedback('✓ Tarea completada y entregada solemnemente a la Princesa.');
       setCompletingTaskId(null);
       setTaskEvidence('');
+      setTaskMedia([]);
       
       // Actualización optimista inmediata en memoria basada en XP (meta 5000 XP para ascenso)
       setMember(prev => {
@@ -307,7 +310,7 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
         const newXp = (prev.experiencePoints || 0) + addedXp;
         const newProg = Math.min(100, Math.round((newXp / 5000) * 100));
         const updatedAssignments = (prev.assignments || []).map(a => 
-          a.id === taskId ? { ...a, status: 'COMPLETED_ON_TIME', completedAt: new Date().toISOString(), memberEvidence: evidenceContent } : a
+          a.id === taskId ? { ...a, status: 'COMPLETED_ON_TIME', completedAt: new Date().toISOString(), memberEvidence: evidenceContent, memberMedia: JSON.stringify(taskMedia) } : a
         );
         return {
           ...prev,
@@ -768,6 +771,34 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
                                   {task.customInstructions || task.template?.instructions || 'Cumple con devoción este mandato de la Casa.'}
                                 </div>
 
+                                {parseTaskMedia(task.adminMedia).length > 0 && (
+                                  <div className="p-3 rounded-xl bg-gold-500/5 border border-gold-500/25">
+                                    <TaskMediaGallery
+                                      media={task.adminMedia}
+                                      label="Material adjunto por la Princesa"
+                                      compact
+                                    />
+                                  </div>
+                                )}
+
+                                {(task.memberEvidence || parseTaskMedia(task.memberMedia).length > 0) && (
+                                  <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/25 space-y-2">
+                                    {task.memberEvidence && (
+                                      <p className="text-xs text-emerald-200/90 whitespace-pre-line">
+                                        <span className="text-[10px] font-mono uppercase font-bold text-emerald-400 block mb-0.5">📝 Tu entrega:</span>
+                                        {task.memberEvidence}
+                                      </p>
+                                    )}
+                                    {parseTaskMedia(task.memberMedia).length > 0 && (
+                                      <TaskMediaGallery
+                                        media={task.memberMedia}
+                                        label="Tus archivos adjuntos"
+                                        compact
+                                      />
+                                    )}
+                                  </div>
+                                )}
+
                                 {task.adminFeedback && (
                                   <div className="p-3 rounded-xl bg-gold-500/10 border border-gold-500/30 text-xs text-gold-300 space-y-1">
                                     <span className="text-[10px] font-mono uppercase font-bold text-gold-400 block">👑 Feedback de la Princesa:</span>
@@ -790,10 +821,23 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
                                         placeholder="Escribe aquí los detalles de la entrega, enlace de audio/captura o confirmación..."
                                         className="w-full bg-dark-950 border border-gray-800 rounded-lg p-2.5 text-xs text-white"
                                       />
+                                      <div className="p-2.5 rounded-lg bg-dark-950/80 border border-gold-500/20">
+                                        <TaskMediaUploader
+                                          token={localStorage.getItem('yakuza_member_token')}
+                                          endpoint="/api/kingdom/me/assignments/media/upload"
+                                          mediaList={taskMedia}
+                                          onChange={setTaskMedia}
+                                          label="Adjuntar pruebas (fotos, vídeos o audios)"
+                                          compact
+                                        />
+                                      </div>
                                       <div className="flex gap-2 justify-end">
                                         <button
                                           type="button"
-                                          onClick={() => setCompletingTaskId(null)}
+                                          onClick={() => {
+                                            setCompletingTaskId(null);
+                                            setTaskMedia([]);
+                                          }}
                                           className="py-1.5 px-3 rounded text-xs text-gray-400 border border-gray-800"
                                         >
                                           Cancelar
@@ -813,7 +857,8 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
                                       type="button"
                                       onClick={() => {
                                         setCompletingTaskId(task.id);
-                                        setTaskEvidence('');
+                                        setTaskEvidence(task.memberEvidence || '');
+                                        setTaskMedia(parseTaskMedia(task.memberMedia));
                                       }}
                                       className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 text-dark-950 font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-md"
                                     >
