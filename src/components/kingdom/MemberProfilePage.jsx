@@ -3,11 +3,12 @@ import {
   Castle, Crown, CheckCircle, ShieldAlert, Key, LogIn, Sparkles, Send, 
   Lock, BookOpen, Clock, Award, Check, RefreshCw, AlertCircle, ChevronRight, 
   User, Shield, Calendar, ArrowRight, ArrowLeft, ExternalLink, ScrollText,
-  FileText, MessageSquare, AlertTriangle, Star, Zap, MessageCircle
+  FileText, MessageSquare, AlertTriangle, Star, Zap, MessageCircle, Trophy, CreditCard
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE, safeFetchJson } from '../../config';
 import { KingdomChatBox } from './KingdomChatBox';
+import { KingdomRankingSection } from './KingdomRankingSection';
 import { TaskMediaGallery, TaskMediaUploader, parseTaskMedia } from './TaskMediaGallery';
 
 const JOURNAL_CATEGORIES = [
@@ -600,8 +601,18 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
                     </div>
                   </div>
 
-                  {/* STATS RÁPIDOS */}
-                  <div className="flex items-center gap-3 z-10">
+                  {/* STATS RÁPIDOS (RESUMEN ECONÓMICO + XP + PROGRESO EN PARTE SUPERIOR DERECHA) */}
+                  <div className="flex flex-wrap items-center gap-3 z-10">
+                    <div className="bg-dark-950/90 border border-gold-400/40 rounded-2xl p-4 text-center min-w-[125px] shadow-lg shadow-gold-500/5">
+                      <span className="text-[10px] font-mono text-gold-300 uppercase tracking-wider block">Total Aportado</span>
+                      <span className="font-serif font-black text-xl text-white">
+                        {Number(member.totalRevenue || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}€
+                      </span>
+                      <span className="text-[9px] font-mono text-emerald-400 block mt-0.5">
+                        {(member.tributes || []).length} pagos confirmados
+                      </span>
+                    </div>
+
                     <div className="bg-dark-950/80 border border-gold-500/20 rounded-2xl p-4 text-center min-w-[105px]">
                       <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Experiencia</span>
                       <span className="font-serif font-black text-xl text-gold-400">{member.experiencePoints || 0} XP</span>
@@ -636,7 +647,19 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
                 </div>
 
                 {/* SELECTOR DE SECCIONES (TABS DE PANTALLA COMPLETA) */}
-                <div className="flex items-center gap-2 border-b border-gray-800 pb-2">
+                <div className="flex flex-wrap items-center gap-2 border-b border-gray-800 pb-2">
+                  <button
+                    onClick={() => setActiveSection('ranking')}
+                    className={`py-2.5 px-5 rounded-xl font-mono text-xs uppercase tracking-wider font-bold transition-all flex items-center gap-2 ${
+                      activeSection === 'ranking'
+                        ? 'bg-gradient-to-r from-gold-500 to-amber-400 text-dark-950 shadow-lg shadow-gold-500/25'
+                        : 'bg-dark-950 text-gold-300 hover:text-white border border-gold-500/40'
+                    }`}
+                  >
+                    <Trophy className="w-4 h-4" />
+                    <span>Ranking del Reino</span>
+                  </button>
+
                   <button
                     onClick={() => setActiveSection('tasks')}
                     className={`py-2.5 px-5 rounded-xl font-mono text-xs uppercase tracking-wider font-bold transition-all flex items-center gap-2 ${
@@ -671,6 +694,18 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
                   >
                     <ScrollText className="w-4 h-4" />
                     <span>Normas y Privilegios</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveSection('payments')}
+                    className={`py-2.5 px-5 rounded-xl font-mono text-xs uppercase tracking-wider font-bold transition-all flex items-center gap-2 ${
+                      activeSection === 'payments'
+                        ? 'bg-gold-500 text-dark-950 shadow-lg shadow-gold-500/20'
+                        : 'bg-dark-950 text-gray-400 hover:text-white border border-gray-800'
+                    }`}
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>Historial de Pagos ({(member.tributes || []).length})</span>
                   </button>
 
                   <button
@@ -1122,6 +1157,83 @@ export function MemberProfilePage({ currentMember, onAuthSuccess, onLogout }) {
                       heightClass="h-[600px] md:h-[680px]"
                       showQuickReplies={true}
                     />
+                  </div>
+                )}
+
+                {/* ========================================================================= */}
+                {/* SECCIÓN RANKING DEL REINO                                                 */}
+                {/* ========================================================================= */}
+                {activeSection === 'ranking' && (
+                  <KingdomRankingSection
+                    memberToken={localStorage.getItem('yakuza_member_token')}
+                    compact={true}
+                  />
+                )}
+
+                {/* ========================================================================= */}
+                {/* SECCIÓN HISTORIAL DE PAGOS CONFIRMADOS                                    */}
+                {/* ========================================================================= */}
+                {activeSection === 'payments' && (
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-dark-950/70 p-5 rounded-2xl border border-gold-500/25">
+                      <div>
+                        <h3 className="font-serif font-bold text-lg text-white flex items-center gap-2">
+                          <CreditCard className="w-5 h-5 text-gold-400" />
+                          Historial de Pagos y Aportaciones
+                        </h3>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Todas tus compras, suscripciones, contenido personalizado, audiencias, tributos, regalos, facturas y crowdfunding confirmados.
+                        </p>
+                      </div>
+                      <div className="px-4 py-2 rounded-xl bg-dark-900 border border-gold-500/40 text-right">
+                        <span className="text-[10px] font-mono uppercase text-gray-400 block">Acumulado Total</span>
+                        <span className="font-serif font-black text-xl text-gold-300">
+                          {Number(member.totalRevenue || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                        </span>
+                      </div>
+                    </div>
+
+                    {(member.tributes || []).length === 0 ? (
+                      <div className="p-10 text-center rounded-2xl bg-dark-950/60 border border-gray-800 text-gray-400 font-mono text-xs">
+                        Aún no tienes pagos confirmados registrados en tu historial.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-2xl border border-gray-800 bg-dark-950/80">
+                        <table className="w-full text-left text-xs font-mono">
+                          <thead className="bg-dark-900 text-gray-400 uppercase text-[10px] border-b border-gray-800">
+                            <tr>
+                              <th className="p-3.5">Fecha</th>
+                              <th className="p-3.5">Concepto</th>
+                              <th className="p-3.5">Tipo</th>
+                              <th className="p-3.5">Método</th>
+                              <th className="p-3.5 text-right">Importe</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-800/80">
+                            {(member.tributes || []).map((t) => (
+                              <tr key={t.id} className="hover:bg-white/[0.02]">
+                                <td className="p-3.5 text-gray-400 whitespace-nowrap">
+                                  {new Date(t.date || t.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </td>
+                                <td className="p-3.5">
+                                  <span className="font-sans font-bold text-white block">{t.concept}</span>
+                                  {t.reference && <span className="text-[10px] text-gray-500">Ref: {t.reference}</span>}
+                                </td>
+                                <td className="p-3.5">
+                                  <span className="px-2 py-0.5 rounded bg-dark-900 border border-gold-500/30 text-gold-300 text-[10px] uppercase">
+                                    {t.sourceType || 'PAGO'}
+                                  </span>
+                                </td>
+                                <td className="p-3.5 text-gray-300">{t.paymentMethod}</td>
+                                <td className="p-3.5 text-right font-bold text-emerald-400 whitespace-nowrap">
+                                  +{Number(t.amount || 0).toFixed(2)}€
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 )}
 

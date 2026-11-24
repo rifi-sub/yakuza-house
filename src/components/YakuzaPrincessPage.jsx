@@ -7,6 +7,7 @@ import { resolveMediaUrl } from '../config';
 import princessVisionBanner from '../assets/princess-vision-banner.png';
 import yakuzaPrincessTitleImg from '../assets/yakuza-princess-title.png';
 import { KingdomHallOfFame } from './kingdom/KingdomHallOfFame';
+import { KingdomRankingSection } from './kingdom/KingdomRankingSection';
 
 export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, onOpenKingdomRequest }) {
   const [activeTab, setActiveTab] = useState('normas'); // normas, presentate, reino
@@ -486,10 +487,13 @@ export default function YakuzaPrincessPage({ princessConfig, onNavigateToStore, 
         </div>
       )}
 
-      {/* TAB 3: MI REINO (JERARQUÍA Y CARTAS FLIP 3D) */}
+      {/* TAB 3: MI REINO (RANKING DESTACADO + JERARQUÍA Y CARTAS FLIP 3D) */}
       {activeTab === 'reino' && (
-        <div className="space-y-8">
-          <div className="text-center max-w-2xl mx-auto space-y-2">
+        <div className="space-y-12">
+          {/* ELEMENTO VISUALMENTE DESTACADO: RANKING OFICIAL DEL REINO */}
+          <KingdomRankingSection onOpenMemberPortal={() => onOpenKingdomRequest?.('plebeyos')} />
+
+          <div className="text-center max-w-2xl mx-auto space-y-2 pt-4">
             <span className="text-xs font-sans text-gold-400 uppercase tracking-widest block">{kingdomHeaderBadge}</span>
             <h3 className="font-sans font-bold text-2xl text-ivory-100">{kingdomHeaderTitle}</h3>
             <p className="text-xs text-ivory-300 font-sans">

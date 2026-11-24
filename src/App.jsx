@@ -13,6 +13,7 @@ import YakuzaPrincessPage from './components/YakuzaPrincessPage';
 import HowToOrderPage from './components/HowToOrderPage';
 import GiveawayPage from './components/GiveawayPage';
 import { MemberProfilePage } from './components/kingdom/MemberProfilePage';
+import { CrowdfundingSection } from './components/CrowdfundingSection';
 import { Sparkles, Crown, Lock, ShoppingBag, HelpCircle, Search, ArrowRight, Castle, Gift } from 'lucide-react';
 import { API_BASE } from './config';
 
@@ -83,7 +84,9 @@ export default function App() {
   // Fetch Items, Categories, Banner, Launch and Princess Config from backend
   const fetchStoreData = () => {
     setLoadingItems(true);
-    const catQuery = selectedCategory ? `?category=${encodeURIComponent(selectedCategory)}` : '';
+    const catQuery = (selectedCategory && selectedCategory !== '__crowdfunding__')
+      ? `?category=${encodeURIComponent(selectedCategory)}`
+      : '';
     
     Promise.all([
       fetch(`${API_BASE}/api/store/items${catQuery}`).then(r => r.json()).catch(() => []),
@@ -105,14 +108,34 @@ export default function App() {
 
   useEffect(() => {
     fetchStoreData();
-
-    // Comprobar retorno de Stripe Checkout
-    const urlParams = new URLSearchParams(window.location.search);
-    const orderSuccess = urlParams.get('orderSuccess');
-    if (orderSuccess) {
-      navigate(`/pedido/${orderSuccess}`);
-    }
   }, [selectedCategory]);
+
+  // Verificar automáticamente pagos de Stripe al volver (?orderSuccess=... o ?crowdfundingSuccess=...)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const orderSuccess = params.get('orderSuccess');
+    const crowdfundingSuccess = params.get('crowdfundingSuccess');
+
+    if (orderSuccess) {
+      fetch(`${API_BASE}/api/store/orders/${encodeURIComponent(orderSuccess)}/verify-stripe`, { method: 'POST' })
+        .catch(() => {})
+        .finally(() => {
+          navigate(`/pedido/${orderSuccess}`, { replace: true });
+        });
+    } else if (crowdfundingSuccess) {
+      fetch(`${API_BASE}/api/store/crowdfunding/contributions/${encodeURIComponent(crowdfundingSuccess)}/confirm-payment`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+          if (d.verified) {
+            alert('¡Gracias! Tu aportación al crowdfunding ha sido confirmada y registrada automáticamente.');
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          navigate('/tienda', { replace: true });
+        });
+    }
+  }, [location.search]);
 
   // Si estamos en /findreamland preseleccionar categoría findreamland
   useEffect(() => {
@@ -432,6 +455,17 @@ export default function App() {
                   >
                     Todas las categorías ({items.length})
                   </button>
+                  <button
+                    onClick={() => setSelectedCategory('__crowdfunding__')}
+                    className={`py-2 px-5 rounded-full font-sans text-xs uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                      selectedCategory === '__crowdfunding__'
+                        ? 'bg-gradient-to-r from-gold-500 to-amber-500 text-dark-950 font-extrabold border border-gold-300 shadow-lg shadow-gold-500/30'
+                        : 'bg-dark-950/80 border border-gold-500/40 text-gold-300 hover:text-white hover:border-gold-400'
+                    }`}
+                  >
+                    <Gift className="w-3.5 h-3.5" />
+                    <span>Regalos · Crowdfunding</span>
+                  </button>
                   {categories.map(cat => (
                     <button
                       key={cat.id}
@@ -448,7 +482,13 @@ export default function App() {
                 </div>
               )}
 
+              {/* Sección Crowdfunding de Regalos (visible en su pestaña dedicada, en Adopt a Bill / Regalos, o en Todas) */}
+              {(selectedCategory === '__crowdfunding__' || selectedCategory === 'adopt-a-bill' || selectedCategory === '') && (
+                <CrowdfundingSection currentMember={currentMember} />
+              )}
+
               {/* Grid Artículos */}
+              {selectedCategory !== '__crowdfunding__' && (
               <div>
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8 border-b border-gold-500/20 pb-4">
                   <div>
@@ -480,6 +520,7 @@ export default function App() {
                   </div>
                 )}
               </div>
+              )}
             </section>
           } />
 

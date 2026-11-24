@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Edit, Trash2, Eye, EyeOff, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart, Crown, Users, Castle, BookOpen, Inbox, ShoppingBag, Gift, MessageSquare } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Eye, EyeOff, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Clock, Filter, Lock, Save, Copy, Upload, Image as ImageIcon, X, Heart, Crown, Users, Castle, BookOpen, Inbox, ShoppingBag, Gift, MessageSquare, Trophy, Truck } from 'lucide-react';
 import { API_BASE, resolveMediaUrl, safeFetchJson } from '../config';
 import princessVideo from '../princess-yakuza.mp4';
 import { MediaPickerModal } from './MediaPickerModal';
@@ -9,6 +9,10 @@ import { KingdomActivitiesView } from './kingdom/KingdomActivitiesView';
 import { KingdomRequestsView } from './kingdom/KingdomRequestsView';
 import { KingdomHallOfFameAdmin } from './kingdom/KingdomHallOfFameAdmin';
 import { KingdomAdminChatView } from './kingdom/KingdomAdminChatView';
+import { KingdomRankingAdmin } from './kingdom/KingdomRankingAdmin';
+import { CrowdfundingAdmin } from './CrowdfundingAdmin';
+import { ShippingMethodsAdmin } from './ShippingMethodsAdmin';
+import { ProductTypeConfigEditor, parsePurchaseConfig } from './ProductTypeConfigEditor';
 import { MemberCrmModal } from './kingdom/MemberCrmModal';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -22,6 +26,10 @@ const ROUTE_TAB_MAP = {
   'extras': 'extras',
   'paqueteria': 'packaging',
   'packaging': 'packaging',
+  'envios': 'shipping',
+  'shipping': 'shipping',
+  'crowdfunding': 'crowdfunding',
+  'regalos': 'crowdfunding',
   'crm': 'kingdom_crm',
   'chat': 'kingdom_chat',
   'mensajes': 'kingdom_chat',
@@ -29,6 +37,7 @@ const ROUTE_TAB_MAP = {
   'actividades': 'kingdom_activities',
   'solicitudes': 'kingdom_requests',
   'muro-fama': 'kingdom_hall_of_fame',
+  'ranking': 'kingdom_ranking',
   'sorteo': 'launch',
   'launch': 'launch',
   'princess': 'princess',
@@ -43,12 +52,15 @@ const TAB_ROUTE_MAP = {
   'categories': '/admin/categorias',
   'extras': '/admin/extras',
   'packaging': '/admin/paqueteria',
+  'shipping': '/admin/envios',
+  'crowdfunding': '/admin/crowdfunding',
   'kingdom_crm': '/admin/crm',
   'kingdom_chat': '/admin/chat',
   'kingdom_hierarchy': '/admin/jerarquia',
   'kingdom_activities': '/admin/actividades',
   'kingdom_requests': '/admin/solicitudes',
   'kingdom_hall_of_fame': '/admin/muro-fama',
+  'kingdom_ranking': '/admin/ranking',
   'launch': '/admin/sorteo',
   'princess': '/admin/princess',
   'banner': '/admin/banner',
@@ -971,7 +983,9 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
       subTabs: [
         { id: 'orders', label: `Pedidos (${orders.length})`, icon: Package, badge: pendingOrdersCount > 0 ? `${pendingOrdersCount}` : null },
         { id: 'items', label: `Artículos & Catálogo (${items.length})`, icon: Sparkles },
+        { id: 'crowdfunding', label: 'Crowdfunding / Regalos', icon: Gift },
         { id: 'categories', label: `Categorías (${categories.length})`, icon: Filter },
+        { id: 'shipping', label: 'Métodos de Envío', icon: Truck },
         { id: 'extras', label: `Extras (${extras.length})`, icon: Plus },
         { id: 'packaging', label: `Embalaje (${packaging.length})`, icon: Package }
       ]
@@ -981,6 +995,7 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
       label: 'El Reino (Club Privado)',
       icon: Castle,
       subTabs: [
+        { id: 'kingdom_ranking', label: 'Ranking del Reino', icon: Trophy },
         { id: 'kingdom_crm', label: 'CRM Miembros', icon: Users },
         { id: 'kingdom_chat', label: 'Chat y Mensajería', icon: MessageSquare },
         { id: 'kingdom_hierarchy', label: 'Jerarquía Reino', icon: Castle },
@@ -1258,6 +1273,8 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
                   description: '',
                   conditionsHtml: '<h3>Condiciones Específicas</h3><p>Escribe aquí las condiciones del artículo, plazos y empaquetado libremente...</p>',
                   basePrice: 60,
+                  productType: 'PHYSICAL',
+                  purchaseConfig: {},
                   status: 'AVAILABLE',
                   stock: 1,
                   categoryId: '',
@@ -1343,6 +1360,8 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
                             description: item.description,
                             conditionsHtml: item.conditionsHtml || '',
                             basePrice: item.basePrice,
+                            productType: item.productType || 'PHYSICAL',
+                            purchaseConfig: parsePurchaseConfig(item.purchaseConfig),
                             status: item.status,
                             stock: item.stock || 1,
                             categoryId: item.categoryId || '',
@@ -2807,6 +2826,15 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
                 </label>
               </div>
 
+              {/* TIPO DE PRODUCTO Y OPCIONES DE COMPRA ADAPTADAS */}
+              <ProductTypeConfigEditor
+                productType={itemForm.productType || 'PHYSICAL'}
+                purchaseConfig={itemForm.purchaseConfig || {}}
+                basePrice={itemForm.basePrice}
+                onChangeType={(nextType) => setItemForm({ ...itemForm, productType: nextType })}
+                onChangeConfig={(nextCfg) => setItemForm({ ...itemForm, purchaseConfig: nextCfg })}
+              />
+
               {/* SECCIÓN DE FOTOGRAFÍAS Y VÍDEOS */}
               <div className="bg-dark-950 p-4 rounded-xl border border-gray-800 space-y-3">
                 <div className="flex items-center justify-between">
@@ -3773,6 +3801,18 @@ export default function AdminPanel({ onBackToStore, onRefreshData }) {
 
       {activeTab === 'kingdom_hall_of_fame' && (
         <KingdomHallOfFameAdmin token={token} />
+      )}
+
+      {activeTab === 'kingdom_ranking' && (
+        <KingdomRankingAdmin token={token} />
+      )}
+
+      {activeTab === 'crowdfunding' && (
+        <CrowdfundingAdmin token={token} />
+      )}
+
+      {activeTab === 'shipping' && (
+        <ShippingMethodsAdmin token={token} />
       )}
 
     </div>
